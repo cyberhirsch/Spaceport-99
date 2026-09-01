@@ -1,6 +1,7 @@
 import {
   BUILDABLE,
   DECK_WIDTH,
+  WING,
   MAX_LEVEL,
   MAX_MERGE,
   buildCost,
@@ -12,11 +13,13 @@ import {
   powerDraw,
   staffSlots,
   storageBonus,
+  touchesLift,
   upgradeCost,
-} from './modules'
-import { MAX_STAT, effectiveness, grantXp, makeCrew, rollStats, uid } from './crew'
-import { incidentDef } from './incidents'
-import { RESOURCE_INFO } from './types'
+  wingOf,
+} from './modules.ts'
+import { MAX_STAT, effectiveness, grantXp, makeCrew, rollStats, uid } from './crew.ts'
+import { incidentDef } from './incidents.ts'
+import { RESOURCE_INFO } from './types.ts'
 import type {
   Crew,
   ModuleDef,
@@ -27,9 +30,9 @@ import type {
   ResourceKey,
   StatKey,
   StationModule,
-} from './types'
+} from './types.ts'
 
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 export const BASE_CREW_CAP = 8
 export const BASE_STORAGE = 220
@@ -147,14 +150,14 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     credits: 500,
     resources: { power: 140, air: 140, food: 140 },
     modules: [
-      makeModule('reactor', 0, 0),
-      makeModule('atmospherics', 0, 1),
-      makeModule('hydroponics', 0, 2),
+      makeModule('atmospherics', 0, WING - 1),
+      makeModule('reactor', 0, WING),
+      makeModule('hydroponics', 0, WING + 1),
     ],
     crew: [],
     incidents: [],
     log: [],
-    decks: 2,
+    decks: 1,
     lastTick: Date.now(),
     elapsed: 0,
     nextIncidentIn: 150,
@@ -182,9 +185,22 @@ export const canBuildAt = (s: GameState, deck: number, col: number): boolean => 
   if (deck < 0 || deck >= s.decks) return false
   if (col < 0 || col >= DECK_WIDTH) return false
   if (moduleAt(s, deck, col)) return false
-  // Rooms must touch the docking spine or an existing room on the same deck.
-  if (col === 0) return true
-  return Boolean(moduleAt(s, deck, col - 1)) || Boolean(moduleAt(s, deck, col + 1))
+  // Every wing hangs off the lift shaft and grows outward from it.
+  if (touchesLift(col)) return true
+  return wingOf(col) === 'port'
+    ? Boolean(moduleAt(s, deck, col + 1))
+    : Boolean(moduleAt(s, deck, col - 1))
+}
+
+/**
+ * Only the room at the outer end of a run can be scrapped. Cutting one out of
+ * the middle would strand everything beyond it with no corridor to the lift.
+ */
+export const canDemolish = (s: GameState, m: StationModule): boolean => {
+  if (s.incidents.some((i) => i.moduleId === m.id)) return false
+  return wingOf(m.col) === 'port'
+    ? !moduleAt(s, m.deck, m.col - 1)
+    : !moduleAt(s, m.deck, m.col + m.width)
 }
 
 export const countOfKind = (s: GameState, kind: ModuleKind): number =>
@@ -194,22 +210,15 @@ export const countOfKind = (s: GameState, kind: ModuleKind): number =>
 const mergeNeighbours = (s: GameState, m: StationModule): StationModule => {
   let current = m
   for (let pass = 0; pass < 2; pass += 1) {
-    const left = s.modules.find(
-      (o) =>
-        o.id !== current.id &&
-        o.deck === current.deck &&
-        o.col + o.width === current.col &&
-        o.kind === current.kind &&
-        o.level === current.level,
-    )
-    const right = s.modules.find(
-      (o) =>
-        o.id !== current.id &&
-        o.deck === current.deck &&
-        o.col === current.col + current.width &&
-        o.kind === current.kind &&
-        o.level === current.level,
-    )
+    // Rooms only merge with their own wing; the lift shaft is a hard divide.
+    const twin = (o: StationModule) =>
+      o.id !== current.id &&
+      o.deck === current.deck &&
+      o.kind === current.kind &&
+      o.level === current.level &&
+      wingOf(o.col) === wingOf(current.col)
+    const left = s.modules.find((o) => twin(o) && o.col + o.width === current.col)
+    const right = s.modules.find((o) => twin(o) && o.col === current.col + current.width)
     const other = left ?? right
     if (!other || other.width + current.width > MAX_MERGE) break
     const merged: StationModule = {
@@ -306,11 +315,17 @@ const jobPriority = (m: StationModule): number => {
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
 
+/**
+ * Neighbours an emergency can spread into: along the same wing, or straight up
+ * and down through the deck. The lift shaft acts as a fire break.
+ */
 const adjacentModules = (s: GameState, m: StationModule): StationModule[] =>
   s.modules.filter(
     (o) =>
       o.id !== m.id &&
-      ((o.deck === m.deck && (o.col + o.width === m.col || o.col === m.col + m.width)) ||
+      ((o.deck === m.deck &&
+        wingOf(o.col) === wingOf(m.col) &&
+        (o.col + o.width === m.col || o.col === m.col + m.width)) ||
         (Math.abs(o.deck - m.deck) === 1 && o.col < m.col + m.width && o.col + o.width > m.col)),
   )
 
@@ -679,8 +694,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
     }
     case 'demolish': {
       const m = s.modules.find((x) => x.id === action.moduleId)
-      if (!m) return state
-      if (s.incidents.some((i) => i.moduleId === m.id)) return state
+      if (!m || !canDemolish(s, m)) return state
       for (const id of [...m.staff]) unassign(s, id)
       s.modules = s.modules.filter((x) => x.id !== m.id)
       const refund = Math.round(buildCost(m.kind, Math.max(0, countOfKind(s, m.kind))) * 0.5 * m.width)
@@ -809,4 +823,4 @@ export const reducer = (state: GameState, action: Action): GameState => {
   return s
 }
 
-export { BUILDABLE, DECK_WIDTH, MAX_LEVEL, buildCost, deckCost, def, staffSlots, upgradeCost }
+export { BUILDABLE, DECK_WIDTH, MAX_LEVEL, WING, buildCost, deckCost, def, staffSlots, upgradeCost, wingOf }

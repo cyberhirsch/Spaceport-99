@@ -1,4 +1,4 @@
-import { STAT_KEYS, type Crew, type StatKey, type Stats } from './types'
+import { STAT_KEYS, type Crew, type StatKey, type Stats } from './types.ts'
 
 const FIRST = [
   'Ada', 'Bex', 'Cyrus', 'Dara', 'Emil', 'Fenn', 'Greer', 'Halcyon', 'Ilse', 'Juno',

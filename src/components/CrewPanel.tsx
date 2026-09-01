@@ -1,10 +1,10 @@
-import { BROADCAST_COST, def } from '../game/engine'
-import type { Derived } from '../game/engine'
-import { xpForLevel } from '../game/crew'
-import type { Crew, GameState } from '../game/types'
-import type { DragState } from '../hooks/useDragAssign'
-import { CrewAvatar } from './CrewAvatar'
-import { hpStyle } from './meters'
+import { BROADCAST_COST, def } from '../game/engine.ts'
+import type { Derived } from '../game/engine.ts'
+import { xpForLevel } from '../game/crew.ts'
+import type { Crew, GameState } from '../game/types.ts'
+import type { DragState } from '../hooks/useDragAssign.ts'
+import { CrewAvatar } from './CrewAvatar.tsx'
+import { hpStyle } from './meters.ts'
 
 interface Props {
   state: GameState

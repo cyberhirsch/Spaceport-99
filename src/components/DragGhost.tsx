@@ -1,7 +1,7 @@
-import type { DragState } from '../hooks/useDragAssign'
-import type { GameState } from '../game/types'
-import { def } from '../game/engine'
-import { CrewAvatar } from './CrewAvatar'
+import type { DragState } from '../hooks/useDragAssign.ts'
+import type { GameState } from '../game/types.ts'
+import { def } from '../game/engine.ts'
+import { CrewAvatar } from './CrewAvatar.tsx'
 
 /** The portrait that follows your finger, plus what dropping here would do. */
 export const DragGhost = ({ drag, state }: { drag: DragState | null; state: GameState }) => {

@@ -1,10 +1,10 @@
-import { REVIVE_COST_PER_LEVEL, def, staffSlots } from '../game/engine'
-import { effectiveness, xpForLevel } from '../game/crew'
-import type { GameState } from '../game/types'
-import { CrewAvatar } from './CrewAvatar'
-import { hpStyle } from './meters'
-import { Modal } from './Modal'
-import { StatBars } from './StatBars'
+import { REVIVE_COST_PER_LEVEL, def, staffSlots } from '../game/engine.ts'
+import { effectiveness, xpForLevel } from '../game/crew.ts'
+import type { GameState } from '../game/types.ts'
+import { CrewAvatar } from './CrewAvatar.tsx'
+import { hpStyle } from './meters.ts'
+import { Modal } from './Modal.tsx'
+import { StatBars } from './StatBars.tsx'
 
 interface Props {
   state: GameState

@@ -1,4 +1,4 @@
-import type { IncidentKind, StatKey } from './types'
+import type { IncidentKind, StatKey } from './types.ts'
 
 export interface IncidentDef {
   kind: IncidentKind

@@ -1,4 +1,4 @@
-import type { GameState } from '../game/types'
+import type { GameState } from '../game/types.ts'
 
 const clock = (seconds: number) => {
   const h = Math.floor(seconds / 3600)

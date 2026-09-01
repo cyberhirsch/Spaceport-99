@@ -1,5 +1,5 @@
-import { MAX_STAT } from '../game/crew'
-import { STAT_INFO, STAT_KEYS, type Stats } from '../game/types'
+import { MAX_STAT } from '../game/crew.ts'
+import { STAT_INFO, STAT_KEYS, type Stats } from '../game/types.ts'
 
 export const StatBars = ({ stats, highlight }: { stats: Stats; highlight?: string }) => (
   <ul className="statbars">

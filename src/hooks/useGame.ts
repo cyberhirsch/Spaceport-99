@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
-import { type Action, derive, newGame, reducer } from '../game/engine'
-import { clearSave, loadGame, saveGame } from '../game/save'
-import type { GameState } from '../game/types'
+import { type Action, derive, newGame, reducer } from '../game/engine.ts'
+import { clearSave, loadGame, saveGame } from '../game/save.ts'
+import type { GameState } from '../game/types.ts'
 
 const TICK_MS = 500
 const SAVE_EVERY_MS = 5000

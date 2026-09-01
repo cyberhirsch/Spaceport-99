@@ -1,4 +1,4 @@
-import { portraitFor } from '../game/crew'
+import { portraitFor } from '../game/crew.ts'
 
 interface Props {
   seed: number

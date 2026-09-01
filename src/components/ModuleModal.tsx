@@ -1,11 +1,11 @@
-import { MAX_LEVEL, def, staffSlots, upgradeCost, workRate } from '../game/engine'
-import { effectiveness } from '../game/crew'
-import { cycleCredits, cycleYield, powerDraw } from '../game/modules'
-import { incidentDef } from '../game/incidents'
-import { RESOURCE_INFO, STAT_INFO, type Crew, type GameState } from '../game/types'
-import type { DragState } from '../hooks/useDragAssign'
-import { CrewAvatar } from './CrewAvatar'
-import { Modal } from './Modal'
+import { MAX_LEVEL, canDemolish, def, staffSlots, upgradeCost, workRate } from '../game/engine.ts'
+import { effectiveness } from '../game/crew.ts'
+import { cycleCredits, cycleYield, powerDraw } from '../game/modules.ts'
+import { incidentDef } from '../game/incidents.ts'
+import { RESOURCE_INFO, STAT_INFO, type Crew, type GameState } from '../game/types.ts'
+import type { DragState } from '../hooks/useDragAssign.ts'
+import { CrewAvatar } from './CrewAvatar.tsx'
+import { Modal } from './Modal.tsx'
 
 interface Props {
   state: GameState
@@ -37,6 +37,7 @@ export const ModuleModal = ({
   const slots = staffSlots(m)
   const rate = workRate(m, crewById)
   const incident = state.incidents.find((i) => i.moduleId === m.id)
+  const scrappable = canDemolish(state, m)
   const upCost = upgradeCost(m)
   const staffed: Crew[] = m.staff.map((id) => crewById.get(id)).filter(Boolean) as Crew[]
   const bench = state.crew
@@ -178,7 +179,18 @@ export const ModuleModal = ({
         <button className="btn" disabled={m.level >= MAX_LEVEL || state.credits < upCost} onClick={onUpgrade}>
           {m.level >= MAX_LEVEL ? 'Max level' : `Upgrade — ${upCost}c`}
         </button>
-        <button className="btn btn--danger" disabled={Boolean(incident)} onClick={onDemolish}>
+        <button
+          className="btn btn--danger"
+          disabled={!scrappable}
+          onClick={onDemolish}
+          title={
+            incident
+              ? 'Deal with the emergency first'
+              : scrappable
+                ? 'Reclaim half the build cost'
+                : 'Scrap the room at the end of this wing first'
+          }
+        >
           Scrap
         </button>
       </div>

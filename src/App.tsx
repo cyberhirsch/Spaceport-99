@@ -1,18 +1,18 @@
 import { useCallback, useState } from 'react'
-import { BuildMenu } from './components/BuildMenu'
-import { CrewModal } from './components/CrewModal'
-import { CrewPanel } from './components/CrewPanel'
-import { DragGhost } from './components/DragGhost'
-import { LogPanel } from './components/LogPanel'
-import { Modal } from './components/Modal'
-import { ModuleModal } from './components/ModuleModal'
-import { StationView } from './components/StationView'
-import { TopBar } from './components/TopBar'
-import { staffSlots } from './game/engine'
-import { useDragAssign } from './hooks/useDragAssign'
-import { useGame } from './hooks/useGame'
-import { useMediaQuery } from './hooks/useMediaQuery'
-import type { ModuleKind } from './game/types'
+import { BuildMenu } from './components/BuildMenu.tsx'
+import { CrewModal } from './components/CrewModal.tsx'
+import { CrewPanel } from './components/CrewPanel.tsx'
+import { DragGhost } from './components/DragGhost.tsx'
+import { LogPanel } from './components/LogPanel.tsx'
+import { Modal } from './components/Modal.tsx'
+import { ModuleModal } from './components/ModuleModal.tsx'
+import { StationView } from './components/StationView.tsx'
+import { TopBar } from './components/TopBar.tsx'
+import { staffSlots } from './game/engine.ts'
+import { useDragAssign } from './hooks/useDragAssign.ts'
+import { useGame } from './hooks/useGame.ts'
+import { useMediaQuery } from './hooks/useMediaQuery.ts'
+import type { ModuleKind } from './game/types.ts'
 
 type Tab = 'build' | 'crew' | 'log'
 
@@ -253,8 +253,8 @@ export default function App() {
               high Operations runs atmospherics.
             </li>
             <li>
-              <b>Rooms merge</b> when two identical rooms of the same level sit side by side — bigger
-              rooms are faster and hold more staff.
+              <b>Decks are symmetrical</b> — five room slots each side of the lift shaft, built
+              outward from it. Two identical rooms side by side merge into one bigger, faster room.
             </li>
             <li>
               <b>Rushing</b> finishes a cycle instantly but can start a fire. <b>Emergencies</b> are

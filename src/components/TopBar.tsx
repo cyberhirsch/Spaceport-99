@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import type { Derived } from '../game/engine'
-import { resupplyAmount, resupplyCost } from '../game/engine'
-import type { GameState, ResourceKey } from '../game/types'
-import { RESOURCE_INFO } from '../game/types'
+import type { Derived } from '../game/engine.ts'
+import { resupplyAmount, resupplyCost } from '../game/engine.ts'
+import type { GameState, ResourceKey } from '../game/types.ts'
+import { RESOURCE_INFO } from '../game/types.ts'
 
 interface Props {
   state: GameState

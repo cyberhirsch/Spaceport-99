@@ -1,8 +1,18 @@
-import type { ModuleDef, ModuleKind, StationModule } from './types'
+import type { ModuleDef, ModuleKind, StationModule } from './types.ts'
 
-export const DECK_WIDTH = 6
+/** Room slots in each wing, either side of the lift shaft. */
+export const WING = 5
+export const DECK_WIDTH = WING * 2
 export const MAX_MERGE = 3
 export const MAX_LEVEL = 3
+
+export type Wing = 'port' | 'starboard'
+
+/** Which side of the lift a column sits on. */
+export const wingOf = (col: number): Wing => (col < WING ? 'port' : 'starboard')
+
+/** The two columns that touch the lift shaft — where every wing starts. */
+export const touchesLift = (col: number): boolean => col === WING - 1 || col === WING
 
 export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   spine: {

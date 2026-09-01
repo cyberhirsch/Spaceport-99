@@ -14,6 +14,7 @@ the browser and saves to `localStorage`.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
+npm run test     # geometry rules, via node:test — no test framework needed
 npm run build    # typecheck + production bundle into dist/
 npm run lint
 ```
@@ -42,9 +43,15 @@ people standing in it. A full crew of rookies runs a room at roughly 100%; a
 well-trained veteran crew pushes past 170%. *Auto-assign roster* does a
 greedy best-fit pass if you would rather not micromanage.
 
-**Rooms merge.** Build two identical rooms of the same level side by side on a
-deck and they fuse into one wider room — more staff slots, more output per cycle,
-up to three segments. Rooms must touch the docking spine or an existing room.
+**Every deck is symmetrical.** A lift shaft runs down the centre of the station
+with a five-slot wing either side of it. Rooms hang off the shaft and grow
+outward along their wing, and only the room at the outer end of a run can be
+scrapped, so nothing is ever stranded with no corridor back to the lift.
+
+**Rooms merge.** Build two identical rooms of the same level side by side in the
+same wing and they fuse into one wider room — more staff slots, more output per
+cycle, up to three segments. Merges never cross the shaft, and neither do
+emergencies: the lift is a fire break.
 
 **Rushing** finishes a production cycle instantly. It also might start a fire.
 The risk climbs with every successful rush and decays slowly while you leave the
@@ -84,6 +91,7 @@ src/
     incidents.ts   the four emergency types and their numbers
     engine.ts      the simulation: derive(), the per-second step, and the reducer
     save.ts        localStorage round-trip
+    __tests__/     station geometry: wings, merging, scrapping
   hooks/
     useGame.ts       tick loop, autosave, offline catch-up
     useDragAssign.ts pointer-event drag and drop for crew assignment

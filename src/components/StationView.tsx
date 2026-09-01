@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react'
-import { DECK_WIDTH, canBuildAt, deckCost, def, moduleAt, staffSlots, workRate } from '../game/engine'
-import { incidentDef } from '../game/incidents'
-import type { DragState } from '../hooks/useDragAssign'
-import type { Crew, GameState, ModuleKind, StationModule } from '../game/types'
-import { CrewAvatar } from './CrewAvatar'
+import { useEffect, useLayoutEffect, useRef } from 'react'
+import { WING, canBuildAt, deckCost, def, moduleAt, staffSlots, workRate } from '../game/engine.ts'
+import { incidentDef } from '../game/incidents.ts'
+import type { DragState } from '../hooks/useDragAssign.ts'
+import type { Crew, GameState, ModuleKind, StationModule } from '../game/types.ts'
+import { CrewAvatar } from './CrewAvatar.tsx'
 
 interface Props {
   state: GameState
@@ -145,6 +145,14 @@ export const StationView = ({
   const idle = state.crew.filter((c) => !c.dead && !c.assignment)
   const nextDeck = deckCost(state.decks)
 
+  // The station is wider than a phone, so open it centred on the lift shaft —
+  // that is where the station starts and where the empty slots worth building
+  // on are. Panning from there is the player's choice, not the default.
+  useLayoutEffect(() => {
+    const el = scroller.current
+    if (el) el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2
+  }, [])
+
   // Drag a crew member towards an edge and the station pans that way, so decks
   // off-screen are still reachable on a phone.
   useEffect(() => {
@@ -164,6 +172,48 @@ export const StationView = ({
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
   }, [drag])
+
+  /** Renders one wing of a deck: rooms in place, empty slots where you can build. */
+  const wing = (deck: number, from: number, to: number) => {
+    const cells: React.ReactNode[] = []
+    for (let col = from; col < to; ) {
+      const m = moduleAt(state, deck, col)
+      if (m && m.col === col) {
+        cells.push(
+          <Room
+            key={m.id}
+            module={m}
+            crewById={crewById}
+            incident={state.incidents.find((i) => i.moduleId === m.id)}
+            drag={drag}
+            onOpen={() => onSelectModule(m.id)}
+            onDragStart={onDragStart}
+          />,
+        )
+        col += m.width
+        continue
+      }
+      // `col` advances below, so bind this cell's column first — the click
+      // handler must not read the loop's later value.
+      const at = col
+      const buildable = canBuildAt(state, deck, at)
+      cells.push(
+        <button
+          key={`${deck}-${at}`}
+          className={`cell${buildable ? ' cell--open' : ''}${
+            placing && buildable ? ' cell--target' : ''
+          }`}
+          disabled={!buildable && !placing}
+          onClick={() => (placing && buildable ? onPlace(deck, at) : onEmptyCell())}
+          title={buildable ? 'Empty slot' : 'Unreachable — build outward from the lift'}
+        >
+          {buildable ? '+' : ''}
+        </button>,
+      )
+      col += 1
+    }
+    return cells
+  }
 
   return (
     <div className="stage">
@@ -189,58 +239,17 @@ export const StationView = ({
         <div className="station__hull">
           {Array.from({ length: state.decks }, (_, deck) => (
             <div className="deck" key={deck}>
-              <div className="deck__spine">
+              <div className="deck__wing">{wing(deck, 0, WING)}</div>
+              <div className="deck__lift">
                 <span className="deck__num">{deck + 1}</span>
               </div>
-              <div className="deck__cells">
-                {(() => {
-                  const cells: React.ReactNode[] = []
-                  for (let col = 0; col < DECK_WIDTH; ) {
-                    const m = moduleAt(state, deck, col)
-                    if (m && m.col === col) {
-                      cells.push(
-                        <Room
-                          key={m.id}
-                          module={m}
-                          crewById={crewById}
-                          incident={state.incidents.find((i) => i.moduleId === m.id)}
-                          drag={drag}
-                          onOpen={() => onSelectModule(m.id)}
-                          onDragStart={onDragStart}
-                        />,
-                      )
-                      col += m.width
-                      continue
-                    }
-                    // `col` advances below, so bind this cell's column first —
-                    // the click handler must not read the loop's later value.
-                    const at = col
-                    const buildable = canBuildAt(state, deck, at)
-                    cells.push(
-                      <button
-                        key={`${deck}-${at}`}
-                        className={`cell${buildable ? ' cell--open' : ''}${
-                          placing && buildable ? ' cell--target' : ''
-                        }`}
-                        disabled={!buildable && !placing}
-                        onClick={() => (placing && buildable ? onPlace(deck, at) : onEmptyCell())}
-                        title={buildable ? 'Empty slot' : 'Unreachable — build outward from the spine'}
-                      >
-                        {buildable ? '+' : ''}
-                      </button>,
-                    )
-                    col += 1
-                  }
-                  return cells
-                })()}
-              </div>
+              <div className="deck__wing">{wing(deck, WING, WING * 2)}</div>
             </div>
           ))}
 
         </div>
 
-        <div className="deck deck--new">
-          <div className="deck__spine deck__spine--cap" />
+        <div className="deck--new">
           <button className="deck__buy" onClick={onBuyDeck} disabled={state.credits < nextDeck}>
             ＋ Pressurise deck {state.decks + 1} — {nextDeck}c
           </button>

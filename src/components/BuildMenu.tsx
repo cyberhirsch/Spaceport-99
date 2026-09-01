@@ -1,7 +1,7 @@
-import { BUILDABLE, buildCost, countOfKind } from '../game/engine'
-import type { Derived } from '../game/engine'
-import type { GameState, ModuleKind } from '../game/types'
-import { RESOURCE_INFO, STAT_INFO } from '../game/types'
+import { BUILDABLE, buildCost, countOfKind } from '../game/engine.ts'
+import type { Derived } from '../game/engine.ts'
+import type { GameState, ModuleKind } from '../game/types.ts'
+import { RESOURCE_INFO, STAT_INFO } from '../game/types.ts'
 
 interface Props {
   state: GameState
@@ -15,8 +15,8 @@ export const BuildMenu = ({ state, derived, placing, onPick }: Props) => {
   return (
     <div className="panel-body">
       <p className="panel-note">
-        Rooms must touch the spine or an existing room. Two identical rooms side by side merge into
-        one bigger, faster room.
+        Wings grow outward from the lift shaft, five rooms to a side. Two identical rooms of the
+        same level side by side merge into one bigger, faster room.
       </p>
       <ul className="build-list">
         {BUILDABLE.map((d) => {

@@ -8,6 +8,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   spine: {
     kind: 'spine',
     name: 'Docking Spine',
+    short: 'Spine',
     blurb: 'The station backbone. Crew loiter here when unassigned.',
     glyph: '║',
     hue: 200,
@@ -20,6 +21,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   reactor: {
     kind: 'reactor',
     name: 'Fusion Reactor',
+    short: 'Reactor',
     blurb: 'Bottles a small star. Everything else on the station runs off it.',
     glyph: '☢',
     hue: 45,
@@ -35,6 +37,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   atmospherics: {
     kind: 'atmospherics',
     name: 'Atmospherics Plant',
+    short: 'Air Plant',
     blurb: 'Scrubs CO₂ and cracks ice into breathable air.',
     glyph: '◌',
     hue: 190,
@@ -50,6 +53,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   hydroponics: {
     kind: 'hydroponics',
     name: 'Hydroponics Bay',
+    short: 'Farm',
     blurb: 'Racks of algae and beans under grow lamps. Smells green.',
     glyph: '❦',
     hue: 110,
@@ -65,6 +69,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   quarters: {
     kind: 'quarters',
     name: 'Crew Quarters',
+    short: 'Quarters',
     blurb: 'Bunks, lockers and a little privacy. Raises crew capacity.',
     glyph: '⌂',
     hue: 280,
@@ -78,6 +83,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   storage: {
     kind: 'storage',
     name: 'Cargo Hold',
+    short: 'Cargo',
     blurb: 'Pressurised racking. Raises the cap on every stored resource.',
     glyph: '▦',
     hue: 35,
@@ -91,6 +97,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   medbay: {
     kind: 'medbay',
     name: 'Med Bay',
+    short: 'Med Bay',
     blurb: 'Autodocs and a very tired nurse. Heals injured crew station-wide.',
     glyph: '✚',
     hue: 0,
@@ -104,6 +111,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   fabricator: {
     kind: 'fabricator',
     name: 'Fabricator',
+    short: 'Fab Shop',
     blurb: 'Prints parts from feedstock and sells the surplus dockside.',
     glyph: '⚒',
     hue: 25,
@@ -118,6 +126,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   comms: {
     kind: 'comms',
     name: 'Comms Array',
+    short: 'Comms',
     blurb: 'Broadcasts a recruitment beacon into the shipping lanes.',
     glyph: '((·))',
     hue: 320,
@@ -132,6 +141,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   gym: {
     kind: 'gym',
     name: 'Centrifuge Gym',
+    short: 'Gym',
     blurb: 'Spin gravity and heavy iron. Trains Brawn.',
     glyph: '⊕',
     hue: 15,
@@ -145,6 +155,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   range: {
     kind: 'range',
     name: 'Combat Sim',
+    short: 'Combat Sim',
     blurb: 'Holographic boarders that shoot back. Trains Reflex.',
     glyph: '✜',
     hue: 350,
@@ -158,6 +169,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   library: {
     kind: 'library',
     name: 'Archive',
+    short: 'Archive',
     blurb: 'Every manual ever written, and a coffee machine. Trains Intellect.',
     glyph: '❑',
     hue: 215,
@@ -171,6 +183,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   workshop: {
     kind: 'workshop',
     name: 'Engineering Bay',
+    short: 'Eng Bay',
     blurb: 'Where things get taken apart to see how they work. Trains Tech.',
     glyph: '⚙',
     hue: 45,
@@ -184,6 +197,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   observatory: {
     kind: 'observatory',
     name: 'Observation Deck',
+    short: 'Obs Deck',
     blurb: 'Charts, traffic control and a very big window. Trains Operations.',
     glyph: '◉',
     hue: 195,
@@ -197,6 +211,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   lounge: {
     kind: 'lounge',
     name: 'Crew Lounge',
+    short: 'Lounge',
     blurb: 'Cards, bad music, worse synth-beer. Trains Adaptability.',
     glyph: '☕',
     hue: 300,
@@ -210,6 +225,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   vault: {
     kind: 'vault',
     name: 'Salvage Vault',
+    short: 'Vault',
     blurb: 'Sorting other people’s misfortune into value. Trains Luck.',
     glyph: '◈',
     hue: 55,

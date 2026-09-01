@@ -1,24 +1,62 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { BuildMenu } from './components/BuildMenu'
 import { CrewModal } from './components/CrewModal'
 import { CrewPanel } from './components/CrewPanel'
+import { DragGhost } from './components/DragGhost'
 import { LogPanel } from './components/LogPanel'
 import { Modal } from './components/Modal'
 import { ModuleModal } from './components/ModuleModal'
 import { StationView } from './components/StationView'
 import { TopBar } from './components/TopBar'
+import { staffSlots } from './game/engine'
+import { useDragAssign } from './hooks/useDragAssign'
 import { useGame } from './hooks/useGame'
+import { useMediaQuery } from './hooks/useMediaQuery'
 import type { ModuleKind } from './game/types'
 
 type Tab = 'build' | 'crew' | 'log'
 
+const TABS: { id: Tab; label: string; glyph: string }[] = [
+  { id: 'build', label: 'Build', glyph: '⊞' },
+  { id: 'crew', label: 'Crew', glyph: '☺' },
+  { id: 'log', label: 'Log', glyph: '≡' },
+]
+
 export default function App() {
   const { state, derived, act, hardReset } = useGame()
+  const wide = useMediaQuery('(min-width: 900px)')
   const [tab, setTab] = useState<Tab>('build')
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [placing, setPlacing] = useState<ModuleKind | null>(null)
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [crewId, setCrewId] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const panelOpen = wide || sheetOpen
+
+  const canDrop = useCallback(
+    (id: string, target: string) => {
+      const m = state.modules.find((x) => x.id === target)
+      const c = state.crew.find((x) => x.id === id)
+      if (!m || !c || c.dead) return false
+      return m.staff.includes(id) || m.staff.length < staffSlots(m)
+    },
+    [state],
+  )
+
+  const { drag, start } = useDragAssign({
+    onDrop: (id, target) => act({ type: 'assign', crewId: id, moduleId: target }),
+    onTap: (id) => setCrewId(id),
+    canDrop,
+  })
+
+  const openTab = (next: Tab) => {
+    if (wide) {
+      setTab(next)
+      return
+    }
+    setSheetOpen(tab === next ? !sheetOpen : true)
+    setTab(next)
+  }
 
   // Flag a deficit only once it will actually empty the tanks within ten
   // minutes — a room going briefly unstaffed is not worth an alarm.
@@ -29,17 +67,14 @@ export default function App() {
     state.resources.food <= 0 && 'No rations — the crew is starving',
     state.incidents.length > 0 && `${state.incidents.length} emergency in progress`,
     derived.brownout && 'Grid brownout — rooms are running slow',
-    draining(state.resources.power, derived.powerRate) &&
-      'Power deficit — add or upgrade a Fusion Reactor',
-    draining(state.resources.air, derived.airRate) &&
-      'Oxygen deficit — add an Atmospherics Plant or cut crew',
-    draining(state.resources.food, derived.foodRate) &&
-      'Ration deficit — add a Hydroponics Bay or cut crew',
+    draining(state.resources.power, derived.powerRate) && 'Power deficit — add a Fusion Reactor',
+    draining(state.resources.air, derived.airRate) && 'Oxygen deficit — add an Atmospherics Plant',
+    draining(state.resources.food, derived.foodRate) && 'Ration deficit — add a Hydroponics Bay',
     derived.crewAlive.length >= derived.crewCap && 'No free bunks — build Crew Quarters',
   ].filter(Boolean) as string[]
 
   return (
-    <div className="app">
+    <div className={`app${drag ? ' is-dragging' : ''}`}>
       <TopBar
         state={state}
         derived={derived}
@@ -60,6 +95,8 @@ export default function App() {
         <StationView
           state={state}
           placing={placing}
+          drag={drag}
+          onDragStart={start}
           onPlace={(deck, col) => {
             if (!placing) return
             act({ type: 'build', kind: placing, deck, col })
@@ -67,16 +104,27 @@ export default function App() {
           }}
           onCancelPlacing={() => setPlacing(null)}
           onSelectModule={(id) => setModuleId(id)}
-          onSelectCrew={(id) => setCrewId(id)}
-          onEmptyCell={() => setTab('build')}
+          onEmptyCell={() => {
+            setTab('build')
+            if (!wide) setSheetOpen(true)
+          }}
           onBuyDeck={() => act({ type: 'buyDeck' })}
         />
 
-        <aside className="panel">
+        {!wide && sheetOpen && (
+          <button className="sheet-scrim" onClick={() => setSheetOpen(false)} aria-label="Close panel" />
+        )}
+
+        <aside className={`panel${panelOpen ? ' is-open' : ''}`} aria-hidden={!panelOpen}>
+          <button className="panel__grab" onClick={() => setSheetOpen(false)} aria-label="Close panel" />
           <nav className="panel__tabs">
-            {(['build', 'crew', 'log'] as Tab[]).map((t) => (
-              <button key={t} className={tab === t ? 'is-active' : ''} onClick={() => setTab(t)}>
-                {t === 'build' ? 'Build' : t === 'crew' ? `Crew (${derived.crewAlive.length})` : 'Log'}
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                className={tab === t.id ? 'is-active' : ''}
+                onClick={() => openTab(t.id)}
+              >
+                {t.id === 'crew' ? `Crew (${derived.crewAlive.length})` : t.label}
               </button>
             ))}
           </nav>
@@ -85,13 +133,19 @@ export default function App() {
               state={state}
               derived={derived}
               placing={placing}
-              onPick={(kind) => setPlacing((p) => (p === kind ? null : kind))}
+              onPick={(kind) => {
+                setPlacing((p) => (p === kind ? null : kind))
+                // On a phone the sheet covers the station, so get out of the way.
+                if (!wide) setSheetOpen(false)
+              }}
             />
           )}
           {tab === 'crew' && (
             <CrewPanel
               state={state}
               derived={derived}
+              drag={drag}
+              onDragStart={start}
               onSelect={(id) => setCrewId(id)}
               onAutoAssign={() => act({ type: 'autoAssign' })}
               onBroadcast={() => act({ type: 'broadcast' })}
@@ -101,10 +155,31 @@ export default function App() {
         </aside>
       </main>
 
+      <nav className="tabbar">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            className={sheetOpen && tab === t.id ? 'is-active' : ''}
+            onClick={() => openTab(t.id)}
+          >
+            <i>{t.glyph}</i>
+            {t.id === 'crew' ? `Crew ${derived.crewAlive.length}` : t.label}
+          </button>
+        ))}
+        <button onClick={() => setMenuOpen(true)}>
+          <i>☰</i>
+          More
+        </button>
+      </nav>
+
+      <DragGhost drag={drag} state={state} />
+
       {moduleId && (
         <ModuleModal
           state={state}
           moduleId={moduleId}
+          drag={drag}
+          onDragStart={start}
           onClose={() => setModuleId(null)}
           onAssign={(cid, mid) => act({ type: 'assign', crewId: cid, moduleId: mid })}
           onUpgrade={() => act({ type: 'upgrade', moduleId })}
@@ -133,8 +208,12 @@ export default function App() {
       {menuOpen && (
         <Modal title="Station options" onClose={() => setMenuOpen(false)}>
           <p className="panel-note">
-            Progress saves to this browser automatically, and the station keeps running while you are
+            Progress saves to this device automatically, and the station keeps running while you are
             away (up to four hours of catch-up).
+          </p>
+          <p className="panel-note">
+            Drag a crew portrait from the off-duty tray onto a room to post them there, or back onto
+            the tray to stand them down. Tap a portrait to open their file.
           </p>
           <div className="modal__actions">
             <button
@@ -162,24 +241,24 @@ export default function App() {
           </p>
           <ul className="tips">
             <li>
-              <b>Power, oxygen and rations</b> are produced in cycles by staffed rooms and consumed
-              constantly by your crew. Watch the rates in the header.
+              <b>Drag a crew portrait</b> from the tray at the bottom onto a room to post them there.
+              Drag them back to the tray to stand them down; tap one to open their file.
             </li>
             <li>
-              <b>O.R.B.I.T.A.L.</b> stats decide who is good at what. Put high-Tech crew in the
-              reactor, high-Operations crew in atmospherics.
+              <b>Power, oxygen and rations</b> are made in cycles by staffed rooms and burned
+              constantly by your crew. Watch the rates under each gauge.
+            </li>
+            <li>
+              <b>O.R.B.I.T.A.L.</b> stats decide who is good at what. High Tech runs the reactor,
+              high Operations runs atmospherics.
             </li>
             <li>
               <b>Rooms merge</b> when two identical rooms of the same level sit side by side — bigger
               rooms are faster and hold more staff.
             </li>
             <li>
-              <b>Rushing</b> finishes a cycle instantly but can start a fire, a breach or worse. The
-              risk climbs with every rush.
-            </li>
-            <li>
-              <b>Emergencies</b> are fought by whoever is standing in that room, using the stat listed
-              in the room panel.
+              <b>Rushing</b> finishes a cycle instantly but can start a fire. <b>Emergencies</b> are
+              fought by whoever is standing in that room.
             </li>
           </ul>
           <div className="modal__actions">

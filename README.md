@@ -4,6 +4,10 @@ A Fallout Shelter–style station management game, in orbit. Dig rooms into a hu
 instead of a hillside, keep a crew of drifters breathing, and try not to let the
 reactor catch fire.
 
+Mobile first: portrait phone is the primary target, with a thumb-height tab bar,
+bottom-sheet panels, a pannable station and drag-and-drop crew assignment. The
+same DOM unfolds into a two-column desktop layout at 900px.
+
 Built with React + TypeScript + Vite. No backend — the whole simulation runs in
 the browser and saves to `localStorage`.
 
@@ -23,6 +27,14 @@ Everything after that is yours to build.
 fill their progress bar and dump a batch into storage; your crew burn oxygen and
 rations every second, and every powered room draws off the grid. The header shows
 the live net rate for each — that number going red is the only warning you get.
+
+**Crew go where you drag them.** Pick a portrait up out of the tray at the bottom
+of the screen and drop it on a room to post someone there; drop it back on the
+tray to stand them down; drag straight from one room to another to reassign.
+Valid rooms light up while a portrait is in the air, full ones dim, and dragging
+towards an edge pans the station. Tap a portrait instead of dragging it to open
+that crew member's file. It is one pointer-event implementation, so a mouse
+behaves exactly like a finger.
 
 **O.R.B.I.T.A.L.** — Operations, Reflex, Brawn, Intellect, Tech, Adaptability,
 Luck. Every room is driven by one stat, and a room runs at the speed of the
@@ -72,8 +84,12 @@ src/
     incidents.ts   the four emergency types and their numbers
     engine.ts      the simulation: derive(), the per-second step, and the reducer
     save.ts        localStorage round-trip
-  hooks/useGame.ts tick loop, autosave, offline catch-up
-  components/      station grid, side panel, modals, procedural crew portraits
+  hooks/
+    useGame.ts       tick loop, autosave, offline catch-up
+    useDragAssign.ts pointer-event drag and drop for crew assignment
+    useMediaQuery.ts the one place layout behaviour branches on screen size
+  components/        station grid, bottom sheets, modals, crew portraits
+  index.css          mobile-first, with a single 900px desktop breakpoint
 ```
 
 `engine.ts` is the whole game. `reducer(state, action)` is the only way state

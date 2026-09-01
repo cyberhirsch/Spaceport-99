@@ -3,12 +3,15 @@ import { effectiveness } from '../game/crew'
 import { cycleCredits, cycleYield, powerDraw } from '../game/modules'
 import { incidentDef } from '../game/incidents'
 import { RESOURCE_INFO, STAT_INFO, type Crew, type GameState } from '../game/types'
+import type { DragState } from '../hooks/useDragAssign'
 import { CrewAvatar } from './CrewAvatar'
 import { Modal } from './Modal'
 
 interface Props {
   state: GameState
   moduleId: string
+  drag: DragState | null
+  onDragStart: (crewId: string, e: React.PointerEvent) => void
   onClose: () => void
   onAssign: (crewId: string, moduleId: string | null) => void
   onUpgrade: () => void
@@ -19,6 +22,8 @@ interface Props {
 export const ModuleModal = ({
   state,
   moduleId,
+  drag,
+  onDragStart,
   onClose,
   onAssign,
   onUpgrade,
@@ -116,16 +121,20 @@ export const ModuleModal = ({
       </h3>
       <div className="staff-grid">
         {staffed.map((c) => (
-          <button key={c.id} className="staff-chip" onClick={() => onAssign(c.id, null)} title="Send off duty">
-            <CrewAvatar seed={c.seed} size={30} dead={c.dead} />
+          <div key={c.id} className={`staff-chip${drag?.crewId === c.id ? ' is-lifted' : ''}`}>
+            <span className="grip" onPointerDown={(e) => onDragStart(c.id, e)} title="Drag to another room">
+              <CrewAvatar seed={c.seed} size={30} dead={c.dead} />
+            </span>
             <span>
               {c.name}
               <em>
                 {d.stat} {c.stats[d.stat]} · eff {effectiveness(c, d.stat).toFixed(1)}
               </em>
             </span>
-            <i>✕</i>
-          </button>
+            <button className="staff-chip__act" onClick={() => onAssign(c.id, null)} title="Send off duty">
+              ✕
+            </button>
+          </div>
         ))}
         {staffed.length === 0 && <p className="panel-note">Empty. Nothing gets made without hands.</p>}
       </div>
@@ -135,7 +144,11 @@ export const ModuleModal = ({
           <h3 className="modal__sub">Assign someone</h3>
           <div className="staff-grid">
             {bench.slice(0, 12).map((c) => (
-              <button key={c.id} className="staff-chip staff-chip--add" onClick={() => onAssign(c.id, m.id)}>
+              <button
+                key={c.id}
+                className="staff-chip staff-chip--add"
+                onClick={() => onAssign(c.id, m.id)}
+              >
                 <CrewAvatar seed={c.seed} size={30} />
                 <span>
                   {c.name}

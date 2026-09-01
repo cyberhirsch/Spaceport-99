@@ -2,12 +2,15 @@ import { BROADCAST_COST, def } from '../game/engine'
 import type { Derived } from '../game/engine'
 import { xpForLevel } from '../game/crew'
 import type { Crew, GameState } from '../game/types'
+import type { DragState } from '../hooks/useDragAssign'
 import { CrewAvatar } from './CrewAvatar'
 import { hpStyle } from './meters'
 
 interface Props {
   state: GameState
   derived: Derived
+  drag: DragState | null
+  onDragStart: (crewId: string, e: React.PointerEvent) => void
   onSelect: (id: string) => void
   onAutoAssign: () => void
   onBroadcast: () => void
@@ -16,7 +19,7 @@ interface Props {
 const bestStat = (c: Crew) =>
   (Object.entries(c.stats) as [keyof Crew['stats'], number][]).reduce((a, b) => (b[1] > a[1] ? b : a))
 
-export const CrewPanel = ({ state, derived, onSelect, onAutoAssign, onBroadcast }: Props) => {
+export const CrewPanel = ({ state, derived, drag, onDragStart, onSelect, onAutoAssign, onBroadcast }: Props) => {
   const commsStaffed = state.modules.some((m) => m.kind === 'comms' && m.staff.length > 0)
   const full = derived.crewAlive.length >= derived.crewCap
   const roster = [...state.crew].sort(
@@ -52,9 +55,15 @@ export const CrewPanel = ({ state, derived, onSelect, onAutoAssign, onBroadcast 
           const [statKey, statValue] = bestStat(c)
           return (
             <li key={c.id}>
-              <button className={`crew-row${c.dead ? ' is-dead' : ''}`} onClick={() => onSelect(c.id)}>
-                <CrewAvatar seed={c.seed} size={38} dead={c.dead} />
-                <span className="crew-row__text">
+              <div className={`crew-row${c.dead ? ' is-dead' : ''}${drag?.crewId === c.id ? ' is-lifted' : ''}`}>
+                <span
+                  className="grip"
+                  onPointerDown={(e) => (c.dead ? undefined : onDragStart(c.id, e))}
+                  title={c.dead ? c.name : `${c.name} — drag to a room`}
+                >
+                  <CrewAvatar seed={c.seed} size={38} dead={c.dead} />
+                </span>
+                <button className="crew-row__text" onClick={() => onSelect(c.id)}>
                   <span className="crew-row__name">
                     {c.name} <em>Lv{c.level}</em>
                   </span>
@@ -73,8 +82,8 @@ export const CrewPanel = ({ state, derived, onSelect, onAutoAssign, onBroadcast 
                       <i style={{ width: `${c.morale * 100}%` }} />
                     </span>
                   </span>
-                </span>
-              </button>
+                </button>
+              </div>
             </li>
           )
         })}

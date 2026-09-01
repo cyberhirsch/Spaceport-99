@@ -45,6 +45,8 @@ export type ModuleKind =
 export interface ModuleDef {
   kind: ModuleKind
   name: string
+  /** One-word label for the station card, where space is tight. */
+  short: string
   blurb: string
   glyph: string
   /** Hue used for the module's accent colour. */

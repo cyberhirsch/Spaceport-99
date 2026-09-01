@@ -39,6 +39,15 @@ towards an edge pans the station. Tap a portrait instead of dragging it to open
 that crew member's file. It is one pointer-event implementation, so a mouse
 behaves exactly like a finger.
 
+**Every crew member has a face.** 24 portraits live in `public/crew`, each in two
+sizes: a 512px dossier and a 128px thumbnail cropped in to the head, because a
+whole head-and-shoulders frame becomes an unreadable smudge in a 24px room
+avatar. Which portrait someone wears is derived from their seed, so a given
+crew member keeps the same face for as long as they are aboard. With more crew
+than portraits faces repeat — there are only so many people on the manifest.
+Tap anyone to open their dossier: portrait, serial, rank, posting, condition and
+full stat readout.
+
 **O.R.B.I.T.A.L.** — Operations, Reflex, Brawn, Intellect, Tech, Adaptability,
 Luck. Every room is driven by one stat, and a room runs at the speed of the
 people standing in it. A full crew of rookies runs a room at roughly 100%; a
@@ -98,9 +107,17 @@ src/
     useGame.ts       tick loop, autosave, offline catch-up
     useDragAssign.ts pointer-event drag and drop for crew assignment
     useMediaQuery.ts the one place layout behaviour branches on screen size
-  components/        station grid, bottom sheets, modals, crew portraits
+  components/        station grid, bottom sheets, modals, crew dossiers
   index.css          mobile-first, with a single 900px desktop breakpoint
+public/crew/         24 portraits, each as crew-NN.webp + crew-NN-sm.webp
 ```
+
+Portraits were converted from 1080px PNG sources with `sharp` — dossiers are a
+plain `resize(512).webp({quality: 90})`, thumbnails are
+`extract({top: 0, height: 670}).resize(128, 128, {fit: 'cover', position: attention})`
+so the crop lands on the head. `sharp` is not a project dependency; it was
+installed for the one-off conversion and removed again, since the originals are
+not in the working tree.
 
 ## Continuous integration
 

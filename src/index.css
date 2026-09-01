@@ -1011,13 +1011,87 @@ h3 {
 
 .avatar {
   display: block;
-  border-radius: 6px;
   flex: none;
+  border-radius: 6px;
+  object-fit: cover;
+  /* A tinted ground so a portrait that has not loaded is a plate, not a gap. */
+  background: #16222f;
 }
 
 .avatar--dead {
-  filter: grayscale(1);
+  filter: grayscale(1) brightness(0.7);
 }
+
+.avatar--dossier {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 10px;
+}
+
+/* ----------------------------------------------------------- dossier -- */
+
+.dossier {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.dossier__portrait {
+  position: relative;
+  padding: 5px;
+  border: 1px solid var(--line-hot);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #16222f, #0b131d);
+}
+
+.dossier__stamp {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  padding: 3px 12px;
+  border: 2px solid var(--red);
+  border-radius: 4px;
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  opacity: 0.85;
+}
+
+.dossier__name {
+  margin: 0 0 8px;
+  font-size: 19px;
+  line-height: 1.15;
+  color: var(--mint);
+}
+
+.dossier__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 10px;
+  margin: 0;
+}
+
+.dossier__facts dt {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.dossier__facts dd {
+  margin: 1px 0 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
 
 /* ---------------------------------------------------------------- log -- */
 
@@ -1372,6 +1446,7 @@ h3 {
 .crew-meters {
   display: grid;
   gap: 6px;
+  margin-top: 16px;
 }
 
 .crew-meters label {
@@ -1694,6 +1769,16 @@ h3 {
 
   .modal--wide {
     width: min(700px, 100%);
+  }
+
+  /* More room on a desktop, so the dossier photo gets to be a photo. */
+  .dossier {
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .dossier__name {
+    font-size: 22px;
   }
 
   .modal__body {

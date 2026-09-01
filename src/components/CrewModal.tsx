@@ -1,5 +1,5 @@
 import { REVIVE_COST_PER_LEVEL, def, staffSlots } from '../game/engine.ts'
-import { effectiveness, xpForLevel } from '../game/crew.ts'
+import { effectiveness, portraitIndex, statTotal, xpForLevel } from '../game/crew.ts'
 import type { GameState } from '../game/types.ts'
 import { CrewAvatar } from './CrewAvatar.tsx'
 import { hpStyle } from './meters.ts'
@@ -23,18 +23,41 @@ export const CrewModal = ({ state, crewId, onClose, onAssign, onRevive, onDismis
     .filter((m) => staffSlots(m) > 0 && m.id !== c.assignment && m.staff.length < staffSlots(m))
     .sort((a, b) => effectiveness(c, def(b.kind).stat) - effectiveness(c, def(a.kind).stat))
   const reviveCost = REVIVE_COST_PER_LEVEL * c.level
+  // A stable, human-looking service number so the dossier reads like a record.
+  const serial = `SP99-${String(portraitIndex(c.seed)).padStart(2, '0')}-${String(
+    Math.abs(Math.trunc(c.seed)) % 10000,
+  ).padStart(4, '0')}`
 
   return (
-    <Modal
-      onClose={onClose}
-      title={
-        <span className="modal__title">
-          <CrewAvatar seed={c.seed} size={34} dead={c.dead} />
-          {c.name}
-          <em>Level {c.level}</em>
-        </span>
-      }
-    >
+    <Modal onClose={onClose} title={<span className="modal__title">Crew dossier</span>}>
+      <div className="dossier">
+        <div className="dossier__portrait">
+          <CrewAvatar seed={c.seed} size={168} dead={c.dead} dossier />
+          {c.dead && <span className="dossier__stamp">Deceased</span>}
+        </div>
+        <div className="dossier__id">
+          <h3 className="dossier__name">{c.name}</h3>
+          <dl className="dossier__facts">
+            <div>
+              <dt>Serial</dt>
+              <dd>{serial}</dd>
+            </div>
+            <div>
+              <dt>Rank</dt>
+              <dd>Level {c.level}</dd>
+            </div>
+            <div>
+              <dt>Posting</dt>
+              <dd>{c.dead ? '—' : job ? def(job.kind).name : 'Off duty'}</dd>
+            </div>
+            <div>
+              <dt>Aptitude</dt>
+              <dd>{statTotal(c)} pts</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+
       <div className="crew-meters">
         <label>
           <span>Health</span>

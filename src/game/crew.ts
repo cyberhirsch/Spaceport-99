@@ -106,30 +106,14 @@ export const effectiveness = (c: Crew, stat: StatKey): number => {
   return base * health * mood
 }
 
-/** Deterministic palette + features for a crew portrait. */
-export interface Portrait {
-  skin: string
-  hair: string
-  suit: string
-  visor: boolean
-  hairStyle: number
-  eyes: number
-  mouth: number
-}
+/** How many portrait images live in `public/crew`. */
+export const PORTRAIT_COUNT = 24
 
-const SKINS = ['#f2c9a0', '#e0a878', '#c78a5e', '#9c6440', '#6f452c', '#f7dcc0', '#4d3020']
-const HAIRS = ['#20161a', '#4b2e1e', '#8a5a2b', '#c9a227', '#b8b8c0', '#2f5d8a', '#8a2f5d']
-const SUITS = ['#2b7f7a', '#7a4b9c', '#b5603a', '#3a63b5', '#4f8a3a', '#9c3a5f', '#5a6270']
-
-export const portraitFor = (seed: number): Portrait => {
-  const r = (n: number, mod: number) => Math.floor(seed / Math.pow(7, n)) % mod
-  return {
-    skin: SKINS[r(1, SKINS.length)],
-    hair: HAIRS[r(2, HAIRS.length)],
-    suit: SUITS[r(3, SUITS.length)],
-    visor: r(4, 5) === 0,
-    hairStyle: r(5, 4),
-    eyes: r(6, 3),
-    mouth: r(7, 3),
-  }
-}
+/**
+ * Which portrait a crew member wears. Derived from their seed so a given person
+ * always has the same face, for as long as they are aboard and afterwards in
+ * the log. With more crew than portraits, faces repeat — there are only so many
+ * people on the shuttle manifest.
+ */
+export const portraitIndex = (seed: number): number =>
+  (Math.abs(Math.trunc(seed)) % PORTRAIT_COUNT) + 1

@@ -1,0 +1,81 @@
+# Spaceport-99
+
+A Fallout Shelter–style station management game, in orbit. Dig rooms into a hull
+instead of a hillside, keep a crew of drifters breathing, and try not to let the
+reactor catch fire.
+
+Built with React + TypeScript + Vite. No backend — the whole simulation runs in
+the browser and saves to `localStorage`.
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # typecheck + production bundle into dist/
+npm run lint
+```
+
+## How it plays
+
+You start with a reactor, an air plant, a hydroponics bay and five founders.
+Everything after that is yours to build.
+
+**Three resources, produced in cycles and consumed continuously.** Staffed rooms
+fill their progress bar and dump a batch into storage; your crew burn oxygen and
+rations every second, and every powered room draws off the grid. The header shows
+the live net rate for each — that number going red is the only warning you get.
+
+**O.R.B.I.T.A.L.** — Operations, Reflex, Brawn, Intellect, Tech, Adaptability,
+Luck. Every room is driven by one stat, and a room runs at the speed of the
+people standing in it. A full crew of rookies runs a room at roughly 100%; a
+well-trained veteran crew pushes past 170%. *Auto-assign roster* does a
+greedy best-fit pass if you would rather not micromanage.
+
+**Rooms merge.** Build two identical rooms of the same level side by side on a
+deck and they fuse into one wider room — more staff slots, more output per cycle,
+up to three segments. Rooms must touch the docking spine or an existing room.
+
+**Rushing** finishes a production cycle instantly. It also might start a fire.
+The risk climbs with every successful rush and decays slowly while you leave the
+room alone.
+
+**Emergencies** — electrical fires, hull breaches, boarding parties and void
+mites — are fought by whoever is standing in that room, using the stat named in
+the room panel. They chew through the room's condition, drain whichever supply
+suits them, and spread to neighbouring rooms if nobody is beating them back.
+Crew who drop below a quarter health fall back to the spine and return to their
+post once they have healed up. Automated suppression handles an unattended
+emergency eventually, but far too slowly to rely on.
+
+**Growth.** Crew Quarters raise your bunk cap; drifters dock on their own if you
+have a spare bunk and a well-run station. A staffed Comms Array lets you spend
+credits to broadcast a recruitment beacon, and high-Luck operators pull in better
+people. Training rooms raise a single stat, one point per cycle, each point
+slower than the last.
+
+**Money** comes from docking fees (scaled with crew and station size), the
+Fabricator, the Comms Array, and salvage from emergencies you put down. Spend it
+on rooms, upgrades, new decks, reviving the dead, and emergency resupply barges
+when a supply run dry — that last one is your way out of a death spiral.
+
+The station keeps running while the tab is closed, catching up on as much as four
+hours when you return. Nobody dies during that catch-up: you come back to a
+station in crisis rather than to a tomb.
+
+## Layout
+
+```
+src/
+  game/
+    types.ts       data model — crew, modules, incidents, save shape
+    modules.ts     the room catalogue and its cost/yield/capacity maths
+    crew.ts        name and stat generation, xp curve, effectiveness, portraits
+    incidents.ts   the four emergency types and their numbers
+    engine.ts      the simulation: derive(), the per-second step, and the reducer
+    save.ts        localStorage round-trip
+  hooks/useGame.ts tick loop, autosave, offline catch-up
+  components/      station grid, side panel, modals, procedural crew portraits
+```
+
+`engine.ts` is the whole game. `reducer(state, action)` is the only way state
+changes, `advance(state, seconds)` splits any elapsed span into one-second steps,
+and `derive(state)` computes everything the UI displays but never stores.

@@ -1,0 +1,135 @@
+import { STAT_KEYS, type Crew, type StatKey, type Stats } from './types'
+
+const FIRST = [
+  'Ada', 'Bex', 'Cyrus', 'Dara', 'Emil', 'Fenn', 'Greer', 'Halcyon', 'Ilse', 'Juno',
+  'Kestrel', 'Lior', 'Mira', 'Nkechi', 'Osip', 'Perrin', 'Quill', 'Rook', 'Sable', 'Tovah',
+  'Umi', 'Vasco', 'Wren', 'Xanthe', 'Yusuf', 'Zeph', 'Bo', 'Calla', 'Dmitri', 'Etta',
+  'Fitz', 'Gale', 'Hux', 'Ines', 'Jax', 'Kip', 'Lark', 'Moss', 'Nadia', 'Oona',
+]
+
+const LAST = [
+  'Okonkwo', 'Vance', 'Ashgrove', 'Petrov', 'Nakamura', 'Silva', 'Halloran', 'Bright',
+  'Odell', 'Marsh', 'Kaur', 'Ferro', 'Lindqvist', 'Abara', 'Voss', 'Chen', 'Reyes',
+  'Mbeki', 'Sorrel', 'Quint', 'Vaughn', 'Ostrova', 'Danner', 'Ilves', 'Farrow',
+  'Zhu', 'Bellamy', 'Nwosu', 'Kaspar', 'Trent', 'Solano', 'Weatherly', 'Bright-Ito',
+]
+
+let counter = 0
+export const uid = (prefix: string): string => {
+  counter += 1
+  return `${prefix}_${Date.now().toString(36)}_${counter.toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`
+}
+
+const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)]
+
+export const randomName = (): string => `${pick(FIRST)} ${pick(LAST)}`
+
+/**
+ * New recruits start at 1 in everything with a handful of points sprinkled on
+ * top. Pass a `focus` stat to guarantee a specialist — used for the founders so
+ * the opening station is never staffed entirely by people who can't run it.
+ */
+export const rollStats = (points = 6, focus?: StatKey): Stats => {
+  const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, 1])) as Stats
+  if (focus) {
+    stats[focus] = 4
+    points = Math.max(0, points - 3)
+  }
+  for (let i = 0; i < points; i += 1) {
+    const k = pick(STAT_KEYS)
+    if (stats[k] < 6) stats[k] += 1
+    else i -= 1
+  }
+  return stats
+}
+
+export const MAX_STAT = 10
+
+export const maxHpFor = (level: number, stats: Stats): number =>
+  Math.round(45 + (level - 1) * 9 + stats.B * 5)
+
+export const xpForLevel = (level: number): number => Math.round(55 * Math.pow(level, 1.55))
+
+export const makeCrew = (overrides: Partial<Crew> = {}): Crew => {
+  const stats = overrides.stats ?? rollStats()
+  const level = overrides.level ?? 1
+  const maxHp = maxHpFor(level, stats)
+  return {
+    id: uid('c'),
+    name: randomName(),
+    stats,
+    level,
+    xp: 0,
+    hp: maxHp,
+    maxHp,
+    morale: 0.8,
+    assignment: null,
+    returnTo: null,
+    seed: Math.floor(Math.random() * 1e9),
+    dead: false,
+    ...overrides,
+    // Keep derived values consistent even when overrides set stats/level.
+    ...(overrides.maxHp === undefined ? { maxHp } : {}),
+    ...(overrides.hp === undefined ? { hp: overrides.maxHp ?? maxHp } : {}),
+  }
+}
+
+/** Grants xp, applying as many level-ups as the total earns. Mutates a copy. */
+export const grantXp = (c: Crew, amount: number): { crew: Crew; levelled: boolean } => {
+  let xp = c.xp + amount
+  let level = c.level
+  let levelled = false
+  while (level < 50 && xp >= xpForLevel(level)) {
+    xp -= xpForLevel(level)
+    level += 1
+    levelled = true
+  }
+  const maxHp = maxHpFor(level, c.stats)
+  return {
+    crew: { ...c, xp, level, maxHp, hp: levelled ? maxHp : Math.min(c.hp, maxHp) },
+    levelled,
+  }
+}
+
+export const statTotal = (c: Crew): number =>
+  STAT_KEYS.reduce((sum, k) => sum + c.stats[k], 0)
+
+/**
+ * How good this crew member is at a given job, folding in level, injuries and
+ * mood. Both penalties have generous floors — an unhappy, battered station
+ * should be slow and miserable, never mathematically doomed.
+ */
+export const effectiveness = (c: Crew, stat: StatKey): number => {
+  const base = c.stats[stat] + (c.level - 1) * 0.35
+  const health = 0.5 + 0.5 * (c.hp / c.maxHp)
+  const mood = 0.75 + 0.25 * c.morale
+  return base * health * mood
+}
+
+/** Deterministic palette + features for a crew portrait. */
+export interface Portrait {
+  skin: string
+  hair: string
+  suit: string
+  visor: boolean
+  hairStyle: number
+  eyes: number
+  mouth: number
+}
+
+const SKINS = ['#f2c9a0', '#e0a878', '#c78a5e', '#9c6440', '#6f452c', '#f7dcc0', '#4d3020']
+const HAIRS = ['#20161a', '#4b2e1e', '#8a5a2b', '#c9a227', '#b8b8c0', '#2f5d8a', '#8a2f5d']
+const SUITS = ['#2b7f7a', '#7a4b9c', '#b5603a', '#3a63b5', '#4f8a3a', '#9c3a5f', '#5a6270']
+
+export const portraitFor = (seed: number): Portrait => {
+  const r = (n: number, mod: number) => Math.floor(seed / Math.pow(7, n)) % mod
+  return {
+    skin: SKINS[r(1, SKINS.length)],
+    hair: HAIRS[r(2, HAIRS.length)],
+    suit: SUITS[r(3, SUITS.length)],
+    visor: r(4, 5) === 0,
+    hairStyle: r(5, 4),
+    eyes: r(6, 3),
+    mouth: r(7, 3),
+  }
+}

@@ -1,0 +1,267 @@
+import type { ModuleDef, ModuleKind, StationModule } from './types'
+
+export const DECK_WIDTH = 6
+export const MAX_MERGE = 3
+export const MAX_LEVEL = 3
+
+export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
+  spine: {
+    kind: 'spine',
+    name: 'Docking Spine',
+    blurb: 'The station backbone. Crew loiter here when unassigned.',
+    glyph: '║',
+    hue: 200,
+    cost: 0,
+    unlockAtCrew: 0,
+    slotsPerSegment: 0,
+    stat: 'O',
+    powerDraw: 0,
+  },
+  reactor: {
+    kind: 'reactor',
+    name: 'Fusion Reactor',
+    blurb: 'Bottles a small star. Everything else on the station runs off it.',
+    glyph: '☢',
+    hue: 45,
+    cost: 180,
+    unlockAtCrew: 0,
+    slotsPerSegment: 2,
+    stat: 'T',
+    produces: 'power',
+    baseYield: 42,
+    cycleSeconds: 10,
+    powerDraw: 0,
+  },
+  atmospherics: {
+    kind: 'atmospherics',
+    name: 'Atmospherics Plant',
+    blurb: 'Scrubs CO₂ and cracks ice into breathable air.',
+    glyph: '◌',
+    hue: 190,
+    cost: 180,
+    unlockAtCrew: 0,
+    slotsPerSegment: 2,
+    stat: 'O',
+    produces: 'air',
+    baseYield: 22,
+    cycleSeconds: 14,
+    powerDraw: 1.2,
+  },
+  hydroponics: {
+    kind: 'hydroponics',
+    name: 'Hydroponics Bay',
+    blurb: 'Racks of algae and beans under grow lamps. Smells green.',
+    glyph: '❦',
+    hue: 110,
+    cost: 180,
+    unlockAtCrew: 0,
+    slotsPerSegment: 2,
+    stat: 'B',
+    produces: 'food',
+    baseYield: 22,
+    cycleSeconds: 16,
+    powerDraw: 1.2,
+  },
+  quarters: {
+    kind: 'quarters',
+    name: 'Crew Quarters',
+    blurb: 'Bunks, lockers and a little privacy. Raises crew capacity.',
+    glyph: '⌂',
+    hue: 280,
+    cost: 260,
+    unlockAtCrew: 4,
+    slotsPerSegment: 2,
+    stat: 'A',
+    crewCapacity: 4,
+    powerDraw: 1,
+  },
+  storage: {
+    kind: 'storage',
+    name: 'Cargo Hold',
+    blurb: 'Pressurised racking. Raises the cap on every stored resource.',
+    glyph: '▦',
+    hue: 35,
+    cost: 300,
+    unlockAtCrew: 5,
+    slotsPerSegment: 2,
+    stat: 'B',
+    storageBonus: 90,
+    powerDraw: 1,
+  },
+  medbay: {
+    kind: 'medbay',
+    name: 'Med Bay',
+    blurb: 'Autodocs and a very tired nurse. Heals injured crew station-wide.',
+    glyph: '✚',
+    hue: 0,
+    cost: 400,
+    unlockAtCrew: 6,
+    slotsPerSegment: 2,
+    stat: 'I',
+    heals: 0.35,
+    powerDraw: 3,
+  },
+  fabricator: {
+    kind: 'fabricator',
+    name: 'Fabricator',
+    blurb: 'Prints parts from feedstock and sells the surplus dockside.',
+    glyph: '⚒',
+    hue: 25,
+    cost: 480,
+    unlockAtCrew: 7,
+    slotsPerSegment: 2,
+    stat: 'T',
+    credits: 30,
+    cycleSeconds: 20,
+    powerDraw: 4,
+  },
+  comms: {
+    kind: 'comms',
+    name: 'Comms Array',
+    blurb: 'Broadcasts a recruitment beacon into the shipping lanes.',
+    glyph: '((·))',
+    hue: 320,
+    cost: 620,
+    unlockAtCrew: 8,
+    slotsPerSegment: 1,
+    stat: 'L',
+    credits: 12,
+    cycleSeconds: 24,
+    powerDraw: 3,
+  },
+  gym: {
+    kind: 'gym',
+    name: 'Centrifuge Gym',
+    blurb: 'Spin gravity and heavy iron. Trains Brawn.',
+    glyph: '⊕',
+    hue: 15,
+    cost: 500,
+    unlockAtCrew: 8,
+    slotsPerSegment: 2,
+    stat: 'B',
+    trains: 'B',
+    powerDraw: 2,
+  },
+  range: {
+    kind: 'range',
+    name: 'Combat Sim',
+    blurb: 'Holographic boarders that shoot back. Trains Reflex.',
+    glyph: '✜',
+    hue: 350,
+    cost: 560,
+    unlockAtCrew: 9,
+    slotsPerSegment: 2,
+    stat: 'R',
+    trains: 'R',
+    powerDraw: 3,
+  },
+  library: {
+    kind: 'library',
+    name: 'Archive',
+    blurb: 'Every manual ever written, and a coffee machine. Trains Intellect.',
+    glyph: '❑',
+    hue: 215,
+    cost: 600,
+    unlockAtCrew: 10,
+    slotsPerSegment: 2,
+    stat: 'I',
+    trains: 'I',
+    powerDraw: 2,
+  },
+  workshop: {
+    kind: 'workshop',
+    name: 'Engineering Bay',
+    blurb: 'Where things get taken apart to see how they work. Trains Tech.',
+    glyph: '⚙',
+    hue: 45,
+    cost: 640,
+    unlockAtCrew: 11,
+    slotsPerSegment: 2,
+    stat: 'T',
+    trains: 'T',
+    powerDraw: 3,
+  },
+  observatory: {
+    kind: 'observatory',
+    name: 'Observation Deck',
+    blurb: 'Charts, traffic control and a very big window. Trains Operations.',
+    glyph: '◉',
+    hue: 195,
+    cost: 700,
+    unlockAtCrew: 12,
+    slotsPerSegment: 2,
+    stat: 'O',
+    trains: 'O',
+    powerDraw: 3,
+  },
+  lounge: {
+    kind: 'lounge',
+    name: 'Crew Lounge',
+    blurb: 'Cards, bad music, worse synth-beer. Trains Adaptability.',
+    glyph: '☕',
+    hue: 300,
+    cost: 760,
+    unlockAtCrew: 13,
+    slotsPerSegment: 2,
+    stat: 'A',
+    trains: 'A',
+    powerDraw: 2,
+  },
+  vault: {
+    kind: 'vault',
+    name: 'Salvage Vault',
+    blurb: 'Sorting other people’s misfortune into value. Trains Luck.',
+    glyph: '◈',
+    hue: 55,
+    cost: 900,
+    unlockAtCrew: 15,
+    slotsPerSegment: 2,
+    stat: 'L',
+    trains: 'L',
+    powerDraw: 4,
+  },
+}
+
+/** Every module the player can actually place, in build-menu order. */
+export const BUILDABLE: ModuleDef[] = Object.values(MODULE_DEFS)
+  .filter((d) => d.kind !== 'spine')
+  .sort((a, b) => a.unlockAtCrew - b.unlockAtCrew || a.cost - b.cost)
+
+export const def = (kind: ModuleKind): ModuleDef => MODULE_DEFS[kind]
+
+/** Building a room costs more per copy already on the station. */
+export const buildCost = (kind: ModuleKind, existing: number): number =>
+  Math.round(def(kind).cost * (1 + existing * 0.35))
+
+/** Upgrading scales with room size and the level being bought. */
+export const upgradeCost = (m: StationModule): number =>
+  Math.round(def(m.kind).cost * 0.8 * m.width * m.level * 1.4)
+
+/** Each new deck is markedly pricier than the last. */
+export const deckCost = (decks: number): number => Math.round(260 * Math.pow(decks, 1.5))
+
+export const staffSlots = (m: StationModule): number => def(m.kind).slotsPerSegment * m.width
+
+/** Yield of one completed production cycle at full effectiveness. */
+export const cycleYield = (m: StationModule): number => {
+  const d = def(m.kind)
+  if (!d.baseYield) return 0
+  return d.baseYield * m.width * (1 + (m.level - 1) * 0.6)
+}
+
+export const cycleCredits = (m: StationModule): number => {
+  const d = def(m.kind)
+  if (!d.credits) return 0
+  return d.credits * m.width * (1 + (m.level - 1) * 0.6)
+}
+
+export const powerDraw = (m: StationModule): number =>
+  def(m.kind).powerDraw * m.width * (1 + (m.level - 1) * 0.4)
+
+export const capacityBonus = (m: StationModule): number =>
+  (def(m.kind).crewCapacity ?? 0) * m.width * m.level
+
+export const storageBonus = (m: StationModule): number =>
+  (def(m.kind).storageBonus ?? 0) * m.width * m.level
+
+export const moduleLabel = (m: StationModule): string => def(m.kind).name

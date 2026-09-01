@@ -11,6 +11,8 @@ same DOM unfolds into a two-column desktop layout at 900px.
 Built with React + TypeScript + Vite. No backend — the whole simulation runs in
 the browser and saves to `localStorage`.
 
+**Play it:** https://cyberhirsch.github.io/Spaceport-99/
+
 ```bash
 npm install
 npm run dev      # http://localhost:5173
@@ -99,6 +101,16 @@ src/
   components/        station grid, bottom sheets, modals, crew portraits
   index.css          mobile-first, with a single 900px desktop breakpoint
 ```
+
+## Continuous integration
+
+`.github/workflows/build.yml` typechecks, lints, tests and builds on every push
+and pull request. Pushes to the default branch also publish the bundle to GitHub
+Pages; other branches are checked but never deployed.
+
+Pages serves a project site from `/<repo>/`, so the build sets Vite's `base` to
+match — read from `GITHUB_REPOSITORY` rather than hardcoded, so renaming the
+repository cannot silently break every asset URL. Local builds stay at `/`.
 
 `engine.ts` is the whole game. `reducer(state, action)` is the only way state
 changes, `advance(state, seconds)` splits any elapsed span into one-second steps,

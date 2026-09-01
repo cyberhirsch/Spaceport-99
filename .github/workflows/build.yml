@@ -59,11 +59,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      # `enablement` turns Pages on for the repo if it is not already, so there
-      # is no manual settings step before the first deploy.
+      # Pages must be switched on once by a repo admin, at
+      # Settings -> Pages -> Source -> "GitHub Actions". The workflow token
+      # cannot do it: creating a Pages site needs `administration: write`,
+      # which is not a permission a workflow is allowed to request. Until it
+      # is on, this job fails with "Get Pages site failed ... Not Found".
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - id: deploy
         uses: actions/deploy-pages@v4

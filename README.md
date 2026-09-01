@@ -112,6 +112,12 @@ Pages serves a project site from `/<repo>/`, so the build sets Vite's `base` to
 match — read from `GITHUB_REPOSITORY` rather than hardcoded, so renaming the
 repository cannot silently break every asset URL. Local builds stay at `/`.
 
+**One-time setup:** Pages has to be switched on by hand under
+*Settings → Pages → Source → "GitHub Actions"*. A workflow cannot do it for
+itself — creating a Pages site needs `administration: write`, which is not a
+permission `permissions:` can grant. Until it is on, the deploy job fails with
+`Get Pages site failed … Not Found` while the build job stays green.
+
 `engine.ts` is the whole game. `reducer(state, action)` is the only way state
 changes, `advance(state, seconds)` splits any elapsed span into one-second steps,
 and `derive(state)` computes everything the UI displays but never stores.

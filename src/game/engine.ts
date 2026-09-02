@@ -309,7 +309,9 @@ const unassign = (s: GameState, crewId: string, remember = false): void => {
   if (!c || !c.assignment) return
   const m = s.modules.find((x) => x.id === c.assignment)
   if (m) m.staff = m.staff.filter((id) => id !== crewId)
-  c.returnTo = remember ? c.assignment : null
+  // A drafted hand keeps pointing at their *original* station, not at the
+  // room they were pulled into.
+  c.returnTo = remember ? (c.returnTo ?? c.assignment) : null
   c.assignment = null
 }
 
@@ -320,10 +322,14 @@ const assign = (s: GameState, crewId: string, moduleId: string): boolean => {
   // Someone light-minutes away cannot take a shift here.
   if (awayCrewIds(s).has(crewId)) return false
   if (m.staff.length >= staffSlots(m) && !m.staff.includes(crewId)) return false
+  // Sending someone into a room that is on fire is a temporary posting. Note
+  // the station they walked away from so they can walk back to it afterwards.
+  const emergency = s.incidents.some((i) => i.moduleId === m.id)
+  const previous = emergency ? (c.returnTo ?? (c.assignment === m.id ? null : c.assignment)) : null
   unassign(s, crewId)
   m.staff.push(crewId)
   c.assignment = m.id
-  c.returnTo = null
+  c.returnTo = previous
   return true
 }
 
@@ -541,6 +547,25 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
       s.credits += reward
       awardXp(s, m, 22)
       log(s, `${idef.name} contained in ${def(m.kind).name}. +${reward}c salvage.`, 'good')
+      // The emergency detail stands down: anyone drafted in walks back to the
+      // station they left. If that post is gone, full, powered down or itself
+      // burning, they simply stay put.
+      for (const id of [...m.staff]) {
+        const c = crewById.get(id)
+        if (!c || c.dead || !c.returnTo || c.returnTo === m.id) continue
+        const post = s.modules.find((x) => x.id === c.returnTo)
+        const free =
+          post &&
+          !post.standby &&
+          post.staff.length < staffSlots(post) &&
+          !s.incidents.some((i) => i.moduleId === post.id)
+        if (post && free) {
+          assign(s, c.id, post.id)
+          log(s, `${c.name} returned to the ${def(post.kind).name}.`, 'info')
+        } else {
+          c.returnTo = null
+        }
+      }
       continue
     }
     inc.spreadIn -= dt

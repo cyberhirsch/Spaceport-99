@@ -49,12 +49,16 @@ export const ModuleModal = ({
   const slots = staffSlots(m)
   const rate = workRate(m, crewById)
   const incident = state.incidents.find((i) => i.moduleId === m.id)
+  const idef = incident ? incidentDef(incident.kind) : null
+  // While a room is burning, what matters is who can put it out — not who is
+  // good at the job the room normally does.
+  const focus = idef ? idef.counter : d.stat
   const scrappable = canDemolish(state, m)
   const upCost = upgradeCost(m)
   const staffed: Crew[] = m.staff.map((id) => crewById.get(id)).filter(Boolean) as Crew[]
   const bench = availableCrew(state)
     .filter((c) => c.assignment !== m.id)
-    .sort((a, b) => effectiveness(b, d.stat) - effectiveness(a, d.stat))
+    .sort((a, b) => effectiveness(b, focus) - effectiveness(a, focus))
 
   const cycle = d.cycleSeconds
   const secondsLeft = cycle && rate > 0 ? ((1 - m.progress) * cycle) / rate : null
@@ -75,14 +79,15 @@ export const ModuleModal = ({
     >
       <p className="panel-note">{d.blurb}</p>
 
-      {incident && (
+      {incident && idef && (
         <div className="alarm-box">
           <strong>
-            {incidentDef(incident.kind).glyph} {incidentDef(incident.kind).name}
+            {idef.glyph} {idef.name}
           </strong>
           <span>
-            Crew here fight it with <b>{incidentDef(incident.kind).counter}</b> ·{' '}
-            {STAT_INFO[incidentDef(incident.kind).counter].name}. Send your best.
+            Crew here fight it with <b>{idef.counter}</b> · {STAT_INFO[idef.counter].name}. The
+            roster below is ranked on that, not on the room's usual work. Anyone you send back
+            returns to their own station once it is out.
           </span>
           <span className="alarm-box__bar">
             <i style={{ width: `${(incident.hp / incident.maxHp) * 100}%` }} />
@@ -143,7 +148,7 @@ export const ModuleModal = ({
             <span>
               {c.name}
               <em>
-                {d.stat} {c.stats[d.stat]} · eff {effectiveness(c, d.stat).toFixed(1)}
+                {focus} {c.stats[focus]} · eff {effectiveness(c, focus).toFixed(1)}
               </em>
             </span>
             <button className="staff-chip__act" onClick={() => onAssign(c.id, null)} title="Send off duty">
@@ -156,7 +161,7 @@ export const ModuleModal = ({
 
       {slots > staffed.length && bench.length > 0 && (
         <>
-          <h3 className="modal__sub">Assign someone</h3>
+          <h3 className="modal__sub">{idef ? `Send someone — best ${idef.counter} first` : 'Assign someone'}</h3>
           <div className="staff-grid">
             {bench.slice(0, 12).map((c) => (
               <button
@@ -168,7 +173,7 @@ export const ModuleModal = ({
                 <span>
                   {c.name}
                   <em>
-                    {d.stat} {c.stats[d.stat]} · eff {effectiveness(c, d.stat).toFixed(1)}
+                    {focus} {c.stats[focus]} · eff {effectiveness(c, focus).toFixed(1)}
                     {c.assignment ? ' · reassign' : ''}
                   </em>
                 </span>

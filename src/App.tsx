@@ -34,7 +34,7 @@ const TABS: { id: Tab; label: string; glyph: string }[] = [
 ]
 
 export default function App() {
-  const { state, derived, act, hardReset, saveNow, bookmark, restore } = useGame()
+  const { state, derived, act, hardReset, saveNow, bookmark, restore, discardSlot } = useGame()
   const wide = useMediaQuery('(min-width: 900px)')
   const [tab, setTab] = useState<Tab>('build')
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -167,9 +167,9 @@ export default function App() {
           if (restore()) setParked(false)
         }}
         onScuttle={() => {
-          if (!confirm('Scuttle the station and start over? This cannot be undone.')) return
+          if (!confirm('Scuttle the station and start over? Your manual save is kept.')) return
           hardReset()
-          setSlot(null)
+          setSlot(slotInfo())
           setParked(false)
         }}
       />
@@ -446,7 +446,8 @@ export default function App() {
           <p className="panel-note">
             Progress saves to this device by itself, and the station keeps running while you are
             away — up to four hours of it is credited when you come back. A manual save is a
-            separate bookmark you can come back to whenever you like.
+            separate bookmark you can come back to whenever you like, and scuttling the station
+            does not touch it.
           </p>
 
           <dl className="kv">
@@ -497,6 +498,17 @@ export default function App() {
             </button>
             <button
               className="btn"
+              disabled={!slot}
+              onClick={() => {
+                if (!confirm('Throw away the manual save? There is no getting it back.')) return
+                discardSlot()
+                setSlot(null)
+              }}
+            >
+              Discard save
+            </button>
+            <button
+              className="btn"
               onClick={() => {
                 saveNow()
                 setMenuOpen(false)
@@ -514,9 +526,9 @@ export default function App() {
             <button
               className="btn btn--danger"
               onClick={() => {
-                if (confirm('Scuttle the station and start over? This cannot be undone.')) {
+                if (confirm('Scuttle the station and start over? Your manual save is kept.')) {
                   hardReset()
-                  setSlot(null)
+                  setSlot(slotInfo())
                   setSavedAt(null)
                   setMenuOpen(false)
                   setModuleId(null)

@@ -48,11 +48,18 @@ export const useGame = () => {
 
   const act = useCallback((action: Action) => dispatch(action), [])
 
+  /**
+   * Scuttles the running station. The manual save is deliberately left alone:
+   * it is a bookmark the player made on purpose, and starting over is one of
+   * the likeliest reasons to want it back.
+   */
   const hardReset = useCallback(() => {
     clearSave()
-    clearSlot()
     dispatch({ type: 'reset' })
   }, [])
+
+  /** Throws the bookmark away, for a player who wants a genuinely clean slate. */
+  const discardSlot = useCallback(() => clearSlot(), [])
 
   /** Flush the rolling autosave right now, so a close is never mid-second. */
   const saveNow = useCallback(() => {
@@ -75,5 +82,5 @@ export const useGame = () => {
     return true
   }, [])
 
-  return { state, derived, act, hardReset, saveNow, bookmark, restore }
+  return { state, derived, act, hardReset, saveNow, bookmark, restore, discardSlot }
 }

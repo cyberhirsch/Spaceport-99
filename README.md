@@ -30,6 +30,14 @@ npm run electron      # run the desktop shell against a fresh bundle
 npm run pack:desktop  # installers for this machine's platform, into release/
 ```
 
+## Saving
+
+The autosave is continuous: it writes to the device every few seconds and credits up to four
+hours of catch-up when you come back. The **manual save** in Station options is something else —
+a bookmark you place deliberately, kept in its own slot, and the only thing **Load** ever
+restores. Scuttling the station does not touch it, because starting over is one of the likeliest
+reasons to want it back; **Discard save** is there for a genuinely clean slate.
+
 ## Standalone builds
 
 The same bundle, wrapped twice. **Electron** serves it to a desktop window;

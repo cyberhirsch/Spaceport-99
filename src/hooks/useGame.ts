@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { type Action, derive, newGame, reducer } from '../game/engine.ts'
-import { clearSave, loadGame, saveGame } from '../game/save.ts'
+import { clearSave, clearSlot, loadGame, readSlot, saveGame, writeSlot } from '../game/save.ts'
 import type { GameState } from '../game/types.ts'
 
 const TICK_MS = 500
@@ -50,8 +50,30 @@ export const useGame = () => {
 
   const hardReset = useCallback(() => {
     clearSave()
+    clearSlot()
     dispatch({ type: 'reset' })
   }, [])
 
-  return { state, derived, act, hardReset }
+  /** Flush the rolling autosave right now, so a close is never mid-second. */
+  const saveNow = useCallback(() => {
+    lastSave.current = Date.now()
+    saveGame(state)
+  }, [state])
+
+  /** Write the manual slot — a bookmark to come back to later. */
+  const bookmark = useCallback(() => {
+    writeSlot(state)
+    saveGame(state)
+  }, [state])
+
+  /** Restore that bookmark, discarding everything since. */
+  const restore = useCallback(() => {
+    const slot = readSlot()
+    if (!slot) return false
+    const away = Math.max(0, (Date.now() - slot.lastTick) / 1000)
+    dispatch({ type: 'load', state: reducer(slot, { type: 'catchUp', seconds: away }) })
+    return true
+  }, [])
+
+  return { state, derived, act, hardReset, saveNow, bookmark, restore }
 }

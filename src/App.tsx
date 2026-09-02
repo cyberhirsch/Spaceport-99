@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { BuildMenu } from './components/BuildMenu.tsx'
 import { CrewModal } from './components/CrewModal.tsx'
 import { CrewPanel } from './components/CrewPanel.tsx'
@@ -12,6 +12,9 @@ import { Modal } from './components/Modal.tsx'
 import { GuestModal } from './components/GuestModal.tsx'
 import { ModuleModal } from './components/ModuleModal.tsx'
 import { StationView } from './components/StationView.tsx'
+import { TitleScreen } from './components/TitleScreen.tsx'
+import { agoOf, spanOf } from './components/saveText.ts'
+import { slotInfo } from './game/save.ts'
 import { TopBar } from './components/TopBar.tsx'
 import { canMove, guestsAboard, isAway, relocateAnchor, staffSlots } from './game/engine.ts'
 import { useDragAssign } from './hooks/useDragAssign.ts'
@@ -29,7 +32,7 @@ const TABS: { id: Tab; label: string; glyph: string }[] = [
 ]
 
 export default function App() {
-  const { state, derived, act, hardReset } = useGame()
+  const { state, derived, act, hardReset, saveNow, bookmark, restore } = useGame()
   const wide = useMediaQuery('(min-width: 900px)')
   const [tab, setTab] = useState<Tab>('build')
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -43,6 +46,13 @@ export default function App() {
   const [visitorId, setVisitorId] = useState<string | null>(null)
   const [guestId, setGuestId] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  // Set down at the title screen: saved, and asking nothing of you.
+  const [parked, setParked] = useState(false)
+  // Re-read whenever the menu opens or a save is written, not every render.
+  const [slot, setSlot] = useState(() => slotInfo())
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  // The station's scroll box, so a swipe that started on a room can pan it.
+  const station = useRef<HTMLElement | null>(null)
   const panelOpen = wide || sheetOpen
 
   const canDropCrew = useCallback(
@@ -64,15 +74,38 @@ export default function App() {
     [state],
   )
 
+  // Opening a room: the hangar and command module live in the Fleet tab, so
+  // tapping them takes you there as well as opening the panel.
+  const openModule = useCallback(
+    (id: string) => {
+      const kind = state.modules.find((m) => m.id === id)?.kind
+      if (kind === 'hangar' || kind === 'command') {
+        setTab('fleet')
+        if (!wide) setSheetOpen(true)
+      }
+      setModuleId(id)
+    },
+    [state, wide],
+  )
+
   const { drag, start, startRoom } = useDragAssign({
     onDropCrew: (id, target) => act({ type: 'assign', crewId: id, moduleId: target }),
     onDropRoom: (id, cell) => {
       act({ type: 'relocate', moduleId: id, deck: cell.deck, col: cell.col })
       setMoving(null)
     },
-    onTap: (subject) => (subject.type === 'crew' ? setCrewId(subject.id) : setModuleId(subject.id)),
+    onTap: (subject) => {
+      if (subject.type === 'crew') setCrewId(subject.id)
+      else if (!moving) openModule(subject.id)
+    },
     canDropCrew,
     canDropRoom,
+    onPan: (dx, dy) => {
+      const el = station.current
+      if (!el) return
+      el.scrollLeft -= dx
+      el.scrollTop -= dy
+    },
   })
 
   const openTab = (next: Tab) => {
@@ -121,6 +154,26 @@ export default function App() {
       'Command Module unstaffed — no contracts are coming in',
   ].filter(Boolean) as string[]
 
+  if (parked) {
+    return (
+      <TitleScreen
+        state={state}
+        derived={derived}
+        slot={slot}
+        onResume={() => setParked(false)}
+        onLoad={() => {
+          if (restore()) setParked(false)
+        }}
+        onScuttle={() => {
+          if (!confirm('Scuttle the station and start over? This cannot be undone.')) return
+          hardReset()
+          setSlot(null)
+          setParked(false)
+        }}
+      />
+    )
+  }
+
   return (
     <div className={`app${drag ? ' is-dragging' : ''}`}>
       <TopBar
@@ -128,7 +181,10 @@ export default function App() {
         derived={derived}
         onRename={(name) => act({ type: 'rename', name })}
         onResupply={(resource) => act({ type: 'resupply', resource })}
-        onOpenMenu={() => setMenuOpen(true)}
+        onOpenMenu={() => {
+          setSlot(slotInfo())
+          setMenuOpen(true)
+        }}
       />
 
       {alerts.length > 0 && (
@@ -141,6 +197,9 @@ export default function App() {
 
       <main className="layout">
         <StationView
+          onScroller={(el) => {
+            station.current = el
+          }}
           state={state}
           placing={placing}
           moving={moving}
@@ -161,15 +220,7 @@ export default function App() {
             setPlacing(null)
             setMoving(null)
           }}
-          onSelectModule={(id) => {
-            if (moving) return
-            const kind = state.modules.find((m) => m.id === id)?.kind
-            if (kind === 'hangar' || kind === 'command') {
-              setTab('fleet')
-              if (!wide) setSheetOpen(true)
-            }
-            setModuleId(id)
-          }}
+          onSelectModule={openModule}
           onSelectCrew={(id) => setCrewId(id)}
           onSelectVisitor={(id) => setVisitorId(id)}
           onSelectGuest={(id) => setGuestId(id)}
@@ -367,19 +418,80 @@ export default function App() {
       {menuOpen && (
         <Modal title="Station options" onClose={() => setMenuOpen(false)}>
           <p className="panel-note">
-            Progress saves to this device automatically, and the station keeps running while you are
-            away (up to four hours of catch-up).
+            Progress saves to this device by itself, and the station keeps running while you are
+            away — up to four hours of it is credited when you come back. A manual save is a
+            separate bookmark you can come back to whenever you like.
           </p>
-          <p className="panel-note">
-            Drag a crew portrait from the off-duty tray onto a room to post them there, or back onto
-            the tray to stand them down. Tap a portrait to open their file.
-          </p>
+
+          <dl className="kv">
+            <div>
+              <dt>Station</dt>
+              <dd>{state.name}</dd>
+            </div>
+            <div>
+              <dt>On station</dt>
+              <dd>{spanOf(state.elapsed)}</dd>
+            </div>
+            <div>
+              <dt>Manual save</dt>
+              <dd>
+                {slot
+                  ? `${slot.crew} crew · ${slot.rooms} rooms · ${agoOf(slot.savedAt)}`
+                  : 'none yet'}
+              </dd>
+            </div>
+          </dl>
+
+          {savedAt && <p className="panel-note">Saved {agoOf(savedAt)}.</p>}
+
+          <div className="modal__actions">
+            <button
+              className="btn btn--primary"
+              onClick={() => {
+                bookmark()
+                setSlot(slotInfo())
+                setSavedAt(Date.now())
+              }}
+            >
+              Save
+            </button>
+            <button
+              className="btn"
+              disabled={!slot}
+              onClick={() => {
+                if (!confirm('Load the manual save? Everything since it is lost.')) return
+                if (!restore()) return
+                setMenuOpen(false)
+                setModuleId(null)
+                setCrewId(null)
+                setSavedAt(null)
+              }}
+            >
+              Load
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                saveNow()
+                setMenuOpen(false)
+                setModuleId(null)
+                setCrewId(null)
+                setSlot(slotInfo())
+                setParked(true)
+              }}
+            >
+              Exit
+            </button>
+          </div>
+
           <div className="modal__actions">
             <button
               className="btn btn--danger"
               onClick={() => {
                 if (confirm('Scuttle the station and start over? This cannot be undone.')) {
                   hardReset()
+                  setSlot(null)
+                  setSavedAt(null)
                   setMenuOpen(false)
                   setModuleId(null)
                   setCrewId(null)
@@ -414,8 +526,8 @@ export default function App() {
             <li>
               <b>Decks are symmetrical</b> — five room slots each side of the lift shaft, built
               outward from it. Fresh rooms of a kind side by side weld into one run: more output
-              per segment, and a second upgrade a lone room never gets. Drag a room by its corner
-              grip to move it.
+              per segment, and a second upgrade a lone room never gets. Press and hold a room to
+              pick it up and move it.
             </li>
             <li>
               <b>Rushing</b> finishes a cycle instantly but can start a fire. <b>Emergencies</b> are

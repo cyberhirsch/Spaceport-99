@@ -37,10 +37,18 @@ interface Options {
   onTap: (subject: DragSubject) => void
   canDropCrew: (crewId: string, moduleId: string) => boolean
   canDropRoom: (roomId: string, cell: DragCell) => boolean
+  /** A swipe that started on a room, before the hold picked it up. */
+  onPan: (dx: number, dy: number) => void
 }
 
-/** Hold this long without moving and whatever is under the finger is picked up. */
+/** Hold this long without moving and a crew member is picked up. */
 const HOLD_MS = 150
+/**
+ * Rooms take a deliberate press, because their whole body is also the tap
+ * target and the thing you swipe to pan the station. Same gesture as
+ * rearranging icons on a phone.
+ */
+const ROOM_HOLD_MS = 260
 /** Movement under this is a tap, not a drag. */
 const SLOP = 10
 
@@ -49,9 +57,14 @@ interface Gesture {
   pointerId: number
   x0: number
   y0: number
+  /** Where the pointer was last seen, for panning deltas. */
+  lastX: number
+  lastY: number
   timer: number
   active: boolean
   moved: boolean
+  /** The gesture turned into a station pan and can no longer become anything else. */
+  panning: boolean
   state: DragState | null
 }
 
@@ -74,15 +87,16 @@ export const useDragAssign = ({
   onTap,
   canDropCrew,
   canDropRoom,
+  onPan,
 }: Options) => {
   const [drag, setDrag] = useState<DragState | null>(null)
-  const api = useRef({ onDropCrew, onDropRoom, onTap, canDropCrew, canDropRoom })
+  const api = useRef({ onDropCrew, onDropRoom, onTap, canDropCrew, canDropRoom, onPan })
   const gesture = useRef<Gesture | null>(null)
 
   // Kept fresh in an effect rather than during render; drags only ever start
   // after the commit that set these.
   useEffect(() => {
-    api.current = { onDropCrew, onDropRoom, onTap, canDropCrew, canDropRoom }
+    api.current = { onDropCrew, onDropRoom, onTap, canDropCrew, canDropRoom, onPan }
   })
 
   const finish = useCallback((commit: boolean) => {
@@ -91,6 +105,8 @@ export const useDragAssign = ({
     window.clearTimeout(g.timer)
     gesture.current = null
     setDrag(null)
+    // A swipe across the station is neither a drop nor a tap.
+    if (g.panning) return
     // A long press that never went anywhere is still just a tap.
     if (!g.active || !g.moved) {
       if (commit) api.current.onTap(g.subject)
@@ -112,12 +128,27 @@ export const useDragAssign = ({
       if (!g || e.pointerId !== g.pointerId) return
       const far = Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > SLOP
       if (far) g.moved = true
+      // A room is only picked up by a deliberate press. Swipe one before the
+      // hold lands and you are panning the station, which is what a swipe
+      // across a wall of rooms should do — the room body has taken over the
+      // browser's own panning, so we do it by hand.
+      if (g.panning || (g.subject.type === 'room' && !g.active && far)) {
+        g.panning = true
+        window.clearTimeout(g.timer)
+        e.preventDefault()
+        api.current.onPan(e.clientX - g.lastX, e.clientY - g.lastY)
+        g.lastX = e.clientX
+        g.lastY = e.clientY
+        return
+      }
       if (!g.active) {
         if (!far) return
         g.active = true
         navigator.vibrate?.(8)
       }
       e.preventDefault()
+      g.lastX = e.clientX
+      g.lastY = e.clientY
       const el = document.elementFromPoint(e.clientX, e.clientY)
       const moduleId = el?.closest('[data-drop-module]')?.getAttribute('data-drop-module') ?? null
       const cell = readCell(el)
@@ -162,9 +193,12 @@ export const useDragAssign = ({
       pointerId: e.pointerId,
       x0: e.clientX,
       y0: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
       timer: 0,
       active: false,
       moved: false,
+      panning: false,
       state: null,
     }
     // Picking up on a short hold too, so a slow, deliberate drag also works.
@@ -184,7 +218,7 @@ export const useDragAssign = ({
         valid: false,
       }
       setDrag(g.state)
-    }, HOLD_MS)
+    }, room ? ROOM_HOLD_MS : HOLD_MS)
     gesture.current = g
   }, [])
 

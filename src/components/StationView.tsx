@@ -22,6 +22,8 @@ import { shipDef } from '../game/fleet.ts'
 import { CrewAvatar } from './CrewAvatar.tsx'
 
 interface Props {
+  /** Hands the scroll box up, so a swipe that began on a room can pan it. */
+  onScroller: (el: HTMLElement | null) => void
   state: GameState
   placing: ModuleKind | null
   /** Id of a room picked up for relocation by tapping its Move button. */
@@ -91,26 +93,15 @@ const Room = ({
       data-drop-module={module.id}
       role="button"
       tabIndex={0}
-      onClick={onOpen}
+      onPointerDown={(e) => onRoomDragStart(module.id, e)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onOpen()
         }
       }}
-      title={`${d.name} — level ${module.level}`}
+      title={`${d.name} — level ${module.level}. Press and hold to move it, ${moveCost(module)}c.`}
     >
-      <span
-        className="room__move grip"
-        onPointerDown={(e) => {
-          e.stopPropagation()
-          onRoomDragStart(module.id, e)
-        }}
-        onClick={(e) => e.stopPropagation()}
-        title={`Drag to move this room — ${moveCost(module)}c`}
-      >
-        ⠿
-      </span>
       <span className="room__glyph">{d.glyph}</span>
       {module.standby && <span className="room__standby">off</span>}
       <span className="room__title">
@@ -171,6 +162,7 @@ const Room = ({
 }
 
 export const StationView = ({
+  onScroller,
   state,
   placing,
   moving,
@@ -186,7 +178,7 @@ export const StationView = ({
   onEmptyCell,
   onBuyDeck,
 }: Props) => {
-  const scroller = useRef<HTMLDivElement>(null)
+  const scroller = useRef<HTMLElement | null>(null)
   const crewById = new Map(state.crew.map((c) => [c.id, c]))
   const idle = idleCrew(state)
   // Crew who are off the station are still worth seeing — they are just not
@@ -309,7 +301,10 @@ export const StationView = ({
 
       <section
         className="station"
-        ref={scroller}
+        ref={(el) => {
+          scroller.current = el
+          onScroller(el)
+        }}
         onContextMenu={(e) => {
           if (placing || moving) {
             e.preventDefault()

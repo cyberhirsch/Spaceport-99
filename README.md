@@ -69,8 +69,9 @@ Three powers hold a claim on the patch of the Verge the station sits in, and the
 where the claims overlap — which is the only reason a charter was ever granted, since each of
 them preferred an independent station there to one of the other two.
 
-- **The Terran Registry** claims by precedent: Earth chartered the first survey out here and
-  never stopped filing. It dispatches applicants on its own tab and pays modestly, on schedule.
+- **The Terran Confederation** claims by writ: the Verge was surveyed under Confederation
+  charter and no member world has ever voted to give it up. It dispatches applicants on
+  Confederation pay, and its patrols answer eventually.
 - **The Meridian Concern** claims the lanes. Best prices at your clamps, credit when a reactor
   goes, and everything itemised.
 - **The Vantric Compact** claims by enrolment. It does not take stations; it invites them, once
@@ -83,6 +84,20 @@ you wave off, who you trade with, and who you poach off somebody else's bridge. 
 fly decides which of those four opinions feeds `appeal()`, and so who HQ sends and how nasty the
 contracts get. Changing sides is expected out here and never free; the Compact is the one flag
 that cannot be struck.
+
+## Defending the place
+
+Four things decide whether a station can say no. A **Defence Battery** is two hardpoints and a
+firing solution, worth nothing unstaffed or switched off. A **Shield Projector** holds a field
+that soaks damage before the hull feels it, and holds it badly with nobody tuning it. A hull in
+its berth is a gun platform; one out on a contract is not. And the crew carry what you issue
+them — one sidearm, one layer of armour, bought off berthed hulls and kept in the hold until
+somebody needs it.
+
+Who sells what depends on whose paper they fly: the Drift undercuts everyone on a cargo tool
+with a bad reputation, and the Compact will sell you a lance if it likes you and to nobody else.
+Kit counts twice — as stat points on the person wearing it, and as small arms when a boarding
+party comes down a corridor.
 
 ## How it plays
 

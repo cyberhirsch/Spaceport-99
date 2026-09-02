@@ -276,6 +276,34 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     trains: 'A',
     powerDraw: 2,
   },
+  battery: {
+    kind: 'battery',
+    name: 'Defence Battery',
+    short: 'Battery',
+    blurb: 'Two hardpoints and a firing solution. Nothing docks that the crew here dislike.',
+    glyph: '⁜',
+    hue: 5,
+    cost: 680,
+    unlockAtCrew: 6,
+    slotsPerSegment: 2,
+    stat: 'R',
+    guns: 6,
+    powerDraw: 3.5,
+  },
+  shield: {
+    kind: 'shield',
+    name: 'Shield Projector',
+    short: 'Shield',
+    blurb: 'Holds a field across the hull. Drinks power and gives nothing back until it has to.',
+    glyph: '◌',
+    hue: 210,
+    cost: 820,
+    unlockAtCrew: 8,
+    slotsPerSegment: 1,
+    stat: 'T',
+    shield: 5,
+    powerDraw: 6,
+  },
   vault: {
     kind: 'vault',
     name: 'Reclamation Bay',
@@ -385,5 +413,13 @@ export const shipBerths = (m: StationModule): number =>
 /** Missions a command module can run at once. */
 export const missionSlots = (m: StationModule): number =>
   (def(m.kind).missions ?? 0) * m.width * m.level
+
+/** What a defence battery brings to a fight, when it is staffed and lit. */
+export const moduleGuns = (m: StationModule): number =>
+  (def(m.kind).guns ?? 0) * m.width * m.level * mergeBonus(m)
+
+/** Damage a shield projector soaks before the hull sees any of it. */
+export const moduleShield = (m: StationModule): number =>
+  (def(m.kind).shield ?? 0) * m.width * m.level * mergeBonus(m)
 
 export const moduleLabel = (m: StationModule): string => def(m.kind).name

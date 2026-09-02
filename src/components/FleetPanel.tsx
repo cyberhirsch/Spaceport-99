@@ -2,6 +2,7 @@ import {
   availableCrew,
   berthedShips,
   fleetCapacity,
+  defence,
   missionCapacity,
 } from '../game/engine.ts'
 import {
@@ -107,6 +108,34 @@ const ShipCard = ({
   )
 }
 
+/**
+ * What the station could bring to a fight. It belongs above the fleet rather
+ * than inside it: a battery matters from the day it is built, long before
+ * there is a hangar to put a hull in.
+ */
+const Guard = ({ state }: { state: GameState }) => {
+  const g = defence(state)
+  return (
+    <dl className="guard">
+      <div>
+        <dt>Guns</dt>
+        <dd>{g.guns.toFixed(1)}</dd>
+        <span>batteries and berthed hulls</span>
+      </div>
+      <div>
+        <dt>Shield</dt>
+        <dd>{g.shield.toFixed(1)}</dd>
+        <span>soaked before the hull feels it</span>
+      </div>
+      <div>
+        <dt>Small arms</dt>
+        <dd>{g.smallArms}</dd>
+        <span>what the crew are carrying</span>
+      </div>
+    </dl>
+  )
+}
+
 export const FleetPanel = ({
   state,
   onOpenMission,
@@ -139,6 +168,7 @@ export const FleetPanel = ({
     ]
     return (
       <div className="panel-body">
+        <Guard state={state} />
         <p className="panel-note">Before anything can launch:</p>
         <ul className="checklist">
           {steps.map((step) => (
@@ -176,6 +206,8 @@ export const FleetPanel = ({
 
   return (
     <div className="panel-body">
+      <Guard state={state} />
+
       {reports.map((m) => (
         <div key={m.id} className={`report report--${OUTCOME_INFO[m.outcome!].tone}`}>
           <strong>{OUTCOME_INFO[m.outcome!].label}</strong>

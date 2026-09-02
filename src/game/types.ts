@@ -35,6 +35,8 @@ export type ModuleKind =
   | 'dock'
   | 'hangar'
   | 'command'
+  | 'battery'
+  | 'shield'
   | 'storage'
   | 'gym'
   | 'range'
@@ -87,6 +89,10 @@ export interface ModuleDef {
   ships?: number
   /** Concurrent missions per segment per level, for the command module. */
   missions?: number
+  /** Firepower per segment per level, for the defence battery. */
+  guns?: number
+  /** Damage absorbed per segment per level, for the shield projector. */
+  shield?: number
 }
 
 /** A built (possibly merged) room occupying contiguous slots on one deck. */
@@ -132,6 +138,8 @@ export interface Crew {
   seed: number
   /** Portrait dealt to them, 1..PORTRAIT_COUNT. Absent on pre-portrait saves. */
   portrait?: number
+  /** What they are carrying. Drawn from the hold, one item per slot. */
+  gear: Partial<Record<ItemSlot, ItemId>>
   dead: boolean
 }
 
@@ -191,8 +199,13 @@ export interface Candidate {
 /** What a ship at the clamps actually is, which is not always what it claims. */
 export type VisitorKind = 'trader' | 'courier' | 'patrol' | 'drifter' | 'smuggler' | 'raider'
 
+/** Kit a crew member can be issued: one weapon, one layer of protection. */
+export type ItemSlot = 'sidearm' | 'armour'
+
+export type ItemId = 'cutter' | 'sidearm' | 'lance' | 'vest' | 'plate' | 'carapace'
+
 /** The powers with a claim on the Verge, plus everyone off their books. */
-export type FactionId = 'registry' | 'concern' | 'compact' | 'unlisted'
+export type FactionId = 'terran' | 'concern' | 'compact' | 'unlisted'
 
 /** Something a docked ship wants to talk about. Marked with an exclamation. */
 export interface VisitorOffer {
@@ -402,6 +415,8 @@ export interface GameState {
   patron: FactionId | null
   /** Powers this station has already walked out on. They remember. */
   resigned: FactionId[]
+  /** Kit in the hold, not yet issued to anybody. */
+  stores: Partial<Record<ItemId, number>>
   /** Ids of crew that arrived but have not been greeted yet (for the toast). */
   seenIntro: boolean
   gameOver: boolean

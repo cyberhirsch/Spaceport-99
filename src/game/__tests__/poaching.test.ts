@@ -68,8 +68,8 @@ test('what talks a master round is the station, not the chequebook', () => {
   }
   good = {
     ...good,
-    standing: { ...good.standing, registry: 0.2 },
-    patron: 'registry',
+    standing: { ...good.standing, terran: 0.2 },
+    patron: 'terran',
     credits: 50000,
   }
   const here = guestAboard(good, master.id)

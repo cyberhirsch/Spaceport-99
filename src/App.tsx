@@ -360,6 +360,7 @@ export default function App() {
             setVisitorId(null)
           }}
           onTrade={(resource, buy) => act({ type: 'tradeVisitor', visitorId, resource, buy })}
+          onBuyGear={(item) => act({ type: 'buyGear', visitorId, item })}
           onSelectGuest={(id) => {
             setVisitorId(null)
             setGuestId(id)
@@ -429,6 +430,8 @@ export default function App() {
           onAssign={(cid, mid) => act({ type: 'assign', crewId: cid, moduleId: mid })}
           onRevive={() => act({ type: 'revive', crewId })}
           onRename={(name) => act({ type: 'renameCrew', crewId, name })}
+          onIssue={(item) => act({ type: 'issueGear', crewId, item })}
+          onStow={(slot) => act({ type: 'stowGear', crewId, slot })}
           onDismiss={() => {
             act({ type: 'dismiss', crewId })
             setCrewId(null)

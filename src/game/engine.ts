@@ -16,6 +16,8 @@ import {
   powerDraw,
   berths,
   missionSlots,
+  moduleGuns,
+  moduleShield,
   shipBerths,
   staffSlots,
   storageBonus,
@@ -35,6 +37,7 @@ import {
   uid,
 } from './crew.ts'
 import { incidentDef } from './incidents.ts'
+import { SLOTS, itemDef, stock } from './gear.ts'
 import {
   DEFECTION_COST,
   DEFECTION_CREDIT,
@@ -56,6 +59,7 @@ import {
   shipDef,
   shipHull,
   shipSpeed,
+  shipTeeth,
   teamSize,
   tradeInValue,
 } from './fleet.ts'
@@ -64,6 +68,8 @@ import type {
   Candidate,
   Crew,
   FactionId,
+  ItemId,
+  ItemSlot,
   Prospect,
   Mission,
   Ship,
@@ -125,6 +131,60 @@ const rateOf = (m: StationModule, crewById: Map<string, Crew>, resource: Resourc
   const d = def(m.kind)
   if (d.produces !== resource || !d.cycleSeconds) return 0
   return (cycleYield(m) * workRate(m, crewById)) / d.cycleSeconds
+}
+
+/** Stat points a crew member's kit adds on top of their own. */
+export const gearBonus = (c: Crew, stat: StatKey): number => {
+  let n = 0
+  for (const slot of SLOTS) {
+    const id = c.gear?.[slot]
+    if (id) n += itemDef(id).bonus?.[stat] ?? 0
+  }
+  return n
+}
+
+/** What one crew member's kit is worth when the station has to defend itself. */
+export const crewGuard = (c: Crew): number => {
+  let n = 0
+  for (const slot of SLOTS) {
+    const id = c.gear?.[slot]
+    if (id) n += itemDef(id).guard
+  }
+  return n
+}
+
+/**
+ * What the station can bring to a fight: batteries and berthed hulls that can
+ * shoot, a field to soak what gets through, and whatever the crew are carrying
+ * when somebody comes down a corridor.
+ */
+export interface Defence {
+  guns: number
+  shield: number
+  smallArms: number
+}
+
+export const defence = (s: GameState): Defence => {
+  const crewById = new Map(s.crew.map((c) => [c.id, c]))
+  let guns = 0
+  let shield = 0
+  for (const m of s.modules) {
+    if (m.standby) continue
+    // An unstaffed battery is a decoration. A shield holds without anyone in it,
+    // badly.
+    const rate = workRate(m, crewById)
+    guns += moduleGuns(m) * rate
+    shield += moduleShield(m) * Math.max(0.35, rate)
+  }
+  // A hull in its berth is a gun platform. One out on a contract is not.
+  for (const ship of s.ships) {
+    if (!ship.missionId) guns += shipTeeth(ship) * (ship.hull / shipHull(ship))
+  }
+  let smallArms = 0
+  for (const c of s.crew) {
+    if (!c.dead && !awayCrewIds(s).has(c.id)) smallArms += crewGuard(c)
+  }
+  return { guns, shield, smallArms }
 }
 
 /** How fast a room runs, 0 when unstaffed and up to ~1.6 with an elite crew. */
@@ -232,6 +292,7 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     standing: blankStanding(),
     patron: null,
     resigned: [],
+    stores: {},
     seenIntro: false,
     gameOver: false,
   }
@@ -617,7 +678,11 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
     let firepower = 0.45
     for (const id of m.staff) {
       const c = crewById.get(id)
-      if (c && !c.dead) firepower += effectiveness(c, idef.counter) * 0.55
+      if (!c || c.dead) continue
+      firepower += effectiveness(c, idef.counter) * 0.55
+      // Kit tells most against people. A hull breach does not care what you
+      // are carrying; a boarding party very much does.
+      if (inc.kind === 'pirates') firepower += crewGuard(c) * 0.18
     }
     inc.hp -= firepower * dt
     m.condition = clamp(m.condition - idef.structureDps * dt, 0.2, 1)
@@ -717,6 +782,12 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
       c.hp = 0
       c.dead = true
       c.returnTo = null
+      // Their kit goes back in the hold. Somebody else will need it.
+      for (const slot of SLOTS) {
+        const worn = c.gear?.[slot]
+        if (worn) s.stores[worn] = (s.stores[worn] ?? 0) + 1
+      }
+      c.gear = {}
       unassign(s, c.id)
       log(s, `${c.name} has died. The station observes a minute of silence.`, 'bad')
     }
@@ -870,9 +941,9 @@ const admitVisitor = (s: GameState, v: Visitor): void => {
         s.resources[key] = Math.max(0, s.resources[key] - given)
       }
       shift(s, v.faction, 0.04)
-      // Sheltering a hull with no registration is not a crime. The Registry
-      // still writes it down.
-      if (v.faction === 'unlisted') shift(s, 'registry', -0.01)
+      // Sheltering a hull with no registration is not a crime. The
+      // Confederation still minutes it.
+      if (v.faction === 'unlisted') shift(s, 'terran', -0.01)
       log(s, `${v.name} was taken in and resupplied. Word gets around.`, 'good')
       break
     }
@@ -1098,6 +1169,9 @@ export type Action =
   | { type: 'answerGuest'; guestId: string; yes: boolean }
   | { type: 'persuadeGuest'; guestId: string; tactic: Tactic; moduleId?: string }
   | { type: 'signGuest'; guestId: string }
+  | { type: 'buyGear'; visitorId: string; item: ItemId }
+  | { type: 'issueGear'; crewId: string; item: ItemId }
+  | { type: 'stowGear'; crewId: string; slot: ItemSlot }
   | { type: 'declare'; faction: FactionId }
   | { type: 'resign' }
   | { type: 'revive'; crewId: string }
@@ -1843,6 +1917,39 @@ export const reducer = (state: GameState, action: Action): GameState => {
           log(s, `No berth for the ${hull.name}, so she went dockside. +${paid}c.`, 'info')
         }
       }
+      break
+    }
+    case 'buyGear': {
+      const v = s.visitors.find((x) => x.id === action.visitorId)
+      if (!v || v.status !== 'docked') return state
+      const line = stock(v.faction).find((x) => x.id === action.item)
+      if (!line || s.credits < line.price) return state
+      s.credits -= line.price
+      s.stores[action.item] = (s.stores[action.item] ?? 0) + 1
+      shift(s, v.faction, 0.004)
+      log(s, `Bought a ${itemDef(action.item).name.toLowerCase()} off ${v.name}. −${line.price}c.`, 'info')
+      break
+    }
+    case 'issueGear': {
+      const c = s.crew.find((x) => x.id === action.crewId)
+      const held = s.stores[action.item] ?? 0
+      if (!c || c.dead || held <= 0) return state
+      const slot = itemDef(action.item).slot
+      // Whatever they were carrying in that slot goes back in the hold.
+      const worn = c.gear?.[slot]
+      if (worn) s.stores[worn] = (s.stores[worn] ?? 0) + 1
+      s.stores[action.item] = held - 1
+      c.gear = { ...c.gear, [slot]: action.item }
+      break
+    }
+    case 'stowGear': {
+      const c = s.crew.find((x) => x.id === action.crewId)
+      const worn = c?.gear?.[action.slot]
+      if (!c || !worn) return state
+      s.stores[worn] = (s.stores[worn] ?? 0) + 1
+      const next = { ...c.gear }
+      delete next[action.slot]
+      c.gear = next
       break
     }
     case 'declare': {

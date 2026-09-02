@@ -2,7 +2,8 @@ import { PHASE_LABEL, autoAccepting, def, visitorPhase } from '../game/engine.ts
 import { shipDef } from '../game/fleet.ts'
 import { SELL_MARGIN, TRADE_LOT, scanReading, visitorDef } from '../game/visitors.ts'
 import { factionDef } from '../game/factions.ts'
-import { RESOURCE_INFO, type GameState, type ResourceKey } from '../game/types.ts'
+import { itemDef, stock } from '../game/gear.ts'
+import { RESOURCE_INFO, type GameState, type ItemId, type ResourceKey } from '../game/types.ts'
 import { CrewAvatar } from './CrewAvatar.tsx'
 import { Modal } from './Modal.tsx'
 
@@ -13,6 +14,7 @@ interface Props {
   onAccept: () => void
   onRefuse: () => void
   onTrade: (resource: ResourceKey, buy: boolean) => void
+  onBuyGear: (item: ItemId) => void
   onSelectGuest: (guestId: string) => void
   onAutoAccept: (on: boolean) => void
 }
@@ -24,6 +26,7 @@ export const VisitorModal = ({
   onAccept,
   onRefuse,
   onTrade,
+  onBuyGear,
   onSelectGuest,
   onAutoAccept,
 }: Props) => {
@@ -178,6 +181,36 @@ export const VisitorModal = ({
           )
         })}
       </ul>
+
+      {stock(v.faction).length > 0 && (
+        <>
+          <h3 className="modal__sub">In the hold</h3>
+          <ul className="trade trade--gear">
+            {stock(v.faction).map(({ id, price }) => {
+              const it = itemDef(id)
+              return (
+                <li key={id}>
+                  <span className="trade__what">
+                    {it.glyph} {it.name}
+                    <em>{it.blurb}</em>
+                  </span>
+                  <button
+                    className="btn btn--tiny"
+                    disabled={state.credits < price}
+                    onClick={() => onBuyGear(id)}
+                  >
+                    Buy {price}c
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+          <p className="panel-note">
+            Kit goes into the hold. Issue it from a crew member's file — one sidearm and one layer
+            of armour each.
+          </p>
+        </>
+      )}
 
       {dock && (
         <label className="toggle">

@@ -24,15 +24,15 @@ export interface FactionDef {
 }
 
 export const FACTION_DEFS: Record<FactionId, FactionDef> = {
-  registry: {
-    id: 'registry',
-    name: 'The Terran Registry',
-    short: 'Registry',
-    glyph: '§',
+  terran: {
+    id: 'terran',
+    name: 'The Terran Confederation',
+    short: 'Terran',
+    glyph: '✶',
     hue: 42,
-    claim: 'Precedent. Earth chartered the first survey out here and never stopped filing.',
-    offer: 'Applicants dispatched on their tab, contracts on a schedule, and a serial other powers still grudgingly honour.',
-    exit: 'They cancel the serial. You keep the station and lose the only paper that said it was yours.',
+    claim: 'Writ. The Verge was surveyed under Confederation charter and no member world has ever voted to give it up.',
+    offer: 'Applicants on Confederation pay, contracts on a schedule, and a patrol that will answer — eventually.',
+    exit: 'They strike the station from the roll. You keep the place and lose the only vote that ever counted it.',
     patronable: true,
   },
   concern: {
@@ -86,29 +86,29 @@ export const blankStanding = (): Record<FactionId, number> =>
 
 /**
  * Who a hull of each kind is likely to be flying for. A courier is nearly
- * always Registry paper; a raider is never anything but Unlisted. The rest is
+ * always Confederation paper; a raider is never anything but Unlisted. It is
  * weighted, because the point of the dock is that you cannot be sure.
  */
 const OWNERS: Record<VisitorKind, [FactionId, number][]> = {
   trader: [
     ['concern', 45],
     ['unlisted', 30],
-    ['registry', 15],
+    ['terran', 15],
     ['compact', 10],
   ],
   courier: [
-    ['registry', 65],
+    ['terran', 65],
     ['concern', 25],
     ['compact', 10],
   ],
   patrol: [
-    ['registry', 40],
+    ['terran', 40],
     ['concern', 35],
     ['compact', 25],
   ],
   drifter: [
     ['unlisted', 75],
-    ['registry', 25],
+    ['terran', 25],
   ],
   smuggler: [['unlisted', 100]],
   raider: [['unlisted', 100]],

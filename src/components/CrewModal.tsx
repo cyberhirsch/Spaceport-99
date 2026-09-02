@@ -1,6 +1,7 @@
-import { REVIVE_COST_PER_LEVEL, def, isAway, staffSlots } from '../game/engine.ts'
+import { REVIVE_COST_PER_LEVEL, crewGuard, def, isAway, staffSlots } from '../game/engine.ts'
+import { ITEM_IDS, SLOTS, SLOT_LABEL, itemDef } from '../game/gear.ts'
 import { effectiveness, portraitIndex, statTotal, xpForLevel } from '../game/crew.ts'
-import type { GameState } from '../game/types.ts'
+import type { GameState, ItemId, ItemSlot } from '../game/types.ts'
 import { CrewAvatar } from './CrewAvatar.tsx'
 import { EditableName } from './EditableName.tsx'
 import { hpStyle } from './meters.ts'
@@ -15,6 +16,8 @@ interface Props {
   onRevive: () => void
   onDismiss: () => void
   onRename: (name: string) => void
+  onIssue: (item: ItemId) => void
+  onStow: (slot: ItemSlot) => void
 }
 
 export const CrewModal = ({
@@ -25,6 +28,8 @@ export const CrewModal = ({
   onRevive,
   onDismiss,
   onRename,
+  onIssue,
+  onStow,
 }: Props) => {
   const c = state.crew.find((x) => x.id === crewId)
   if (!c) return null
@@ -104,6 +109,52 @@ export const CrewModal = ({
 
       <h3 className="modal__sub">O.R.B.I.T.A.L.</h3>
       <StatBars stats={c.stats} highlight={job ? def(job.kind).stat : undefined} />
+
+      <h3 className="modal__sub">Issued kit</h3>
+      <div className="kit">
+        {SLOTS.map((slot) => {
+          const worn = c.gear?.[slot]
+          const d = worn ? itemDef(worn) : null
+          // Only what is actually in the hold, and only for this slot.
+          const spare = ITEM_IDS.filter(
+            (id) => itemDef(id).slot === slot && (state.stores[id] ?? 0) > 0,
+          )
+          return (
+            <div key={slot} className={`kit__slot${d ? ' kit__slot--worn' : ''}`}>
+              <span className="kit__label">{SLOT_LABEL[slot]}</span>
+              {d ? (
+                <span className="kit__worn">
+                  <i>{d.glyph}</i>
+                  <span>
+                    {d.name}
+                    <em>{d.blurb}</em>
+                  </span>
+                  <button className="btn btn--tiny" onClick={() => onStow(slot)} disabled={c.dead}>
+                    Stow
+                  </button>
+                </span>
+              ) : (
+                <span className="kit__empty">Nothing issued.</span>
+              )}
+              {spare.length > 0 && !c.dead && (
+                <span className="kit__spares">
+                  {spare.map((id) => (
+                    <button key={id} className="btn btn--tiny" onClick={() => onIssue(id)}>
+                      {itemDef(id).glyph} {itemDef(id).short}
+                      <em> ×{state.stores[id]}</em>
+                    </button>
+                  ))}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <p className="panel-note">
+        {crewGuard(c) > 0
+          ? `Worth ${crewGuard(c)} to the station in a fight, and the bonuses are already in the bars above.`
+          : 'Carrying nothing. Kit is bought off berthed hulls and kept in the hold until somebody needs it.'}
+      </p>
 
       {c.dead ? (
         <div className="modal__actions">

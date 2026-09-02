@@ -1,3 +1,4 @@
+import { ITEM_DEFS } from './gear.ts'
 import { STAT_KEYS, type Crew, type StatKey, type Stats } from './types.ts'
 
 const FIRST = [
@@ -57,6 +58,7 @@ export const makeCrew = (overrides: Partial<Crew> = {}): Crew => {
   return {
     id: uid('c'),
     name: randomName(),
+    gear: {},
     stats,
     level,
     xp: 0,
@@ -100,7 +102,14 @@ export const statTotal = (c: Crew): number =>
  * should be slow and miserable, never mathematically doomed.
  */
 export const effectiveness = (c: Crew, stat: StatKey): number => {
-  const base = c.stats[stat] + (c.level - 1) * 0.35
+  // Kit counts. A vest is worth a point of Brawn to the person wearing it,
+  // whether they are fighting boarders or shifting cargo.
+  let issued = 0
+  for (const slot of ['sidearm', 'armour'] as const) {
+    const id = c.gear?.[slot]
+    if (id) issued += ITEM_DEFS[id].bonus?.[stat] ?? 0
+  }
+  const base = c.stats[stat] + issued + (c.level - 1) * 0.35
   const health = 0.5 + 0.5 * (c.hp / c.maxHp)
   const mood = 0.75 + 0.25 * c.morale
   return base * health * mood

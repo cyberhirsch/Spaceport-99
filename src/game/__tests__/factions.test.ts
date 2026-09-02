@@ -29,38 +29,38 @@ test('the Unlisted are a filing status, not a flag', () => {
 
 test('a power will not take a station that has been no use to it', () => {
   const cold = newGame()
-  assert.ok(declineReason(cold, 'registry')?.includes('no use'))
-  assert.equal(reducer(cold, { type: 'declare', faction: 'registry' }), cold)
+  assert.ok(declineReason(cold, 'terran')?.includes('no use'))
+  assert.equal(reducer(cold, { type: 'declare', faction: 'terran' }), cold)
 
-  const useful = warm(cold, 'registry', DECLARE_AT)
-  assert.equal(declineReason(useful, 'registry'), null)
-  assert.equal(reducer(useful, { type: 'declare', faction: 'registry' }).patron, 'registry')
+  const useful = warm(cold, 'terran', DECLARE_AT)
+  assert.equal(declineReason(useful, 'terran'), null)
+  assert.equal(reducer(useful, { type: 'declare', faction: 'terran' }).patron, 'terran')
 })
 
 test('the flag you fly is the opinion that counts', () => {
-  let s = warm(warm(newGame(), 'registry', 0.2), 'concern', -0.2)
+  let s = warm(warm(newGame(), 'terran', 0.2), 'concern', -0.2)
   assert.ok(Math.abs(patronStanding(s) - 0) < 0.01, 'unaligned, you trade on your general name')
 
-  s = reducer(s, { type: 'declare', faction: 'registry' })
-  assert.equal(patronStanding(s), 0.2, 'Registry paper means Earth is the one grading you')
-  const asRegistry = appeal(s)
+  s = reducer(s, { type: 'declare', faction: 'terran' })
+  assert.equal(patronStanding(s), 0.2, 'Confederation paper means Earth is the one grading you')
+  const asTerran = appeal(s)
 
   const flipped = reducer({ ...s, patron: 'concern' }, { type: 'tick', seconds: 0 })
-  assert.ok(appeal(flipped) < asRegistry, 'flying paper from people who dislike you costs')
+  assert.ok(appeal(flipped) < asTerran, 'flying paper from people who dislike you costs')
 })
 
 test('changing sides costs you with the people you walked out on', () => {
   // The Concern starts below its ceiling, or the credit for defecting has
   // nowhere to go.
-  let s = warm(warm(newGame(), 'registry', 0.2), 'concern', 0.1)
-  s = reducer(s, { type: 'declare', faction: 'registry' })
+  let s = warm(warm(newGame(), 'terran', 0.2), 'concern', 0.1)
+  s = reducer(s, { type: 'declare', faction: 'terran' })
   const before = s.standing
 
   s = reducer(s, { type: 'declare', faction: 'concern' })
   assert.equal(s.patron, 'concern')
-  assert.ok(s.standing.registry < before.registry, 'Earth cancels the serial')
+  assert.ok(s.standing.terran < before.terran, 'Earth strikes the station from the roll')
   assert.ok(s.standing.concern > before.concern, 'though nobody minds a defector coming to them')
-  assert.deepEqual(s.resigned, ['registry'], 'and it is on the record')
+  assert.deepEqual(s.resigned, ['terran'], 'and it is on the record')
 })
 
 test('striking the flag leaves you unaligned, and it still costs', () => {
@@ -74,14 +74,14 @@ test('striking the flag leaves you unaligned, and it still costs', () => {
 })
 
 test('Compact enrolment is the one door that only opens inward', () => {
-  let s = warm(warm(newGame(), 'compact', 0.2), 'registry', 0.2)
+  let s = warm(warm(newGame(), 'compact', 0.2), 'terran', 0.2)
   s = reducer(s, { type: 'declare', faction: 'compact' })
   assert.equal(s.patron, 'compact')
   assert.equal(factionDef('compact').exit, '', 'there is no exit clause to quote')
 
   assert.equal(reducer(s, { type: 'resign' }), s, 'you cannot strike the flag')
-  assert.ok(declineReason(s, 'registry')?.includes('no exit clause'))
-  assert.equal(reducer(s, { type: 'declare', faction: 'registry' }), s, 'nor swap it')
+  assert.ok(declineReason(s, 'terran')?.includes('no exit clause'))
+  assert.equal(reducer(s, { type: 'declare', faction: 'terran' }), s, 'nor swap it')
 })
 
 test('every hull flies for somebody, and raiders are never anything but Unlisted', () => {
@@ -90,9 +90,9 @@ test('every hull flies for somebody, and raiders are never anything but Unlisted
     assert.ok(FACTION_IDS.includes(v.faction), `${v.kind} flew for ${v.faction}`)
     if (v.kind === 'raider' || v.kind === 'smuggler') assert.equal(v.faction, 'unlisted')
   }
-  // Couriers carry Registry paper more often than not.
+  // Couriers carry Confederation writs more often than not.
   const couriers = Array.from({ length: 300 }, () => rollOwner('courier'))
-  assert.ok(couriers.filter((f) => f === 'registry').length > 150)
+  assert.ok(couriers.filter((f) => f === 'terran').length > 150)
 })
 
 test('standing reads as an opinion rather than a number', () => {

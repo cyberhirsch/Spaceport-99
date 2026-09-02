@@ -47,10 +47,10 @@ test('a ship that is waved off leaves, and an honest one leaves a mark', () => {
 })
 
 test('turning away the flag you fly is noticed by the people who issued it', () => {
-  const base: GameState = { ...newGame(), patron: 'registry' }
-  const [ready, v] = hailing(base, { kind: 'trader', claim: 'trader', faction: 'registry' })
+  const base: GameState = { ...newGame(), patron: 'terran' }
+  const [ready, v] = hailing(base, { kind: 'trader', claim: 'trader', faction: 'terran' })
   const waved = reducer(ready, { type: 'refuseVisitor', visitorId: v.id })
-  assert.ok(waved.standing.registry < ready.standing.registry)
+  assert.ok(waved.standing.terran < ready.standing.terran)
 })
 
 test('taking in a drifter costs supplies and buys goodwill', () => {
@@ -61,7 +61,7 @@ test('taking in a drifter costs supplies and buys goodwill', () => {
   assert.ok(s.standing[theirs] > ready.standing[theirs], 'word gets around their own people')
   assert.ok(s.resources.food < ready.resources.food, 'and it comes out of the stores')
   if (theirs === 'unlisted') {
-    assert.ok(s.standing.registry < ready.standing.registry, 'and Earth writes it down')
+    assert.ok(s.standing.terran < ready.standing.terran, 'and Earth writes it down')
   }
 })
 

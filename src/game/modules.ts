@@ -234,8 +234,8 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   },
   vault: {
     kind: 'vault',
-    name: 'Salvage Vault',
-    short: 'Vault',
+    name: 'Reclamation Bay',
+    short: 'Reclaim',
     blurb: 'Sorting other people’s misfortune into value. Trains Luck.',
     glyph: '◈',
     hue: 55,

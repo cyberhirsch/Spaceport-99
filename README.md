@@ -1,8 +1,9 @@
 # Spaceport-99
 
-A Fallout Shelter–style station management game, in orbit. Dig rooms into a hull
-instead of a hillside, keep a crew of drifters breathing, and try not to let the
-reactor catch fire.
+Build an orbital station one room at a time, staff it with a crew of drifters,
+and keep them breathing. Power, oxygen and rations are made in cycles by the
+people you post to each room and burned continuously by everyone aboard. Get the
+balance wrong and you find out how quickly a station stops being habitable.
 
 Mobile first: portrait phone is the primary target, with a thumb-height tab bar,
 bottom-sheet panels, a pannable station and drag-and-drop crew assignment. The

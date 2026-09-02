@@ -206,7 +206,7 @@ export const canDemolish = (s: GameState, m: StationModule): boolean => {
 export const countOfKind = (s: GameState, kind: ModuleKind): number =>
   s.modules.filter((m) => m.kind === kind).length
 
-/** Fold a freshly built room into identical neighbours, Fallout-Shelter style. */
+/** Fold a freshly built room into identical neighbours to form one larger room. */
 const mergeNeighbours = (s: GameState, m: StationModule): StationModule => {
   let current = m
   for (let pass = 0; pass < 2; pass += 1) {

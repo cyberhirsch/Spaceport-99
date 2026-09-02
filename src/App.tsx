@@ -234,7 +234,7 @@ export default function App() {
       )}
 
       {!state.seenIntro && (
-        <Modal title="Welcome aboard, Overseer" onClose={() => act({ type: 'dismissIntro' })}>
+        <Modal title="Welcome aboard, Commander" onClose={() => act({ type: 'dismissIntro' })}>
           <p className="panel-note">
             You have a reactor, an air plant, a hydroponics bay and five people who signed up without
             reading the contract. Keep them breathing.

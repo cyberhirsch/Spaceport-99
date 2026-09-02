@@ -63,6 +63,27 @@ SmartScreen wants *More info → Run anyway*, macOS wants a right-click → *Ope
 on the first launch, and the APK is debug-signed, which is enough to sideload
 but not to publish.
 
+## The powers
+
+Three powers hold a claim on the patch of the Verge the station sits in, and the station sits
+where the claims overlap — which is the only reason a charter was ever granted, since each of
+them preferred an independent station there to one of the other two.
+
+- **The Terran Registry** claims by precedent: Earth chartered the first survey out here and
+  never stopped filing. It dispatches applicants on its own tab and pays modestly, on schedule.
+- **The Meridian Concern** claims the lanes. Best prices at your clamps, credit when a reactor
+  goes, and everything itemised.
+- **The Vantric Compact** claims by enrolment. It does not take stations; it invites them, once
+  a year, indefinitely. Protection that arrives when called, and no exit clause.
+- **The Unlisted** are not a power but a filing status — every hull whose registration lapsed.
+  You can stand well or badly with them; you cannot fly their flag.
+
+Standing is kept separately for each, and moves on what you do at the clamps: who you berth, who
+you wave off, who you trade with, and who you poach off somebody else's bridge. Whose paper you
+fly decides which of those four opinions feeds `appeal()`, and so who HQ sends and how nasty the
+contracts get. Changing sides is expected out here and never free; the Compact is the one flag
+that cannot be struck.
+
 ## How it plays
 
 You start with a reactor, an air plant, a hydroponics bay and five founders.

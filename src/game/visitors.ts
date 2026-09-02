@@ -1,4 +1,5 @@
 import { randomName, rollStats, uid } from './crew.ts'
+import { rollOwner } from './factions.ts'
 import type { Guest, ShipClass, Visitor, VisitorKind, VisitorOffer } from './types.ts'
 
 /** How many units a single trade moves. */
@@ -264,6 +265,7 @@ export const makeVisitor = (): Visitor => {
     cls: HULLS[Math.floor(Math.random() * HULLS.length)],
     kind: def.kind,
     claim,
+    faction: rollOwner(def.kind),
     suspicion,
     // Traffic shows on the board well before anyone hails for a berth.
     status: 'inbound',

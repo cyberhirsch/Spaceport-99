@@ -33,20 +33,36 @@ test('a ship that is waved off leaves, and an honest one leaves a mark', () => {
   const [withTrader, trader] = hailing(newGame(), { kind: 'trader', claim: 'trader' })
   const waved = reducer(withTrader, { type: 'refuseVisitor', visitorId: trader.id })
   assert.equal(waved.visitors.length, 0)
-  assert.equal(waved.standing, withTrader.standing, 'waving off a trader costs nothing')
+  assert.deepEqual(waved.standing, withTrader.standing, 'waving off a trader costs nothing')
 
   const [withDrifter, drifter] = hailing(newGame(), { kind: 'drifter', claim: 'drifter' })
   const turned = reducer(withDrifter, { type: 'refuseVisitor', visitorId: drifter.id })
-  assert.ok(turned.standing < withDrifter.standing, 'turning away real trouble is remembered')
-  assert.ok(appeal(turned) < appeal(withDrifter), 'and it shows in the station standing')
+  const theirs = drifter.faction
+  assert.ok(
+    turned.standing[theirs] < withDrifter.standing[theirs],
+    'turning away real trouble is remembered by their own people',
+  )
+  // Unaligned, every power's opinion feeds the station's name.
+  assert.ok(appeal(turned) < appeal(withDrifter), 'and it shows in what the station is worth')
+})
+
+test('turning away the flag you fly is noticed by the people who issued it', () => {
+  const base: GameState = { ...newGame(), patron: 'registry' }
+  const [ready, v] = hailing(base, { kind: 'trader', claim: 'trader', faction: 'registry' })
+  const waved = reducer(ready, { type: 'refuseVisitor', visitorId: v.id })
+  assert.ok(waved.standing.registry < ready.standing.registry)
 })
 
 test('taking in a drifter costs supplies and buys goodwill', () => {
   const [ready, drifter] = hailing(newGame(), { kind: 'drifter', claim: 'drifter' })
   const s = reducer(ready, { type: 'acceptVisitor', visitorId: drifter.id })
   assert.equal(s.visitors[0].status, 'docked')
-  assert.ok(s.standing > ready.standing, 'word gets around')
+  const theirs = drifter.faction
+  assert.ok(s.standing[theirs] > ready.standing[theirs], 'word gets around their own people')
   assert.ok(s.resources.food < ready.resources.food, 'and it comes out of the stores')
+  if (theirs === 'unlisted') {
+    assert.ok(s.standing.registry < ready.standing.registry, 'and Earth writes it down')
+  }
 })
 
 test('a raider is trouble the moment the clamps close', () => {

@@ -191,6 +191,9 @@ export interface Candidate {
 /** What a ship at the clamps actually is, which is not always what it claims. */
 export type VisitorKind = 'trader' | 'courier' | 'patrol' | 'drifter' | 'smuggler' | 'raider'
 
+/** The powers with a claim on the Verge, plus everyone off their books. */
+export type FactionId = 'registry' | 'concern' | 'compact' | 'unlisted'
+
 /** Something a docked ship wants to talk about. Marked with an exclamation. */
 export interface VisitorOffer {
   /** A contract they hand over, or a conversation with two ways to answer. */
@@ -266,6 +269,8 @@ export interface Visitor {
   claim: VisitorKind
   /** 0..1 scan reading. Trouble usually scans dirty, but not always. */
   suspicion: number
+  /** Whose paper the hull is flying. Raiders are always Unlisted. */
+  faction: FactionId
   /** On approach, hailing for a berth, or clamped on. */
   status: 'inbound' | 'requesting' | 'docked'
   /** Who came aboard off this hull. Empty until the clamps open. */
@@ -385,10 +390,18 @@ export interface GameState {
   /** Seconds until the next ship hails for permission to dock. */
   nextVisitorIn: number
   /**
-   * Goodwill earned or spent by how the station treats people who need it.
-   * Folded into station standing alongside the things you can see.
+   * Goodwill with each power, earned or spent by how the station treats the
+   * hulls that turn up. Folded into station appeal alongside the things a
+   * visitor can see for themselves.
    */
-  standing: number
+  standing: Record<FactionId, number>
+  /**
+   * The flag the station flies. Null is no flag at all — nobody taxes you and
+   * nobody comes when the Ossuary Kings do.
+   */
+  patron: FactionId | null
+  /** Powers this station has already walked out on. They remember. */
+  resigned: FactionId[]
   /** Ids of crew that arrived but have not been greeted yet (for the toast). */
   seenIntro: boolean
   gameOver: boolean

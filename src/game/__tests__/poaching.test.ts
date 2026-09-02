@@ -66,7 +66,12 @@ test('what talks a master round is the station, not the chequebook', () => {
   for (const col of [WING - 3, WING - 4, WING + 2, WING + 3]) {
     good = build(good, 'quarters', col)
   }
-  good = { ...good, standing: 0.2, credits: 50000 }
+  good = {
+    ...good,
+    standing: { ...good.standing, registry: 0.2 },
+    patron: 'registry',
+    credits: 50000,
+  }
   const here = guestAboard(good, master.id)
   assert.ok(here, 'the same person, on the better station')
 
@@ -100,7 +105,8 @@ test('a hand who says yes joins the crew and leaves the manifest', () => {
   const s = reducer(sure, { type: 'signGuest', guestId: guest.id })
   assert.ok(s.crew.some((c) => c.name === guest.name), 'they are crew now')
   assert.equal(guestAboard(s, guest.id), null, 'and off the boarding party')
-  assert.ok(s.standing < sure.standing, 'poaching is noticed')
+  const theirs = v.faction
+  assert.ok(s.standing[theirs] < sure.standing[theirs], 'poaching is noticed by their own people')
 })
 
 test('a master brings the hull with them when a berth is free', () => {

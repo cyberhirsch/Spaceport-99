@@ -1,6 +1,7 @@
 import { PHASE_LABEL, autoAccepting, def, visitorPhase } from '../game/engine.ts'
 import { shipDef } from '../game/fleet.ts'
 import { SELL_MARGIN, TRADE_LOT, scanReading, visitorDef } from '../game/visitors.ts'
+import { factionDef } from '../game/factions.ts'
 import { RESOURCE_INFO, type GameState, type ResourceKey } from '../game/types.ts'
 import { CrewAvatar } from './CrewAvatar.tsx'
 import { Modal } from './Modal.tsx'
@@ -65,7 +66,8 @@ export const VisitorModal = ({
           <span>
             <b>{v.name}</b>
             <em>
-              {hull.name} · claims to be a {claimed.label.toLowerCase()}
+              {hull.name} · {factionDef(v.faction).short} paper · claims to be a{' '}
+              {claimed.label.toLowerCase()}
             </em>
           </span>
         </div>
@@ -77,7 +79,9 @@ export const VisitorModal = ({
         </div>
         <p className="panel-note">
           They will hold for {Math.ceil(v.timer)}s. A clean manifest is not a promise, and turning
-          away someone who really is in trouble gets remembered.
+          away someone who really is in trouble gets remembered — by the power whose paper they
+          fly, which here is {factionDef(v.faction).name.toLowerCase()}.
+          {v.faction === state.patron ? ' That is your own flag.' : ''}
         </p>
 
         <div className="modal__actions">
@@ -113,7 +117,8 @@ export const VisitorModal = ({
         <span>
           <b>{visitorDef(v.kind).label}</b>
           <em>
-            {hull.name} · {PHASE_LABEL[phase]}, leaving in {Math.ceil(v.timer)}s
+            {hull.name} · {factionDef(v.faction).short} paper · {PHASE_LABEL[phase]}, leaving in{' '}
+            {Math.ceil(v.timer)}s
           </em>
         </span>
       </div>

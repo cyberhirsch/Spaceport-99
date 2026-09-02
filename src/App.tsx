@@ -7,6 +7,7 @@ import { FleetPanel } from './components/FleetPanel.tsx'
 import { InterviewModal } from './components/InterviewModal.tsx'
 import { LaunchModal } from './components/LaunchModal.tsx'
 import { LogPanel } from './components/LogPanel.tsx'
+import { PowersPanel } from './components/PowersPanel.tsx'
 import { VisitorModal } from './components/VisitorModal.tsx'
 import { Modal } from './components/Modal.tsx'
 import { GuestModal } from './components/GuestModal.tsx'
@@ -22,12 +23,13 @@ import { useGame } from './hooks/useGame.ts'
 import { useMediaQuery } from './hooks/useMediaQuery.ts'
 import type { ModuleKind } from './game/types.ts'
 
-type Tab = 'build' | 'crew' | 'fleet' | 'log'
+type Tab = 'build' | 'crew' | 'fleet' | 'powers' | 'log'
 
 const TABS: { id: Tab; label: string; glyph: string }[] = [
   { id: 'build', label: 'Build', glyph: '⊞' },
   { id: 'crew', label: 'Crew', glyph: '☺' },
   { id: 'fleet', label: 'Fleet', glyph: '⬢' },
+  { id: 'powers', label: 'Powers', glyph: '⬖' },
   { id: 'log', label: 'Log', glyph: '≡' },
 ]
 
@@ -283,6 +285,17 @@ export default function App() {
               onRepair={(id) => act({ type: 'repairShip', shipId: id })}
               onTradeIn={(id) => act({ type: 'tradeInShip', shipId: id })}
               onRenameShip={(id, name) => act({ type: 'renameShip', shipId: id, name })}
+            />
+          )}
+          {tab === 'powers' && (
+            <PowersPanel
+              state={state}
+              onDeclare={(faction) => act({ type: 'declare', faction })}
+              onResign={() => {
+                if (confirm('Strike the flag? The power you leave will remember it.')) {
+                  act({ type: 'resign' })
+                }
+              }}
             />
           )}
           {tab === 'log' && <LogPanel state={state} />}

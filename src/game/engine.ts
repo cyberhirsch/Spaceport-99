@@ -35,6 +35,15 @@ import {
   uid,
 } from './crew.ts'
 import { incidentDef } from './incidents.ts'
+import {
+  DEFECTION_COST,
+  DEFECTION_CREDIT,
+  FACTION_IDS,
+  STANDING_CEILING,
+  STANDING_FLOOR,
+  blankStanding,
+  factionDef,
+} from './factions.ts'
 import { RESOURCE_INFO } from './types.ts'
 import { STAT_KEYS } from './types.ts'
 import {
@@ -54,6 +63,7 @@ import { SELL_MARGIN, TRADE_LOT, makeGuests, makeVisitor } from './visitors.ts'
 import type {
   Candidate,
   Crew,
+  FactionId,
   Prospect,
   Mission,
   Ship,
@@ -71,7 +81,7 @@ import type {
   StationModule,
 } from './types.ts'
 
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 4
 
 export const BASE_CREW_CAP = 8
 export const BASE_STORAGE = 220
@@ -219,7 +229,9 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     nextContractIn: 45,
     visitors: [],
     nextVisitorIn: 60,
-    standing: 0,
+    standing: blankStanding(),
+    patron: null,
+    resigned: [],
     seenIntro: false,
     gameOver: false,
   }
@@ -847,7 +859,7 @@ const admitVisitor = (s: GameState, v: Visitor): void => {
     case 'patrol': {
       const paid = Math.round(50 + Math.random() * 90)
       s.credits += paid
-      s.standing = clamp(s.standing + 0.01, -0.2, 0.2)
+      shift(s, v.faction, 0.01)
       log(s, `${v.name} took a berth and left the lane a little safer. +${paid}c.`, 'good')
       break
     }
@@ -857,7 +869,10 @@ const admitVisitor = (s: GameState, v: Visitor): void => {
       for (const key of ['air', 'food'] as const) {
         s.resources[key] = Math.max(0, s.resources[key] - given)
       }
-      s.standing = clamp(s.standing + 0.04, -0.2, 0.2)
+      shift(s, v.faction, 0.04)
+      // Sheltering a hull with no registration is not a crime. The Registry
+      // still writes it down.
+      if (v.faction === 'unlisted') shift(s, 'registry', -0.01)
       log(s, `${v.name} was taken in and resupplied. Word gets around.`, 'good')
       break
     }
@@ -1083,6 +1098,8 @@ export type Action =
   | { type: 'answerGuest'; guestId: string; yes: boolean }
   | { type: 'persuadeGuest'; guestId: string; tactic: Tactic; moduleId?: string }
   | { type: 'signGuest'; guestId: string }
+  | { type: 'declare'; faction: FactionId }
+  | { type: 'resign' }
   | { type: 'revive'; crewId: string }
   | { type: 'dismiss'; crewId: string }
   | { type: 'rename'; name: string }
@@ -1111,6 +1128,21 @@ export const SIGN_THRESHOLD = 100
  * dark, hungry outpost, which is why the strongest applicants only turn up once
  * the place is worth joining.
  */
+/** Nudge one power's opinion of the station, inside the range it can move in. */
+const shift = (s: GameState, id: FactionId, amount: number): void => {
+  s.standing[id] = clamp(s.standing[id] + amount, STANDING_FLOOR, STANDING_CEILING)
+}
+
+/**
+ * The standing that actually counts. Flying a flag means that power's opinion
+ * is the one deciding who HQ sends you and how nasty the contracts are; with
+ * no flag you trade on your general name instead, for better and worse.
+ */
+export const patronStanding = (s: GameState): number =>
+  s.patron
+    ? s.standing[s.patron]
+    : FACTION_IDS.reduce((n, id) => n + s.standing[id], 0) / FACTION_IDS.length
+
 export const appeal = (s: GameState): number => {
   const d = derive(s)
   const size = Math.min(1, s.modules.length / 14) * 0.25
@@ -1122,7 +1154,7 @@ export const appeal = (s: GameState): number => {
     : 0
   const funds = Math.min(1, s.credits / 2500) * 0.15
   // Goodwill: how the station treats people who turn up needing something.
-  return clamp(size + room + surplus + spirit + funds + s.standing, 0, 1)
+  return clamp(size + room + surplus + spirit + funds + patronStanding(s), 0, 1)
 }
 
 /** How many ships can be at the clamps at once, waiting or berthed. */
@@ -1292,6 +1324,26 @@ export const guestAboard = (
   const ship = s.visitors.find((v) => v.aboard.some((g) => g.id === guestId))
   const guest = ship?.aboard.find((g) => g.id === guestId)
   return ship && guest ? { guest, ship } : null
+}
+
+/** A power will not take a station on that has not been any use to it. */
+export const DECLARE_AT = 0.05
+
+/**
+ * Whether the station could declare for a power right now, and if not, why
+ * not. The panel says the reason rather than greying a button out.
+ */
+export const declineReason = (s: GameState, id: FactionId): string | null => {
+  const def = factionDef(id)
+  if (!def.patronable) return `${def.short} is a filing status, not a flag.`
+  if (s.patron === id) return `Already flying ${def.short} paper.`
+  if (s.patron && !factionDef(s.patron).exit) {
+    return `Enrolment in ${factionDef(s.patron).short} has no exit clause.`
+  }
+  if (s.standing[id] < DECLARE_AT) {
+    return `${def.short} will not take a station that has been no use to them.`
+  }
+  return null
 }
 
 export const REVIVE_COST_PER_LEVEL = 90
@@ -1617,9 +1669,11 @@ export const reducer = (state: GameState, action: Action): GameState => {
       // Waving off a trader costs nothing. Turning away someone who is actually
       // in trouble is remembered, whatever their manifest looked like.
       if (v.kind === 'drifter') {
-        s.standing = clamp(s.standing - 0.03, -0.2, 0.2)
+        shift(s, v.faction, -0.03)
         log(s, `${v.name} was refused a berth. They were not lying.`, 'warn')
       } else {
+        // Turning away your own flag is noticed by the people who issued it.
+        if (v.faction === s.patron) shift(s, v.faction, -0.01)
         log(s, `${v.name} was waved off.`, 'info')
       }
       break
@@ -1653,6 +1707,8 @@ export const reducer = (state: GameState, action: Action): GameState => {
         s.resources[action.resource] -= lot
         s.credits += Math.round(lot * unit * SELL_MARGIN)
       }
+      // Commerce is how a station ends up with friends it did not plan on.
+      shift(s, v.faction, 0.002)
       break
     }
     case 'answerGuest': {
@@ -1673,7 +1729,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       switch (effect.type) {
         case 'credits':
           s.credits += effect.amount
-          if (effect.standing) s.standing = clamp(s.standing + effect.standing, -0.2, 0.2)
+          if (effect.standing) shift(s, v.faction, effect.standing)
           log(s, `${g.name} settled up quietly. +${effect.amount}c.`, 'warn')
           break
         case 'passenger': {
@@ -1770,7 +1826,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
 
       // Taking someone under contract is noticed. Taking their master is
       // noticed considerably more.
-      s.standing = clamp(s.standing - (guest.captain ? 0.05 : 0.015), -0.2, 0.2)
+      shift(s, ship.faction, guest.captain ? -0.05 : -0.015)
 
       if (guest.captain) {
         // A master does not leave the hull behind. It comes with them if there
@@ -1787,6 +1843,35 @@ export const reducer = (state: GameState, action: Action): GameState => {
           log(s, `No berth for the ${hull.name}, so she went dockside. +${paid}c.`, 'info')
         }
       }
+      break
+    }
+    case 'declare': {
+      if (declineReason(s, action.faction)) return state
+      const taking = factionDef(action.faction)
+      const leaving = s.patron ? factionDef(s.patron) : null
+      if (leaving) {
+        // Nobody rewards a turncoat as much as they punish one.
+        shift(s, leaving.id, -DEFECTION_COST)
+        shift(s, action.faction, DEFECTION_CREDIT)
+        if (!s.resigned.includes(leaving.id)) s.resigned.push(leaving.id)
+        log(s, `${leaving.name} was informed. ${leaving.exit}`, 'warn')
+      }
+      s.patron = action.faction
+      log(s, `The station flies ${taking.name} paper.`, 'good')
+      if (!taking.exit) {
+        log(s, `Enrolment is permanent. There is no clause for undoing this.`, 'warn')
+      }
+      break
+    }
+    case 'resign': {
+      if (!s.patron) return state
+      const leaving = factionDef(s.patron)
+      if (!leaving.exit) return state
+      shift(s, leaving.id, -DEFECTION_COST)
+      if (!s.resigned.includes(leaving.id)) s.resigned.push(leaving.id)
+      s.patron = null
+      log(s, `${leaving.name} was informed. ${leaving.exit}`, 'warn')
+      log(s, 'The station flies no flag. Nobody taxes you. Nobody comes either.', 'info')
       break
     }
     case 'renameCrew': {

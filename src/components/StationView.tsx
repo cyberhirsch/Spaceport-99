@@ -19,6 +19,7 @@ import { incidentDef } from '../game/incidents.ts'
 import type { DragState } from '../hooks/useDragAssign.ts'
 import type { Crew, GameState, ModuleKind, StationModule } from '../game/types.ts'
 import { shipDef } from '../game/fleet.ts'
+import { factionDef } from '../game/factions.ts'
 import { CrewAvatar } from './CrewAvatar.tsx'
 
 interface Props {
@@ -399,8 +400,9 @@ export const StationView = ({
                   <button
                     key={v.id}
                     className={`visitor-chip visitor-chip--${phase}`}
+                    style={{ ['--power-hue' as string]: String(factionDef(v.faction).hue) }}
                     onClick={() => onSelectVisitor(v.id)}
-                    title={`${v.name} — ${
+                    title={`${v.name} — ${factionDef(v.faction).short} paper — ${
                       phase === 'inbound'
                         ? `on approach, hailing in ${Math.ceil(v.timer)}s`
                         : phase === 'hailing'
@@ -408,6 +410,7 @@ export const StationView = ({
                           : `berthed, leaving in ${Math.ceil(v.timer)}s`
                     }`}
                   >
+                    <span className="visitor-chip__flag">{factionDef(v.faction).glyph}</span>
                     <span className="visitor-chip__glyph">{shipDef(v.cls).glyph}</span>
                     <span className="visitor-chip__name">
                       {v.name}

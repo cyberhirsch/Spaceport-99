@@ -23,7 +23,7 @@ export const DragGhost = ({ drag, state }: { drag: DragState | null; state: Game
       style={{ transform: `translate3d(${drag.x}px, ${drag.y}px, 0)` }}
       aria-hidden="true"
     >
-      <CrewAvatar seed={crew.seed} size={44} />
+      <CrewAvatar who={crew} size={44} />
       <span>{label}</span>
     </div>
   )

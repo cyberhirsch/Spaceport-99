@@ -43,9 +43,11 @@ behaves exactly like a finger.
 **Every crew member has a face.** 24 portraits live in `public/crew`, each in two
 sizes: a 512px dossier and a 128px thumbnail cropped in to the head, because a
 whole head-and-shoulders frame becomes an unreadable smudge in a 24px room
-avatar. Which portrait someone wears is derived from their seed, so a given
-crew member keeps the same face for as long as they are aboard. With more crew
-than portraits faces repeat — there are only so many people on the manifest.
+avatar. Portraits are dealt from the pool rather than derived from a random
+seed, so a station of six has six distinct faces instead of whatever the dice
+gave it. Only once all 24 are spoken for does anyone wear a face twice, and then
+the least-worn goes next. An applicant is dealt theirs when HQ dispatches them
+and keeps it if they sign.
 Tap anyone to open their dossier: portrait, serial, rank, posting, condition and
 full stat readout — and their name, which you can rewrite. Ships rename the same
 way, from the hangar list.

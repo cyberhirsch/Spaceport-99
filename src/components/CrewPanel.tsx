@@ -85,7 +85,7 @@ export const CrewPanel = ({
             {state.candidates.map((cand) => (
               <li key={cand.id}>
                 <button className="crew-row" onClick={() => onSelectCandidate(cand.id)}>
-                  <CrewAvatar seed={cand.seed} size={38} />
+                  <CrewAvatar who={cand} size={38} />
                   <span className="crew-row__text">
                     <span className="crew-row__name">{cand.name}</span>
                     <span className="crew-row__job">
@@ -122,7 +122,7 @@ export const CrewPanel = ({
                     c.dead || away.has(c.id) ? c.name : `${c.name} — drag to a room`
                   }
                 >
-                  <CrewAvatar seed={c.seed} size={38} dead={c.dead} />
+                  <CrewAvatar who={c} size={38} dead={c.dead} />
                 </span>
                 <button className="crew-row__text" onClick={() => onSelect(c.id)}>
                   <span className="crew-row__name">

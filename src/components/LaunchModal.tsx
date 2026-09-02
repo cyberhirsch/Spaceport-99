@@ -101,7 +101,7 @@ export const LaunchModal = ({ state, missionId, onClose, onLaunch }: Props) => {
             className={`staff-chip${picked.includes(c.id) ? ' is-picked' : ''}`}
             onClick={() => toggle(c.id)}
           >
-            <CrewAvatar seed={c.seed} size={30} />
+            <CrewAvatar who={c} size={30} />
             <span>
               {c.name}
               <em>

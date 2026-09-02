@@ -126,6 +126,8 @@ export interface Crew {
   returnTo: string | null
   /** Seed for the procedural portrait. */
   seed: number
+  /** Portrait dealt to them, 1..PORTRAIT_COUNT. Absent on pre-portrait saves. */
+  portrait?: number
   dead: boolean
 }
 
@@ -161,6 +163,8 @@ export interface Candidate {
   id: string
   name: string
   seed: number
+  /** Portrait dealt to them, held from the interview through to signing on. */
+  portrait?: number
   stats: Stats
   /** 0..1 — how sought-after they are. Drives their stats and their standards. */
   tier: number

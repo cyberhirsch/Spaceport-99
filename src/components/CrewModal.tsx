@@ -44,7 +44,7 @@ export const CrewModal = ({
     <Modal onClose={onClose} title={<span className="modal__title">Crew dossier</span>}>
       <div className="dossier">
         <div className="dossier__portrait">
-          <CrewAvatar seed={c.seed} size={168} dead={c.dead} dossier />
+          <CrewAvatar who={c} size={168} dead={c.dead} dossier />
           {c.dead && <span className="dossier__stamp">Deceased</span>}
         </div>
         <div className="dossier__id">

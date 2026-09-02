@@ -110,10 +110,12 @@ export const effectiveness = (c: Crew, stat: StatKey): number => {
 export const PORTRAIT_COUNT = 24
 
 /**
- * Which portrait a crew member wears. Derived from their seed so a given person
- * always has the same face, for as long as they are aboard and afterwards in
- * the log. With more crew than portraits, faces repeat — there are only so many
- * people on the shuttle manifest.
+ * Fallback portrait derived from a crew member's seed, for saves written before
+ * portraits were dealt out from a pool.
  */
 export const portraitIndex = (seed: number): number =>
   (Math.abs(Math.trunc(seed)) % PORTRAIT_COUNT) + 1
+
+/** The portrait someone actually wears: the one they were dealt, or the fallback. */
+export const crewPortrait = (who: { portrait?: number; seed: number }): number =>
+  who.portrait ?? portraitIndex(who.seed)

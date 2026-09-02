@@ -5,12 +5,14 @@ import {
   REQUEST_COST,
   WING,
   advance,
+  allocatePortrait,
   appeal,
   dockBerths,
   newGame,
   reducer,
   tacticEffect,
 } from '../engine.ts'
+import { PORTRAIT_COUNT, crewPortrait, makeCrew } from '../crew.ts'
 import { STAT_KEYS } from '../types.ts'
 import type { GameState, ModuleKind, Stats } from '../types.ts'
 
@@ -139,4 +141,45 @@ test('a better station attracts better people', () => {
   grand = { ...grand, decks: 4, credits: 5000 }
   assert.ok(appeal(grand) > humble, 'a bigger, richer, better-run station rates higher')
   assert.ok(appeal(grand) <= 1 && humble >= 0, 'appeal stays on its scale')
+})
+
+test('portraits are dealt out, not guessed, so a small crew has no twins', () => {
+  const s = newGame()
+  const faces = s.crew.map((c) => crewPortrait(c))
+  assert.equal(new Set(faces).size, faces.length, 'the founding five all look different')
+})
+
+test('every portrait is used before any of them repeats', () => {
+  let s = rich(newGame())
+  // Fill the roster well past the portrait count, one hire at a time.
+  while (s.crew.length < PORTRAIT_COUNT) {
+    s = { ...s, crew: [...s.crew, makeCrew({ portrait: allocatePortrait(s) })] }
+  }
+  const faces = s.crew.map((c) => crewPortrait(c))
+  assert.equal(s.crew.length, PORTRAIT_COUNT)
+  assert.equal(new Set(faces).size, PORTRAIT_COUNT, 'all of them, each exactly once')
+
+  // Only now does anyone wear a face twice, and the pool stays even.
+  s = { ...s, crew: [...s.crew, makeCrew({ portrait: allocatePortrait(s) })] }
+  const after = s.crew.map((c) => crewPortrait(c))
+  assert.equal(new Set(after).size, PORTRAIT_COUNT, 'the 25th has to reuse one')
+  const counts = new Map<number, number>()
+  for (const f of after) counts.set(f, (counts.get(f) ?? 0) + 1)
+  assert.equal(Math.max(...counts.values()), 2, 'and only one face is doubled up')
+})
+
+test('an applicant keeps the face you interviewed when they sign', () => {
+  let s = reducer(staffed(), { type: 'requestCrew' })
+  s = advance(s, 60)
+  const cand = { ...s.candidates[0], interest: 100 }
+  s = { ...s, candidates: [cand] }
+  assert.ok(cand.portrait, 'applicants are dealt a face on dispatch')
+  assert.ok(
+    !s.crew.some((c) => crewPortrait(c) === cand.portrait),
+    'and it is not one already aboard',
+  )
+
+  s = reducer(s, { type: 'offerContract', candidateId: cand.id })
+  const hired = s.crew.at(-1)!
+  assert.equal(crewPortrait(hired), cand.portrait, 'the face follows them onto the roster')
 })

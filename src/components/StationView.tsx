@@ -109,7 +109,7 @@ const Room = ({
               onClick={(e) => e.stopPropagation()}
               title={`${c.name} — drag to move`}
             >
-              <CrewAvatar seed={c.seed} size={26} dead={c.dead} />
+              <CrewAvatar who={c} size={26} dead={c.dead} />
             </span>
           )
         })}
@@ -297,7 +297,7 @@ export const StationView = ({
                 onPointerDown={(e) => onDragStart(c.id, e)}
                 title={`${c.name} — drag to a room`}
               >
-                <CrewAvatar seed={c.seed} size={38} />
+                <CrewAvatar who={c} size={38} />
               </span>
             ))}
           </div>
@@ -322,7 +322,7 @@ export const StationView = ({
                         : `${c.name} — on a mission`
                     }
                   >
-                    <CrewAvatar seed={c.seed} size={38} />
+                    <CrewAvatar who={c} size={38} />
                   </button>
                 )
               })}

@@ -20,7 +20,16 @@ import {
   upgradeCost,
   wingOf,
 } from './modules.ts'
-import { MAX_STAT, effectiveness, grantXp, makeCrew, rollStats, uid } from './crew.ts'
+import {
+  MAX_STAT,
+  PORTRAIT_COUNT,
+  crewPortrait,
+  effectiveness,
+  grantXp,
+  makeCrew,
+  rollStats,
+  uid,
+} from './crew.ts'
 import { incidentDef } from './incidents.ts'
 import { RESOURCE_INFO } from './types.ts'
 import { STAT_KEYS } from './types.ts'
@@ -206,7 +215,9 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
   // The founders are hand-picked: one specialist per critical system, plus two
   // generalists, so a new station is never dead on arrival through bad luck.
   const founders: (StatKey | undefined)[] = ['T', 'O', 'B', undefined, undefined]
-  for (const focus of founders) state.crew.push(makeCrew({ stats: rollStats(6, focus) }))
+  for (const focus of founders) {
+    state.crew.push(makeCrew({ stats: rollStats(6, focus), portrait: allocatePortrait(state) }))
+  }
   // Put the founding crew straight to work so the station is not dead on arrival.
   autoAssignInto(state)
   log(state, 'Station commissioned. Docking clamps released.', 'good')
@@ -680,7 +691,7 @@ const resolveMission = (s: GameState, m: Mission): void => {
   if (outcome === 'triumph' || (outcome === 'success' && Math.random() < 0.15)) {
     const roll = Math.random()
     if (roll < 0.4 && s.crew.filter((c) => !c.dead).length < derive(s).crewCap) {
-      const survivor = makeCrew()
+      const survivor = makeCrew({ portrait: allocatePortrait(s) })
       s.crew.push(survivor)
       m.find = { kind: 'survivor', detail: `${survivor.name} came back with them and stayed.` }
     } else if (roll < 0.65 && s.ships.length < fleetCapacity(s)) {
@@ -902,6 +913,22 @@ export const recruiterSkill = (s: GameState): number => {
   return best
 }
 
+/**
+ * Deals out a face nobody is wearing. Portraits only start repeating once every
+ * one of them is spoken for, and then the least-worn goes next — so a station of
+ * six has six distinct faces rather than whatever the dice happened to give.
+ */
+export const allocatePortrait = (s: GameState): number => {
+  const worn = new Map<number, number>()
+  for (let i = 1; i <= PORTRAIT_COUNT; i += 1) worn.set(i, 0)
+  const tally = (n: number) => worn.set(n, (worn.get(n) ?? 0) + 1)
+  for (const c of s.crew) tally(crewPortrait(c))
+  for (const cand of s.candidates) tally(crewPortrait(cand))
+  const fewest = Math.min(...worn.values())
+  const spare = [...worn.entries()].filter(([, n]) => n === fewest).map(([i]) => i)
+  return spare[Math.floor(Math.random() * spare.length)]
+}
+
 /** Someone HQ has picked out, as good as the station deserves. */
 const makeCandidate = (s: GameState, luck: number): Candidate => {
   const reach = clamp(appeal(s) + luck * 0.02 + (Math.random() * 0.3 - 0.15), 0, 1)
@@ -911,6 +938,7 @@ const makeCandidate = (s: GameState, luck: number): Candidate => {
     id: uid('a'),
     name: crew.name,
     seed: crew.seed,
+    portrait: allocatePortrait(s),
     stats,
     tier: reach,
     // Someone HQ rates highly knows it, and starts colder on a modest station.
@@ -1123,7 +1151,13 @@ export const reducer = (state: GameState, action: Action): GameState => {
         log(s, `${cand.name} turned the contract down and undocked.`, 'warn')
         break
       }
-      const hire = makeCrew({ name: cand.name, stats: cand.stats, seed: cand.seed })
+      // They keep the face you interviewed.
+      const hire = makeCrew({
+        name: cand.name,
+        stats: cand.stats,
+        seed: cand.seed,
+        portrait: crewPortrait(cand),
+      })
       s.crew.push(hire)
       if (cand.promised) assign(s, hire.id, cand.promised)
       log(s, `${cand.name} signed on.`, 'good')

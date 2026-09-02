@@ -136,7 +136,7 @@ export const ModuleModal = ({
         {staffed.map((c) => (
           <div key={c.id} className={`staff-chip${drag?.crewId === c.id ? ' is-lifted' : ''}`}>
             <span className="grip" onPointerDown={(e) => onDragStart(c.id, e)} title="Drag to another room">
-              <CrewAvatar seed={c.seed} size={30} dead={c.dead} />
+              <CrewAvatar who={c} size={30} dead={c.dead} />
             </span>
             <span>
               {c.name}
@@ -162,7 +162,7 @@ export const ModuleModal = ({
                 className="staff-chip staff-chip--add"
                 onClick={() => onAssign(c.id, m.id)}
               >
-                <CrewAvatar seed={c.seed} size={30} />
+                <CrewAvatar who={c} size={30} />
                 <span>
                   {c.name}
                   <em>

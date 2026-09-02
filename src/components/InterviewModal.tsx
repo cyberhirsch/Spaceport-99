@@ -61,7 +61,7 @@ export const InterviewModal = ({
     >
       <div className="dossier">
         <div className="dossier__portrait">
-          <CrewAvatar seed={c.seed} size={168} dossier />
+          <CrewAvatar who={c} size={168} dossier />
         </div>
         <div className="dossier__id">
           <h3 className="dossier__name">{c.name}</h3>

@@ -179,6 +179,13 @@ export const ModuleModal = ({
         </>
       )}
 
+      {d.repairs && (
+        <p className="panel-note">
+          While staffed, its damage-control party works the station's worst-damaged rooms back
+          towards sound. It will not touch a room that is currently on fire.
+        </p>
+      )}
+
       {m.kind === 'dock' && (
         <label className="toggle">
           <input

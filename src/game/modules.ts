@@ -236,7 +236,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     kind: 'workshop',
     name: 'Engineering Bay',
     short: 'Eng Bay',
-    blurb: 'Where things get taken apart to see how they work. Trains Tech.',
+    blurb: 'Trains Tech, and puts damaged rooms back together one at a time.',
     glyph: '⚙',
     hue: 45,
     cost: 640,
@@ -244,6 +244,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     slotsPerSegment: 2,
     stat: 'T',
     trains: 'T',
+    repairs: 0.01,
     powerDraw: 3,
   },
   observatory: {

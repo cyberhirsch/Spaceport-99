@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { advance, appeal, autoAccepting, derive, newGame, reducer, visitorBerths } from '../engine.ts'
+import {
+  WING,
+  advance,
+  appeal,
+  autoAccepting,
+  derive,
+  newGame,
+  reducer,
+  visitorBerths,
+} from '../engine.ts'
 import { TRADE_LOT, makeVisitor } from '../visitors.ts'
 import type { GameState, Visitor } from '../types.ts'
 
@@ -133,4 +142,75 @@ test('trouble mostly scans dirty, and honest ships mostly do not', () => {
     'the scan has to be worth reading',
   )
   assert.ok(dirtyHonest / honest > 0, 'but a dirty scan is not proof')
+})
+
+test('a staffed engineering bay puts the station back together', () => {
+  let s = rich(newGame())
+  // Build a bay and post the whole founding crew's best hands to it.
+  s = reducer(s, { type: 'build', kind: 'workshop', deck: 0, col: WING + 2 })
+  const bay = s.modules.find((m) => m.kind === 'workshop')!
+  s = reducer(s, { type: 'assign', crewId: s.crew[0].id, moduleId: bay.id })
+  s = reducer(s, { type: 'assign', crewId: s.crew[1].id, moduleId: bay.id })
+
+  // Batter the reactor and give the bay time to work.
+  const reactor = s.modules.find((m) => m.kind === 'reactor')!
+  s = {
+    ...s,
+    modules: s.modules.map((m) => (m.id === reactor.id ? { ...m, condition: 0.4 } : m)),
+  }
+  const before = s.modules.find((m) => m.id === reactor.id)!.condition
+  s = advance(s, 60)
+  const after = s.modules.find((m) => m.id === reactor.id)!.condition
+  assert.ok(after > before, `condition should recover: ${before} -> ${after}`)
+})
+
+test('an unstaffed or powered-down bay repairs nothing', () => {
+  const damage = (s: GameState): GameState => {
+    const reactor = s.modules.find((m) => m.kind === 'reactor')!
+    return {
+      ...s,
+      modules: s.modules.map((m) => (m.id === reactor.id ? { ...m, condition: 0.4 } : m)),
+    }
+  }
+  const condition = (s: GameState) => s.modules.find((m) => m.kind === 'reactor')!.condition
+
+  // A bay with nobody in it.
+  let empty = reducer(rich(newGame()), { type: 'build', kind: 'workshop', deck: 0, col: WING + 2 })
+  empty = damage(empty)
+  assert.equal(condition(advance(empty, 60)), 0.4, 'nobody is holding the spanner')
+
+  // A staffed bay that has been switched off.
+  let dark = reducer(rich(newGame()), { type: 'build', kind: 'workshop', deck: 0, col: WING + 2 })
+  const bay = dark.modules.find((m) => m.kind === 'workshop')!
+  dark = reducer(dark, { type: 'assign', crewId: dark.crew[0].id, moduleId: bay.id })
+  dark = reducer(dark, { type: 'setStandby', moduleId: bay.id, standby: true })
+  dark = damage(dark)
+  assert.equal(condition(advance(dark, 60)), 0.4, 'and a dark bay fixes nothing')
+})
+
+test('the bay leaves a room that is currently on fire alone', () => {
+  let s = rich(newGame())
+  s = reducer(s, { type: 'build', kind: 'workshop', deck: 0, col: WING + 2 })
+  const bay = s.modules.find((m) => m.kind === 'workshop')!
+  s = reducer(s, { type: 'assign', crewId: s.crew[0].id, moduleId: bay.id })
+  s = reducer(s, { type: 'assign', crewId: s.crew[1].id, moduleId: bay.id })
+
+  const farm = s.modules.find((m) => m.kind === 'hydroponics')!
+  s = {
+    ...s,
+    modules: s.modules.map((m) => (m.id === farm.id ? { ...m, condition: 0.5 } : m)),
+    incidents: [
+      {
+        id: 'burning',
+        kind: 'fire',
+        moduleId: farm.id,
+        hp: 9999,
+        maxHp: 9999,
+        spreadIn: 9999,
+        startedAt: 0,
+      },
+    ],
+  }
+  const after = advance(s, 30).modules.find((m) => m.id === farm.id)!
+  assert.ok(after.condition <= 0.5, 'you cannot patch a room while it is burning')
 })

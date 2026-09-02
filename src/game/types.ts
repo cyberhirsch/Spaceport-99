@@ -79,6 +79,8 @@ export interface ModuleDef {
   credits?: number
   /** Heals assigned-deck crew; hp per second per level. */
   heals?: number
+  /** Restores structural condition station-wide, per second per segment-level. */
+  repairs?: number
   /** Applicant berths per segment per level, for the docking port. */
   berths?: number
   /** Ship berths per segment per level, for the hangar bay. */

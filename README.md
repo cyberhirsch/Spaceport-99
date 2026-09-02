@@ -99,7 +99,10 @@ applicants only appear once the place is worth joining. The ones who do come
 early know they are settling, and their standards are lower to match.
 
 Crew Quarters raise your bunk cap. Training rooms raise a single stat, one point
-per cycle, each point slower than the last.
+per cycle, each point slower than the last. The Engineering Bay trains Tech and,
+while staffed, runs a damage-control party that works the station's worst-damaged
+rooms back towards sound — the only thing besides an upgrade that repairs
+structural condition, so a station that keeps catching fire wants one.
 
 **The clamps are busy.** Ships hail for permission to dock. A scan reads their
 manifest — clean, thin, mismatched, or silent — and you decide. Most are worth

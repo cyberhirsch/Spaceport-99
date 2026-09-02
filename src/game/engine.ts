@@ -480,6 +480,29 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
   }
   if (!starving && !suffocating) healRate += 0.15
 
+  // --- the engineering bay ---------------------------------------------
+  // A staffed bay works the worst room on the station back towards sound. It is
+  // one party, so its attention goes where the damage is deepest — which means
+  // equally battered rooms come up together.
+  let repairRate = 0
+  for (const m of s.modules) {
+    const md = def(m.kind)
+    if (!md.repairs || m.standby) continue
+    repairRate += md.repairs * m.width * m.level * workRate(m, crewById) * Math.max(0.6, grid)
+  }
+  if (repairRate > 0) {
+    const worst = s.modules
+      .filter((m) => m.condition < 1 && !s.incidents.some((i) => i.moduleId === m.id))
+      .sort((a, b) => a.condition - b.condition)[0]
+    if (worst) {
+      const was = worst.condition
+      worst.condition = clamp(worst.condition + repairRate * dt, 0.2, 1)
+      if (was < 1 && worst.condition >= 1) {
+        log(s, `${def(worst.kind).name} repaired to sound.`, 'good')
+      }
+    }
+  }
+
   // --- incidents ------------------------------------------------------
   for (const inc of [...s.incidents]) {
     const idef = incidentDef(inc.kind)

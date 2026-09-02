@@ -12,6 +12,8 @@ import {
   def,
   powerDraw,
   berths,
+  missionSlots,
+  shipBerths,
   staffSlots,
   storageBonus,
   touchesLift,
@@ -22,9 +24,25 @@ import { MAX_STAT, effectiveness, grantXp, makeCrew, rollStats, uid } from './cr
 import { incidentDef } from './incidents.ts'
 import { RESOURCE_INFO } from './types.ts'
 import { STAT_KEYS } from './types.ts'
+import {
+  OUTCOME_INFO,
+  makeMission,
+  makeShip,
+  refitCost,
+  rollOutcome,
+  shipCargo,
+  shipDef,
+  shipHull,
+  shipSpeed,
+  teamSize,
+  tradeInValue,
+} from './fleet.ts'
 import type {
   Candidate,
   Crew,
+  Mission,
+  Ship,
+  ShipClass,
   ModuleDef,
   GameState,
   IncidentKind,
@@ -178,6 +196,9 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     nextIncidentIn: 150,
     broadcastCooldown: 0,
     candidates: [],
+    ships: [],
+    missions: [],
+    nextContractIn: 45,
     seenIntro: false,
     gameOver: false,
   }
@@ -540,6 +561,27 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
 
   // --- random events --------------------------------------------------
   s.broadcastCooldown = Math.max(0, s.broadcastCooldown - dt)
+  // --- the fleet ------------------------------------------------------
+  s.nextContractIn -= dt
+  if (s.nextContractIn <= 0) {
+    s.nextContractIn = 70 + Math.random() * 80
+    // A command module has to be crewed for anyone to be listening to the wire.
+    const listening = s.modules.some((m) => m.kind === 'command' && m.staff.length > 0)
+    const offers = s.missions.filter((m) => m.status === 'offered').length
+    if (listening && offers < 3) s.missions.push(makeMission(appeal(s)))
+  }
+
+  for (const m of [...s.missions]) {
+    if (m.status === 'offered') {
+      m.expiresIn -= dt
+      if (m.expiresIn <= 0) s.missions = s.missions.filter((x) => x.id !== m.id)
+      continue
+    }
+    if (m.status !== 'flying') continue
+    m.remaining -= dt
+    if (m.remaining <= 0) resolveMission(s, m)
+  }
+
   // Applicants HQ has dispatched: first they fly out, then they wait — and
   // they do not wait forever.
   for (const cand of [...s.candidates]) {
@@ -567,6 +609,106 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
     s.gameOver = true
     log(s, 'The last of the crew is gone. Spaceport-99 drifts dark and silent.', 'bad')
   }
+}
+
+/**
+ * Brings a mission home and applies what happened. Injuries and hull damage are
+ * the common cost of a bad run; losing the ship takes a disaster, and losing
+ * people takes a disaster that goes badly on top of that.
+ */
+const resolveMission = (s: GameState, m: Mission): void => {
+  const ship = s.ships.find((x) => x.id === m.shipId) ?? null
+  const team = m.crewIds
+    .map((id) => s.crew.find((c) => c.id === id))
+    .filter((c): c is Crew => c !== undefined && !c.dead)
+  const outcome = rollOutcome(team, m, ship)
+  m.status = 'report'
+  m.outcome = outcome
+  m.remaining = 0
+
+  const yieldOf = { triumph: 1.5, success: 1, setback: 0.35, disaster: 0 }[outcome]
+  const cargo = ship ? shipCargo(ship) : 1
+  const cap = derive(s).storageCap
+  let credits = 0
+  if (yieldOf > 0) {
+    credits = Math.round(m.payout.credits * yieldOf * cargo)
+    s.credits += credits
+    for (const key of ['power', 'air', 'food'] as const) {
+      const amount = Math.round(m.payout[key] * yieldOf * cargo)
+      s.resources[key] = clamp(s.resources[key] + amount, 0, cap)
+    }
+  }
+
+  // Damage: the ship takes it first, the crew take what is left.
+  const harm = { triumph: 0, success: 0.08, setback: 0.3, disaster: 0.65 }[outcome]
+  if (ship && harm > 0) {
+    ship.hull = Math.max(0, Math.round(ship.hull - shipHull(ship) * harm))
+  }
+  for (const c of team) {
+    const idx = s.crew.findIndex((x) => x.id === c.id)
+    if (idx < 0) continue
+    const hurt = Math.round(s.crew[idx].maxHp * harm * (0.6 + Math.random() * 0.8))
+    s.crew[idx] = { ...s.crew[idx], hp: Math.max(1, s.crew[idx].hp - hurt) }
+  }
+
+  // Only a disaster can cost you the hull or the people, and even then not always.
+  let lostShip = false
+  if (outcome === 'disaster' && ship) {
+    if (ship.hull <= 0 || Math.random() < 0.35) {
+      s.ships = s.ships.filter((x) => x.id !== ship.id)
+      lostShip = true
+    }
+  }
+  let lostCrew = 0
+  if (outcome === 'disaster') {
+    for (const c of team) {
+      if (Math.random() >= 0.18) continue
+      const idx = s.crew.findIndex((x) => x.id === c.id)
+      if (idx < 0) continue
+      s.crew[idx] = { ...s.crew[idx], dead: true, hp: 0, returnTo: null }
+      unassign(s, c.id)
+      lostCrew += 1
+    }
+  }
+
+  // Rare finds, and never on a run that went wrong.
+  if (outcome === 'triumph' || (outcome === 'success' && Math.random() < 0.15)) {
+    const roll = Math.random()
+    if (roll < 0.4 && s.crew.filter((c) => !c.dead).length < derive(s).crewCap) {
+      const survivor = makeCrew()
+      s.crew.push(survivor)
+      m.find = { kind: 'survivor', detail: `${survivor.name} came back with them and stayed.` }
+    } else if (roll < 0.65 && s.ships.length < fleetCapacity(s)) {
+      const hull = makeShip('shuttle')
+      hull.hull = Math.round(hull.maxHull * 0.5)
+      s.ships.push(hull)
+      m.find = { kind: 'ship', detail: `They towed home a derelict — the ${hull.name}, half-dead.` }
+    } else {
+      const bump = Math.round(80 + m.danger * 200)
+      for (const key of ['power', 'air', 'food'] as const) {
+        s.resources[key] = clamp(s.resources[key] + bump, 0, cap)
+      }
+      m.find = { kind: 'cache', detail: `A sealed cache — ${bump} of everything.` }
+    }
+  }
+
+  if (ship) ship.missionId = null
+  const bits = [`${OUTCOME_INFO[outcome].label}.`]
+  if (credits > 0) bits.push(`+${credits}c`)
+  if (lostShip) bits.push('The ship did not come back.')
+  if (lostCrew > 0) bits.push(`${lostCrew} did not come home.`)
+  m.report = bits.join(' ')
+  for (const c of team) awardXpTo(s, c.id, outcome === 'disaster' ? 10 : 25 + m.danger * 30)
+  log(s, `${m.name}: ${OUTCOME_INFO[outcome].label.toLowerCase()}.`, OUTCOME_INFO[outcome].tone)
+}
+
+/** Grants xp to one crew member by id. */
+const awardXpTo = (s: GameState, id: string, amount: number): void => {
+  const idx = s.crew.findIndex((c) => c.id === id)
+  if (idx < 0 || s.crew[idx].dead) return
+  const { crew, levelled } = grantXp(s.crew[idx], amount)
+  s.crew[idx] = crew
+  if (levelled) log(s, `${crew.name} reached level ${crew.level}.`, 'good')
 }
 
 const trainingSeconds = (m: StationModule, crewById: Map<string, Crew>): number => {
@@ -658,6 +800,14 @@ export type Action =
   | { type: 'interview'; candidateId: string; tactic: Tactic; moduleId?: string }
   | { type: 'offerContract'; candidateId: string }
   | { type: 'turnAway'; candidateId: string }
+  | { type: 'launch'; missionId: string; shipId: string; crewIds: string[] }
+  | { type: 'declineMission'; missionId: string }
+  | { type: 'fileReport'; missionId: string }
+  | { type: 'buyShip'; cls: ShipClass }
+  | { type: 'refitShip'; shipId: string }
+  | { type: 'repairShip'; shipId: string }
+  | { type: 'tradeInShip'; shipId: string }
+  | { type: 'renameShip'; shipId: string; name: string }
   | { type: 'revive'; crewId: string }
   | { type: 'dismiss'; crewId: string }
   | { type: 'rename'; name: string }
@@ -697,6 +847,23 @@ export const appeal = (s: GameState): number => {
     : 0
   const funds = Math.min(1, s.credits / 2500) * 0.15
   return clamp(size + room + surplus + spirit + funds, 0, 1)
+}
+
+/** Hull berths across every hangar bay. */
+export const fleetCapacity = (s: GameState): number =>
+  s.modules.reduce((n, m) => n + shipBerths(m), 0)
+
+/** Missions that can be in flight at once. */
+export const missionCapacity = (s: GameState): number =>
+  s.modules.reduce((n, m) => n + missionSlots(m), 0)
+
+/** Ships sitting in a hangar rather than out on a job. */
+export const berthedShips = (s: GameState): Ship[] => s.ships.filter((x) => !x.missionId)
+
+/** Crew not already flying, dead, or otherwise spoken for. */
+export const availableCrew = (s: GameState): Crew[] => {
+  const flying = new Set(s.missions.flatMap((m) => (m.status === 'flying' ? m.crewIds : [])))
+  return s.crew.filter((c) => !c.dead && !flying.has(c.id))
 }
 
 /** Applicant berths across every docking port. */
@@ -798,9 +965,15 @@ export const reducer = (state: GameState, action: Action): GameState => {
       if (s.credits < cost) return state
       s.credits -= cost
       const placed = makeModule(action.kind, action.deck, action.col)
+      const firstHangar = action.kind === 'hangar' && s.ships.length === 0
       s.modules.push(placed)
       const final = mergeNeighbours(s, placed)
       log(s, `${def(final.kind).name} online — deck ${action.deck + 1}.`, 'good')
+      if (firstHangar) {
+        const shuttle = makeShip('shuttle')
+        s.ships.push(shuttle)
+        log(s, `HQ issued a shuttle with the bay — the ${shuttle.name}.`, 'good')
+      }
       break
     }
     case 'demolish': {
@@ -941,6 +1114,87 @@ export const reducer = (state: GameState, action: Action): GameState => {
       if (!cand) return state
       s.candidates = s.candidates.filter((x) => x.id !== cand.id)
       log(s, `${cand.name} was sent back to HQ.`, 'info')
+      break
+    }
+    case 'launch': {
+      const m = s.missions.find((x) => x.id === action.missionId)
+      const ship = s.ships.find((x) => x.id === action.shipId)
+      if (!m || m.status !== 'offered' || !ship || ship.missionId) return state
+      if (s.missions.filter((x) => x.status === 'flying').length >= missionCapacity(s)) return state
+      const team = action.crewIds
+        .map((id) => s.crew.find((c) => c.id === id))
+        .filter((c): c is Crew => c !== undefined && !c.dead)
+      if (team.length === 0 || team.length > teamSize(m)) return state
+      // A hull with nothing left in it does not leave the bay.
+      if (ship.hull <= 0) return state
+      m.status = 'flying'
+      m.shipId = ship.id
+      m.crewIds = team.map((c) => c.id)
+      m.remaining = Math.round(m.seconds / shipSpeed(ship))
+      ship.missionId = m.id
+      // The away team comes off the duty roster while they are gone.
+      for (const c of team) unassign(s, c.id)
+      log(s, `${ship.name} launched — ${m.name}.`, 'info')
+      break
+    }
+    case 'declineMission': {
+      const m = s.missions.find((x) => x.id === action.missionId)
+      if (!m || m.status !== 'offered') return state
+      s.missions = s.missions.filter((x) => x.id !== m.id)
+      break
+    }
+    case 'fileReport': {
+      const m = s.missions.find((x) => x.id === action.missionId)
+      if (!m || m.status !== 'report') return state
+      s.missions = s.missions.filter((x) => x.id !== m.id)
+      break
+    }
+    case 'buyShip': {
+      const price = shipDef(action.cls).price
+      if (s.credits < price) return state
+      if (s.ships.length >= fleetCapacity(s)) return state
+      s.credits -= price
+      const bought = makeShip(action.cls)
+      s.ships.push(bought)
+      log(s, `HQ delivered the ${bought.name}, a ${shipDef(action.cls).name.toLowerCase()}.`, 'good')
+      break
+    }
+    case 'refitShip': {
+      const ship = s.ships.find((x) => x.id === action.shipId)
+      if (!ship || ship.missionId || ship.level >= 3) return state
+      const cost = refitCost(ship)
+      if (s.credits < cost) return state
+      s.credits -= cost
+      ship.level += 1
+      ship.maxHull = shipHull(ship)
+      ship.hull = ship.maxHull
+      log(s, `${ship.name} refitted to mark ${ship.level}.`, 'good')
+      break
+    }
+    case 'repairShip': {
+      const ship = s.ships.find((x) => x.id === action.shipId)
+      if (!ship || ship.missionId) return state
+      const missing = shipHull(ship) - ship.hull
+      if (missing <= 0) return state
+      const cost = Math.round(missing * 2.4)
+      if (s.credits < cost) return state
+      s.credits -= cost
+      ship.hull = shipHull(ship)
+      ship.maxHull = ship.hull
+      break
+    }
+    case 'tradeInShip': {
+      const ship = s.ships.find((x) => x.id === action.shipId)
+      if (!ship || ship.missionId) return state
+      s.credits += tradeInValue(ship)
+      s.ships = s.ships.filter((x) => x.id !== ship.id)
+      log(s, `${ship.name} was signed over to HQ.`, 'info')
+      break
+    }
+    case 'renameShip': {
+      const ship = s.ships.find((x) => x.id === action.shipId)
+      if (!ship) return state
+      ship.name = action.name.slice(0, 24) || ship.name
       break
     }
     case 'revive': {

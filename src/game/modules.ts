@@ -162,6 +162,34 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     berths: 2,
     powerDraw: 0.6,
   },
+  hangar: {
+    kind: 'hangar',
+    name: 'Hangar Bay',
+    short: 'Hangar',
+    blurb: 'Pressurised berth, fuel lines and a deck crew. One hull per bay.',
+    glyph: '⬢',
+    hue: 30,
+    cost: 520,
+    unlockAtCrew: 5,
+    slotsPerSegment: 1,
+    stat: 'T',
+    ships: 1,
+    powerDraw: 2,
+  },
+  command: {
+    kind: 'command',
+    name: 'Command Module',
+    short: 'Command',
+    blurb: 'Takes contracts off the wire and sends people out to fly them.',
+    glyph: '✦',
+    hue: 260,
+    cost: 560,
+    unlockAtCrew: 5,
+    slotsPerSegment: 2,
+    stat: 'O',
+    missions: 1,
+    powerDraw: 2.5,
+  },
   gym: {
     kind: 'gym',
     name: 'Centrifuge Gym',
@@ -307,5 +335,13 @@ export const storageBonus = (m: StationModule): number =>
 /** How many applicants the station can have waiting at once. */
 export const berths = (m: StationModule): number =>
   (def(m.kind).berths ?? 0) * m.width * m.level
+
+/** Hulls a hangar can hold: one per bay, more once it is merged or refitted. */
+export const shipBerths = (m: StationModule): number =>
+  (def(m.kind).ships ?? 0) * m.width * m.level
+
+/** Missions a command module can run at once. */
+export const missionSlots = (m: StationModule): number =>
+  (def(m.kind).missions ?? 0) * m.width * m.level
 
 export const moduleLabel = (m: StationModule): string => def(m.kind).name

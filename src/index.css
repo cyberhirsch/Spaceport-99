@@ -785,7 +785,7 @@ h3 {
 .tabbar {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   height: var(--tabbar);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   border-top: 1px solid var(--line);
@@ -803,8 +803,8 @@ h3 {
   border: 0;
   border-top: 2px solid transparent;
   background: none;
-  font-size: 10.5px;
-  letter-spacing: 0.05em;
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--ink-faint);
 }
@@ -1386,6 +1386,232 @@ h3 {
   border-radius: 8px;
   background: #12202e;
   color: var(--ink-faint);
+}
+
+/* -------------------------------------------------------------- fleet -- */
+
+.mission-list,
+.ship-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mission {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--violet);
+  border-radius: 9px;
+  background: #0d1621;
+}
+
+.mission--flying {
+  border-left-color: var(--cyan);
+}
+
+.mission__name {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.mission__meta {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  color: var(--ink-dim);
+}
+
+.mission__meta b {
+  color: var(--amber);
+}
+
+.mission__meta b.is-hot {
+  color: var(--red);
+}
+
+.mission__blurb {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+
+.mission__pay {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--mint);
+}
+
+.mission__pay i {
+  font-style: normal;
+  color: var(--ink-faint);
+}
+
+.mission__acts {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.mission__acts .btn {
+  flex: 1;
+}
+
+.mission__bar {
+  display: block;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: #0a1119;
+  overflow: hidden;
+}
+
+.mission__bar i {
+  display: block;
+  height: 100%;
+  background: var(--cyan);
+  transition: width 0.5s linear;
+}
+
+.ship {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  border-radius: 9px;
+  background: #0d1621;
+}
+
+.ship--out {
+  opacity: 0.6;
+  border-left-color: var(--cyan);
+}
+
+.ship--offer {
+  align-items: center;
+  border-left-color: var(--line-hot);
+}
+
+.ship__glyph {
+  font-size: 20px;
+  color: var(--amber);
+}
+
+.ship__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ship__name {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.ship__name em {
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.ship__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ship__stats i {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #ffffff0f;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-style: normal;
+  color: var(--ink-dim);
+}
+
+.ship__note {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.ship__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 3px;
+}
+
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-hot);
+  border-radius: 10px;
+  background: #101c29;
+}
+
+.report strong {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.report--good {
+  border-color: #38e8b066;
+}
+.report--good strong {
+  color: var(--mint);
+}
+.report--warn {
+  border-color: #ffc45a66;
+}
+.report--warn strong {
+  color: var(--amber);
+}
+.report--bad {
+  border-color: #ff547066;
+  background: #1a0d13;
+}
+.report--bad strong {
+  color: var(--red);
+}
+
+.report span {
+  font-size: 12.5px;
+}
+
+.report__body {
+  color: var(--ink-dim);
+}
+
+.report__find {
+  color: var(--mint);
+}
+
+.report .btn {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.staff-chip.is-picked {
+  border-color: var(--mint);
+  background: #0d2620;
+}
+
+.posting__opt.is-current {
+  border-color: var(--mint);
+  background: #0d2620;
 }
 
 /* ---------------------------------------------------------- interview -- */

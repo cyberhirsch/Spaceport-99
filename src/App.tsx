@@ -3,7 +3,9 @@ import { BuildMenu } from './components/BuildMenu.tsx'
 import { CrewModal } from './components/CrewModal.tsx'
 import { CrewPanel } from './components/CrewPanel.tsx'
 import { DragGhost } from './components/DragGhost.tsx'
+import { FleetPanel } from './components/FleetPanel.tsx'
 import { InterviewModal } from './components/InterviewModal.tsx'
+import { LaunchModal } from './components/LaunchModal.tsx'
 import { LogPanel } from './components/LogPanel.tsx'
 import { Modal } from './components/Modal.tsx'
 import { ModuleModal } from './components/ModuleModal.tsx'
@@ -15,11 +17,12 @@ import { useGame } from './hooks/useGame.ts'
 import { useMediaQuery } from './hooks/useMediaQuery.ts'
 import type { ModuleKind } from './game/types.ts'
 
-type Tab = 'build' | 'crew' | 'log'
+type Tab = 'build' | 'crew' | 'fleet' | 'log'
 
 const TABS: { id: Tab; label: string; glyph: string }[] = [
   { id: 'build', label: 'Build', glyph: '⊞' },
   { id: 'crew', label: 'Crew', glyph: '☺' },
+  { id: 'fleet', label: 'Fleet', glyph: '⬢' },
   { id: 'log', label: 'Log', glyph: '≡' },
 ]
 
@@ -32,6 +35,7 @@ export default function App() {
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [crewId, setCrewId] = useState<string | null>(null)
   const [candidateId, setCandidateId] = useState<string | null>(null)
+  const [missionId, setMissionId] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const panelOpen = wide || sheetOpen
 
@@ -77,6 +81,10 @@ export default function App() {
       const docked = state.candidates.filter((c) => c.arrivesIn <= 0).length
       return docked > 0 && `${docked} applicant${docked === 1 ? '' : 's'} waiting at the dock`
     })(),
+    (() => {
+      const filed = state.missions.filter((m) => m.status === 'report').length
+      return filed > 0 && `${filed} mission report${filed === 1 ? '' : 's'} to read`
+    })(),
   ].filter(Boolean) as string[]
 
   return (
@@ -109,7 +117,14 @@ export default function App() {
             setPlacing(null)
           }}
           onCancelPlacing={() => setPlacing(null)}
-          onSelectModule={(id) => setModuleId(id)}
+          onSelectModule={(id) => {
+            const kind = state.modules.find((m) => m.id === id)?.kind
+            if (kind === 'hangar' || kind === 'command') {
+              setTab('fleet')
+              if (!wide) setSheetOpen(true)
+            }
+            setModuleId(id)
+          }}
           onEmptyCell={() => {
             setTab('build')
             if (!wide) setSheetOpen(true)
@@ -158,6 +173,18 @@ export default function App() {
               onRequestCrew={() => act({ type: 'requestCrew' })}
             />
           )}
+          {tab === 'fleet' && (
+            <FleetPanel
+              state={state}
+              onOpenMission={(id) => setMissionId(id)}
+              onDecline={(id) => act({ type: 'declineMission', missionId: id })}
+              onFileReport={(id) => act({ type: 'fileReport', missionId: id })}
+              onBuy={(cls) => act({ type: 'buyShip', cls })}
+              onRefit={(id) => act({ type: 'refitShip', shipId: id })}
+              onRepair={(id) => act({ type: 'repairShip', shipId: id })}
+              onTradeIn={(id) => act({ type: 'tradeInShip', shipId: id })}
+            />
+          )}
           {tab === 'log' && <LogPanel state={state} />}
         </aside>
       </main>
@@ -194,6 +221,18 @@ export default function App() {
           onDemolish={() => {
             act({ type: 'demolish', moduleId })
             setModuleId(null)
+          }}
+        />
+      )}
+
+      {missionId && (
+        <LaunchModal
+          state={state}
+          missionId={missionId}
+          onClose={() => setMissionId(null)}
+          onLaunch={(shipId, crewIds) => {
+            act({ type: 'launch', missionId, shipId, crewIds })
+            setMissionId(null)
           }}
         />
       )}
@@ -288,6 +327,11 @@ export default function App() {
               <b>Hiring</b> runs through the Comms Array and a Docking Port: request someone from
               HQ, wait out their transit, then interview them. You get three tactics to talk them
               round, and the good ones will not join a station that is not worth joining yet.
+            </li>
+            <li>
+              <b>A Hangar Bay</b> berths one ship — HQ issues a shuttle with your first — and a
+              <b> Command Module</b> pulls contracts off the wire. Pick a hull and an away team and
+              send them out. A bad run costs cargo, hull and skin; only a disaster costs the ship.
             </li>
           </ul>
           <div className="modal__actions">

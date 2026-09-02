@@ -93,6 +93,21 @@ early know they are settling, and their standards are lower to match.
 Crew Quarters raise your bunk cap. Training rooms raise a single stat, one point
 per cycle, each point slower than the last.
 
+**Ships and missions.** A Hangar Bay berths one hull, and HQ issues a shuttle
+with your first one. A Command Module pulls contracts off the wire — salvage
+runs, surveys, rescues, escort patrols, recovery tows — each judged on one stat,
+with a danger rating, a payout and an expiry. Brief a ship and an away team and
+send them out.
+
+Outcomes run from exceptional to disaster on the team's stats against the job,
+plus what the hull brings: a cutter's guns, a hauler's holds, a scout's legs. A
+setback costs you cargo, hull and skin. Only a disaster can lose the ship, and
+only a disaster can kill anyone. Good runs sometimes turn up a survivor who
+stays, a derelict you tow home, or a sealed cache.
+
+Hulls come from HQ for credits, from a mission you got lucky on, or from trading
+in something you have outgrown, and every one of them can be refitted twice.
+
 **Money** comes from docking fees (scaled with crew and station size), the
 Fabricator, the Comms Array, and salvage from emergencies you put down. Spend it
 on rooms, upgrades, new decks, reviving the dead, and emergency resupply barges
@@ -111,9 +126,10 @@ src/
     modules.ts     the room catalogue and its cost/yield/capacity maths
     crew.ts        name and stat generation, xp curve, effectiveness, portraits
     incidents.ts   the four emergency types and their numbers
+    fleet.ts       ship classes, contract generation, mission resolution
     engine.ts      the simulation: derive(), the per-second step, and the reducer
     save.ts        localStorage round-trip
-    __tests__/     station geometry: wings, merging, scrapping
+    __tests__/     station geometry, recruiting, and the mission lifecycle
   hooks/
     useGame.ts       tick loop, autosave, offline catch-up
     useDragAssign.ts pointer-event drag and drop for crew assignment

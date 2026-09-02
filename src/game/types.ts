@@ -33,6 +33,8 @@ export type ModuleKind =
   | 'fabricator'
   | 'comms'
   | 'dock'
+  | 'hangar'
+  | 'command'
   | 'storage'
   | 'gym'
   | 'range'
@@ -79,6 +81,10 @@ export interface ModuleDef {
   heals?: number
   /** Applicant berths per segment per level, for the docking port. */
   berths?: number
+  /** Ship berths per segment per level, for the hangar bay. */
+  ships?: number
+  /** Concurrent missions per segment per level, for the command module. */
+  missions?: number
 }
 
 /** A built (possibly merged) room occupying contiguous slots on one deck. */
@@ -170,6 +176,72 @@ export interface Candidate {
   arrivesIn: number
 }
 
+// ------------------------------------------------------------------ fleet --
+
+export type ShipClass = 'shuttle' | 'hauler' | 'scout' | 'cutter'
+
+export interface ShipDef {
+  cls: ShipClass
+  name: string
+  blurb: string
+  glyph: string
+  hull: number
+  /** Multiplier on mission duration — above 1 is faster. */
+  speed: number
+  /** Multiplier on what the ship can bring home. */
+  cargo: number
+  /** Added to the away team's score. A cutter can handle itself. */
+  teeth: number
+  /** Price from HQ. Building one in the Fabricator costs less but takes time. */
+  price: number
+}
+
+export interface Ship {
+  id: string
+  name: string
+  cls: ShipClass
+  hull: number
+  maxHull: number
+  /** Refits raise hull, speed and cargo. */
+  level: number
+  /** Mission it is flying, or null when berthed. */
+  missionId: string | null
+}
+
+export type MissionKind = 'salvage' | 'survey' | 'rescue' | 'patrol' | 'tow'
+
+export type MissionOutcome = 'triumph' | 'success' | 'setback' | 'disaster'
+
+/** Something brought home that is not simply credits or cargo. */
+export interface MissionFind {
+  kind: 'survivor' | 'ship' | 'cache'
+  detail: string
+}
+
+export interface Mission {
+  id: string
+  name: string
+  kind: MissionKind
+  /** 0..1. Drives the difficulty, the payout and how badly it can go. */
+  danger: number
+  /** The stat the away team is judged on. */
+  stat: StatKey
+  /** Seconds the round trip takes in an unmodified ship. */
+  seconds: number
+  /** Counts down once launched. */
+  remaining: number
+  /** Seconds before an unclaimed offer expires. */
+  expiresIn: number
+  status: 'offered' | 'flying' | 'report'
+  shipId: string | null
+  crewIds: string[]
+  payout: { credits: number; power: number; air: number; food: number }
+  outcome: MissionOutcome | null
+  /** Written when the mission resolves, read in the after-action report. */
+  report: string | null
+  find: MissionFind | null
+}
+
 export interface Resources {
   power: number
   air: number
@@ -198,6 +270,12 @@ export interface GameState {
   broadcastCooldown: number
   /** People HQ has dispatched: in transit, or waiting at the dock. */
   candidates: Candidate[]
+  /** Everything berthed in the hangars, or out on a job. */
+  ships: Ship[]
+  /** Contracts on offer, in flight, and awaiting an after-action report. */
+  missions: Mission[]
+  /** Seconds until the command module posts another contract. */
+  nextContractIn: number
   /** Ids of crew that arrived but have not been greeted yet (for the toast). */
   seenIntro: boolean
   gameOver: boolean

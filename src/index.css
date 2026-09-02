@@ -480,6 +480,30 @@ h3 {
   filter: saturate(0.45) brightness(0.85);
 }
 
+/* A room switched off reads as dark and dead, not merely unstaffed. */
+.room--standby {
+  filter: saturate(0.1) brightness(0.55);
+  border-style: dashed;
+}
+
+.room__standby {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--ink-faint);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.room--standby .room__pips {
+  display: none;
+}
+
 .room--alarm {
   border-color: var(--red);
   animation: pulse 1s ease-in-out infinite;
@@ -1389,6 +1413,79 @@ h3 {
 }
 
 /* -------------------------------------------------------------- fleet -- */
+
+.checklist {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.checklist li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0d1621;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.checklist li i {
+  font-style: normal;
+  color: var(--ink-faint);
+}
+
+.checklist li.is-done {
+  opacity: 0.55;
+}
+
+.checklist li.is-done i {
+  color: var(--mint);
+}
+
+/* A name you can tap to rewrite, wherever one appears. */
+.rename {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.rename i {
+  font-style: normal;
+  font-size: 0.62em;
+  color: var(--ink-faint);
+  opacity: 0.6;
+}
+
+.rename--idle:hover i {
+  color: var(--mint);
+  opacity: 1;
+}
+
+input.rename {
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px dashed var(--line-hot);
+  border-radius: 5px;
+  background: #0a1119;
+  outline: none;
+}
+
+input.rename:focus {
+  border-color: var(--mint);
+}
 
 .mission-list,
 .ship-list {

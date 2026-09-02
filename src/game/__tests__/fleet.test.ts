@@ -7,9 +7,12 @@ import {
   berthedShips,
   fleetCapacity,
   missionCapacity,
+  derive,
   newGame,
   reducer,
+  workRate,
 } from '../engine.ts'
+import { powerDraw } from '../modules.ts'
 import { makeMission, shipHull, teamSize } from '../fleet.ts'
 import type { GameState, Mission, ModuleKind } from '../types.ts'
 
@@ -173,4 +176,49 @@ test('contracts expire if nobody takes them', () => {
   const [ready] = withOffer(flightReady(), { expiresIn: 15 })
   const s = advance(ready, 40)
   assert.equal(s.missions.filter((m) => m.status === 'offered').length, 0, 'the wire moves on')
+})
+
+test('a room on standby costs a tenth of the power and produces nothing', () => {
+  const s = newGame()
+  const farm = s.modules.find((m) => m.kind === 'hydroponics')!
+  const crewById = new Map(s.crew.map((c) => [c.id, c]))
+  const runningDraw = powerDraw(farm)
+  assert.ok(runningDraw > 0)
+  assert.ok(workRate(farm, crewById) > 0, 'it is working to begin with')
+
+  const off = reducer(s, { type: 'setStandby', moduleId: farm.id, standby: true })
+  const dark = off.modules.find((m) => m.id === farm.id)!
+  assert.equal(dark.standby, true)
+  assert.ok(
+    Math.abs(powerDraw(dark) - runningDraw * 0.1) < 1e-9,
+    'standby draw is exactly a tenth',
+  )
+  assert.equal(workRate(dark, new Map(off.crew.map((c) => [c.id, c]))), 0, 'and it makes nothing')
+  assert.equal(dark.staff.length, 0, 'the shift is stood down')
+  for (const id of farm.staff) {
+    assert.equal(off.crew.find((c) => c.id === id)!.assignment, null)
+  }
+
+  const back = reducer(off, { type: 'setStandby', moduleId: farm.id, standby: false })
+  assert.equal(powerDraw(back.modules.find((m) => m.id === farm.id)!), runningDraw, 'and back again')
+})
+
+test('auto-assign leaves powered-down rooms dark', () => {
+  let s = newGame()
+  const farm = s.modules.find((m) => m.kind === 'hydroponics')!
+  s = reducer(s, { type: 'setStandby', moduleId: farm.id, standby: true })
+  s = reducer(s, { type: 'autoAssign' })
+  assert.equal(
+    s.modules.find((m) => m.id === farm.id)!.staff.length,
+    0,
+    'nobody is sent to work in the dark',
+  )
+})
+
+test('powering down a room actually relieves the grid', () => {
+  const s = newGame()
+  const before = derive(s).powerRate
+  const farm = s.modules.find((m) => m.kind === 'hydroponics')!
+  const after = derive(reducer(s, { type: 'setStandby', moduleId: farm.id, standby: true })).powerRate
+  assert.ok(after > before, `switching a room off should free power: ${before} -> ${after}`)
 })

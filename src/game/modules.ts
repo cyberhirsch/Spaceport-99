@@ -323,8 +323,14 @@ export const cycleCredits = (m: StationModule): number => {
   return d.credits * m.width * (1 + (m.level - 1) * 0.6)
 }
 
+/** What a room on standby still costs: heaters, sensors, and the lights. */
+export const STANDBY_DRAW = 0.1
+
 export const powerDraw = (m: StationModule): number =>
-  def(m.kind).powerDraw * m.width * (1 + (m.level - 1) * 0.4)
+  def(m.kind).powerDraw *
+  m.width *
+  (1 + (m.level - 1) * 0.4) *
+  (m.standby ? STANDBY_DRAW : 1)
 
 export const capacityBonus = (m: StationModule): number =>
   (def(m.kind).crewCapacity ?? 0) * m.width * m.level

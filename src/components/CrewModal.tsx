@@ -2,6 +2,7 @@ import { REVIVE_COST_PER_LEVEL, def, staffSlots } from '../game/engine.ts'
 import { effectiveness, portraitIndex, statTotal, xpForLevel } from '../game/crew.ts'
 import type { GameState } from '../game/types.ts'
 import { CrewAvatar } from './CrewAvatar.tsx'
+import { EditableName } from './EditableName.tsx'
 import { hpStyle } from './meters.ts'
 import { Modal } from './Modal.tsx'
 import { StatBars } from './StatBars.tsx'
@@ -13,9 +14,18 @@ interface Props {
   onAssign: (crewId: string, moduleId: string | null) => void
   onRevive: () => void
   onDismiss: () => void
+  onRename: (name: string) => void
 }
 
-export const CrewModal = ({ state, crewId, onClose, onAssign, onRevive, onDismiss }: Props) => {
+export const CrewModal = ({
+  state,
+  crewId,
+  onClose,
+  onAssign,
+  onRevive,
+  onDismiss,
+  onRename,
+}: Props) => {
   const c = state.crew.find((x) => x.id === crewId)
   if (!c) return null
   const job = c.assignment ? state.modules.find((m) => m.id === c.assignment) : null
@@ -36,7 +46,9 @@ export const CrewModal = ({ state, crewId, onClose, onAssign, onRevive, onDismis
           {c.dead && <span className="dossier__stamp">Deceased</span>}
         </div>
         <div className="dossier__id">
-          <h3 className="dossier__name">{c.name}</h3>
+          <h3 className="dossier__name">
+            <EditableName value={c.name} onChange={onRename} label="Rename this crew member" />
+          </h3>
           <dl className="dossier__facts">
             <div>
               <dt>Serial</dt>

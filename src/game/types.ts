@@ -105,6 +105,8 @@ export interface StationModule {
   condition: number
   /** Chance the next rush goes wrong, 0..1. Climbs per rush, decays over time. */
   rushRisk: number
+  /** Powered down to standby: no output, a tenth of the draw. */
+  standby?: boolean
 }
 
 export type CrewState = 'idle' | 'working' | 'training' | 'fighting' | 'dead'

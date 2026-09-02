@@ -104,7 +104,7 @@ const rateOf = (m: StationModule, crewById: Map<string, Crew>, resource: Resourc
 export const workRate = (m: StationModule, crewById: Map<string, Crew>): number => {
   const d = def(m.kind)
   const slots = staffSlots(m)
-  if (slots === 0) return 0
+  if (slots === 0 || m.standby) return 0
   let sum = 0
   for (const id of m.staff) {
     const c = crewById.get(id)
@@ -173,6 +173,7 @@ const makeModule = (kind: ModuleKind, deck: number, col: number): StationModule 
   progress: 0,
   condition: 1,
   rushRisk: 0.15,
+  standby: false,
 })
 
 export const newGame = (name = 'Spaceport-99'): GameState => {
@@ -316,7 +317,9 @@ const assign = (s: GameState, crewId: string, moduleId: string): boolean => {
 export const autoAssignInto = (s: GameState): number => {
   let moved = 0
   const jobs = s.modules
-    .filter((m) => staffSlots(m) > 0 && !s.incidents.some((i) => i.moduleId === m.id))
+    .filter(
+      (m) => staffSlots(m) > 0 && !m.standby && !s.incidents.some((i) => i.moduleId === m.id),
+    )
     .sort((a, b) => jobPriority(a) - jobPriority(b))
   const free = new Set(s.crew.filter((c) => !c.dead && !c.assignment).map((c) => c.id))
   for (const m of jobs) {
@@ -808,6 +811,8 @@ export type Action =
   | { type: 'repairShip'; shipId: string }
   | { type: 'tradeInShip'; shipId: string }
   | { type: 'renameShip'; shipId: string; name: string }
+  | { type: 'renameCrew'; crewId: string; name: string }
+  | { type: 'setStandby'; moduleId: string; standby: boolean }
   | { type: 'revive'; crewId: string }
   | { type: 'dismiss'; crewId: string }
   | { type: 'rename'; name: string }
@@ -1195,6 +1200,25 @@ export const reducer = (state: GameState, action: Action): GameState => {
       const ship = s.ships.find((x) => x.id === action.shipId)
       if (!ship) return state
       ship.name = action.name.slice(0, 24) || ship.name
+      break
+    }
+    case 'setStandby': {
+      const m = s.modules.find((x) => x.id === action.moduleId)
+      if (!m) return state
+      m.standby = action.standby
+      // Nothing useful happens in a dark room, so the shift is stood down.
+      if (action.standby) for (const id of [...m.staff]) unassign(s, id)
+      log(
+        s,
+        `${def(m.kind).name} ${action.standby ? 'powered down to standby' : 'brought back online'}.`,
+        'info',
+      )
+      break
+    }
+    case 'renameCrew': {
+      const c = s.crew.find((x) => x.id === action.crewId)
+      if (!c) return state
+      c.name = action.name.slice(0, 24) || c.name
       break
     }
     case 'revive': {

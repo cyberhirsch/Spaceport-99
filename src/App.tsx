@@ -85,6 +85,9 @@ export default function App() {
       const filed = state.missions.filter((m) => m.status === 'report').length
       return filed > 0 && `${filed} mission report${filed === 1 ? '' : 's'} to read`
     })(),
+    state.modules.some((m) => m.kind === 'command') &&
+      !state.modules.some((m) => m.kind === 'command' && m.staff.length > 0) &&
+      'Command Module unstaffed — no contracts are coming in',
   ].filter(Boolean) as string[]
 
   return (
@@ -183,6 +186,7 @@ export default function App() {
               onRefit={(id) => act({ type: 'refitShip', shipId: id })}
               onRepair={(id) => act({ type: 'repairShip', shipId: id })}
               onTradeIn={(id) => act({ type: 'tradeInShip', shipId: id })}
+              onRenameShip={(id, name) => act({ type: 'renameShip', shipId: id, name })}
             />
           )}
           {tab === 'log' && <LogPanel state={state} />}
@@ -218,6 +222,7 @@ export default function App() {
           onAssign={(cid, mid) => act({ type: 'assign', crewId: cid, moduleId: mid })}
           onUpgrade={() => act({ type: 'upgrade', moduleId })}
           onRush={() => act({ type: 'rush', moduleId })}
+          onStandby={(standby) => act({ type: 'setStandby', moduleId, standby })}
           onDemolish={() => {
             act({ type: 'demolish', moduleId })
             setModuleId(null)
@@ -261,6 +266,7 @@ export default function App() {
           onClose={() => setCrewId(null)}
           onAssign={(cid, mid) => act({ type: 'assign', crewId: cid, moduleId: mid })}
           onRevive={() => act({ type: 'revive', crewId })}
+          onRename={(name) => act({ type: 'renameCrew', crewId, name })}
           onDismiss={() => {
             act({ type: 'dismiss', crewId })
             setCrewId(null)

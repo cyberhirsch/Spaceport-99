@@ -47,7 +47,8 @@ avatar. Which portrait someone wears is derived from their seed, so a given
 crew member keeps the same face for as long as they are aboard. With more crew
 than portraits faces repeat — there are only so many people on the manifest.
 Tap anyone to open their dossier: portrait, serial, rank, posting, condition and
-full stat readout.
+full stat readout — and their name, which you can rewrite. Ships rename the same
+way, from the hangar list.
 
 **O.R.B.I.T.A.L.** — Operations, Reflex, Brawn, Intellect, Tech, Adaptability,
 Luck. Every room is driven by one stat, and a room runs at the speed of the
@@ -64,6 +65,11 @@ scrapped, so nothing is ever stranded with no corridor back to the lift.
 same wing and they fuse into one wider room — more staff slots, more output per
 cycle, up to three segments. Merges never cross the shaft, and neither do
 emergencies: the lift is a fire break.
+
+**Rooms can be powered down.** A room on standby draws a tenth of its usual
+load, makes nothing, and stands its shift down to the off-duty tray. It is the
+lever for a grid that has got ahead of your reactors: switch off the training
+rooms and the hangar until you have built another one.
 
 **Rushing** finishes a production cycle instantly. It also might start a fire.
 The risk climbs with every successful rush and decays slowly while you leave the

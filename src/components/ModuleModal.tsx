@@ -17,6 +17,7 @@ interface Props {
   onUpgrade: () => void
   onRush: () => void
   onDemolish: () => void
+  onStandby: (standby: boolean) => void
 }
 
 export const ModuleModal = ({
@@ -29,6 +30,7 @@ export const ModuleModal = ({
   onUpgrade,
   onRush,
   onDemolish,
+  onStandby,
 }: Props) => {
   const m = state.modules.find((x) => x.id === moduleId)
   if (!m) return null
@@ -105,7 +107,9 @@ export const ModuleModal = ({
         </div>
         <div>
           <dt>Power draw</dt>
-          <dd>{powerDraw(m).toFixed(1)} /s</dd>
+          <dd>
+            {powerDraw(m).toFixed(1)} /s{m.standby ? ' · standby' : ''}
+          </dd>
         </div>
         <div>
           <dt>Condition</dt>
@@ -165,18 +169,32 @@ export const ModuleModal = ({
         </>
       )}
 
+      {m.standby && (
+        <p className="panel-note">
+          Powered down. It draws a tenth of its usual load and does nothing at all until you bring
+          it back.
+        </p>
+      )}
+
       <div className="modal__actions">
+        <button className="btn" onClick={() => onStandby(!m.standby)} disabled={Boolean(incident)}>
+          {m.standby ? 'Bring online' : 'Power down'}
+        </button>
         {cycle && (
           <button
             className="btn"
-            disabled={m.staff.length === 0 || Boolean(incident)}
+            disabled={m.staff.length === 0 || Boolean(incident) || m.standby}
             onClick={onRush}
             title="Finish this cycle instantly — but something might go badly wrong"
           >
             Rush · {Math.round(m.rushRisk * 100)}% risk
           </button>
         )}
-        <button className="btn" disabled={m.level >= MAX_LEVEL || state.credits < upCost} onClick={onUpgrade}>
+        <button
+          className="btn"
+          disabled={m.level >= MAX_LEVEL || state.credits < upCost || m.standby}
+          onClick={onUpgrade}
+        >
           {m.level >= MAX_LEVEL ? 'Max level' : `Upgrade — ${upCost}c`}
         </button>
         <button

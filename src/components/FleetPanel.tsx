@@ -18,6 +18,7 @@ import {
   tradeInValue,
 } from '../game/fleet.ts'
 import { STAT_INFO, type GameState, type Ship, type ShipClass } from '../game/types.ts'
+import { EditableName } from './EditableName.tsx'
 import { hpStyle } from './meters.ts'
 
 interface Props {
@@ -29,6 +30,7 @@ interface Props {
   onRefit: (id: string) => void
   onRepair: (id: string) => void
   onTradeIn: (id: string) => void
+  onRenameShip: (id: string, name: string) => void
 }
 
 const clock = (s: number) => {
@@ -42,12 +44,14 @@ const ShipCard = ({
   onRefit,
   onRepair,
   onTradeIn,
+  onRenameShip,
 }: {
   ship: Ship
   state: GameState
   onRefit: (id: string) => void
   onRepair: (id: string) => void
   onTradeIn: (id: string) => void
+  onRenameShip: (id: string, name: string) => void
 }) => {
   const d = shipDef(ship.cls)
   const full = shipHull(ship)
@@ -60,7 +64,14 @@ const ShipCard = ({
       <span className="ship__glyph">{d.glyph}</span>
       <span className="ship__body">
         <span className="ship__name">
-          {ship.name} <em>{d.name} mk{ship.level}</em>
+          <EditableName
+            value={ship.name}
+            onChange={(name) => onRenameShip(ship.id, name)}
+            label="Rename this ship"
+          />{' '}
+          <em>
+            {d.name} mk{ship.level}
+          </em>
         </span>
         <span className="ship__stats">
           <i>hull {ship.hull}/{full}</i>
@@ -105,6 +116,7 @@ export const FleetPanel = ({
   onRefit,
   onRepair,
   onTradeIn,
+  onRenameShip,
 }: Props) => {
   const capacity = fleetCapacity(state)
   const slots = missionCapacity(state)
@@ -114,14 +126,50 @@ export const FleetPanel = ({
   const free = berthedShips(state)
   const crewFree = availableCrew(state)
 
-  if (capacity === 0 && slots === 0) {
+  const commandRooms = state.modules.filter((m) => m.kind === 'command')
+  const listening = commandRooms.some((m) => m.staff.length > 0)
+
+  // Getting a mission off the ground has three prerequisites, and being told
+  // which one is missing beats staring at an empty board.
+  if (capacity === 0 || slots === 0 || !listening) {
+    const steps = [
+      { done: capacity > 0, text: 'Build a Hangar Bay — HQ issues a shuttle with your first one.' },
+      { done: slots > 0, text: 'Build a Command Module to pull contracts off the wire.' },
+      { done: listening, text: 'Post a crew member to the Command Module — an empty room hears nothing.' },
+    ]
     return (
       <div className="panel-body">
+        <p className="panel-note">Before anything can launch:</p>
+        <ul className="checklist">
+          {steps.map((step) => (
+            <li key={step.text} className={step.done ? 'is-done' : ''}>
+              <i>{step.done ? '✓' : '○'}</i>
+              {step.text}
+            </li>
+          ))}
+        </ul>
         <p className="panel-note">
-          Nothing flies from here yet. Build a <b>Hangar Bay</b> to berth a hull — HQ issues a
-          shuttle with your first one — and a <b>Command Module</b> to take contracts off the wire
-          and send people out on them.
+          Contracts then appear here on their own. Pick one, choose a ship and an away team, and
+          launch.
         </p>
+        {state.ships.length > 0 && (
+          <>
+            <h3 className="modal__sub">Hangar ({state.ships.length}/{capacity})</h3>
+            <ul className="ship-list">
+              {state.ships.map((ship) => (
+                <ShipCard
+                  key={ship.id}
+                  ship={ship}
+                  state={state}
+                  onRefit={onRefit}
+                  onRepair={onRepair}
+                  onTradeIn={onTradeIn}
+                  onRenameShip={onRenameShip}
+                />
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     )
   }
@@ -227,6 +275,7 @@ export const FleetPanel = ({
             onRefit={onRefit}
             onRepair={onRepair}
             onTradeIn={onTradeIn}
+            onRenameShip={onRenameShip}
           />
         ))}
       </ul>

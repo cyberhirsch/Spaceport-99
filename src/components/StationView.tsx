@@ -49,6 +49,7 @@ const Room = ({
         'room',
         incident ? 'room--alarm' : '',
         running ? '' : 'room--idle',
+        module.standby ? 'room--standby' : '',
         room ? (full ? 'room--dropno' : 'room--dropok') : '',
         drag?.overModule === module.id ? 'is-over' : '',
       ]
@@ -72,6 +73,7 @@ const Room = ({
       title={`${d.name} — level ${module.level}`}
     >
       <span className="room__glyph">{d.glyph}</span>
+      {module.standby && <span className="room__standby">off</span>}
       <span className="room__title">
         <span className="room__name">{d.short}</span>
         <span className="room__pips">

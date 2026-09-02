@@ -324,14 +324,19 @@ export const maxLevel = (m: StationModule): number => (m.width > 1 ? MAX_LEVEL :
 export const mergeBonus = (m: StationModule): number => 1 + (m.width - 1) * 0.15
 
 /**
- * Hands on shift. Every segment brings its own workstations, and the final
- * fit-out repacks the run to find room for one more — a fully merged, fully
- * upgraded Crew Quarters works seven.
+ * Hands on shift. Each segment brings two workstations, and each upgrade adds
+ * one more to every segment — so Crew Quarters work 2 alone and 3 upgraded;
+ * 4, 6, 8 across two welded together; 6, 9, 12 across three.
+ *
+ * Deliberately additive: two level-2 rooms hold three each, and the run they
+ * weld into holds six. Anything else would quietly turn a merge into a
+ * demotion for somebody's shift, and rooms of the same level are exactly what
+ * merges.
  */
 export const staffSlots = (m: StationModule): number => {
   const per = def(m.kind).slotsPerSegment
   if (per === 0) return 0
-  return per * m.width + (m.level >= maxLevel(m) ? 1 : 0)
+  return m.width * (per + m.level - 1)
 }
 
 /**

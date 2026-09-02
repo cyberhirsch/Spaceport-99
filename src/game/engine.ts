@@ -346,14 +346,11 @@ const mergeNeighbours = (s: GameState, m: StationModule): StationModule => {
   let current = m
   for (let pass = 0; pass < 2; pass += 1) {
     // Rooms only merge with their own wing; the lift shaft is a hard divide.
-    // Shells weld together; fitted-out rooms do not. Upgrading is what you do
-    // *after* you have decided how wide the run is going to be.
-    if (current.level > 1) break
     const twin = (o: StationModule) =>
       o.id !== current.id &&
       o.deck === current.deck &&
       o.kind === current.kind &&
-      o.level === 1 &&
+      o.level === current.level &&
       wingOf(o.col) === wingOf(current.col)
     const left = s.modules.find((o) => twin(o) && o.col + o.width === current.col)
     const right = s.modules.find((o) => twin(o) && o.col === current.col + current.width)
@@ -1379,6 +1376,13 @@ export const reducer = (state: GameState, action: Action): GameState => {
       m.level += 1
       m.condition = 1
       log(s, `${def(m.kind).name} upgraded to level ${m.level}.`, 'good')
+      // Rooms weld when they match, and an upgrade is one of the ways they come
+      // to match — a neighbour brought up to the same level is now the same
+      // room, so the bulkhead between them comes out.
+      const run = mergeNeighbours(s, m)
+      if (run.width > m.width) {
+        log(s, `It welded into the ${def(run.kind).name} beside it — ${run.width} wide now.`, 'good')
+      }
       break
     }
     case 'assign': {

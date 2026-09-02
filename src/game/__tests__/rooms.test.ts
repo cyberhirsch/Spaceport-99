@@ -39,29 +39,50 @@ test('a room on its own takes one upgrade; a merged run takes two', () => {
   assert.equal(at(s, WING - 3).level, 2, 'and there is no third level for a single room')
 })
 
-test('a fully merged, fully upgraded Crew Quarters works seven', () => {
+test('a fully merged, fully upgraded Crew Quarters works twelve', () => {
   let s = newGame()
   for (const col of [WING - 3, WING - 4, WING - 5]) s = build(s, 'quarters', col)
   let block = at(s, WING - 3)
-  assert.equal(block.width, MAX_MERGE, 'three shells welded into one run')
+  assert.equal(block.width, MAX_MERGE, 'three rooms welded into one run')
   assert.equal(staffSlots(block), 6)
   assert.equal(maxLevel(block), 3, 'merging buys the second upgrade')
 
   s = upgrade(s, block)
   block = at(s, WING - 3)
+  assert.equal(staffSlots(block), 9)
   s = upgrade(s, block)
   block = at(s, WING - 3)
   assert.equal(block.level, 3)
-  assert.equal(staffSlots(block), 7)
+  assert.equal(staffSlots(block), 12)
 })
 
-test('shells weld together, fitted-out rooms do not', () => {
+test('rooms weld the moment they match, including on the upgrade that does it', () => {
   let s = newGame()
   s = build(s, 'quarters', WING - 3)
   s = upgrade(s, at(s, WING - 3))
+  assert.equal(at(s, WING - 3).level, 2)
+
+  // A fresh room next door is a level behind, so nothing welds yet.
   s = build(s, 'quarters', WING - 4)
-  assert.equal(at(s, WING - 3).width, 1, 'the upgraded room stays as it is')
-  assert.equal(at(s, WING - 4).width, 1, 'and the new shell sits beside it')
+  assert.equal(at(s, WING - 4).level, 1)
+  assert.equal(at(s, WING - 3).width, 1, 'different levels stay separate rooms')
+
+  // Bringing it up to match is what welds them.
+  s = upgrade(s, at(s, WING - 4))
+  const run = at(s, WING - 4)
+  assert.equal(run.width, 2, 'the upgrade that matched them welded them')
+  assert.equal(run.level, 2)
+  assert.equal(staffSlots(run), 6, 'and the shift adds up: three plus three')
+})
+
+test('welding never costs anybody their seat', () => {
+  for (const level of [1, 2]) {
+    const single = { kind: 'quarters', width: 1, level } as unknown as StationModule
+    const pair = { ...single, width: 2 }
+    const triple = { ...single, width: 3 }
+    assert.equal(staffSlots(pair), staffSlots(single) * 2, `level ${level}, two wide`)
+    assert.equal(staffSlots(triple), staffSlots(single) * 3, `level ${level}, three wide`)
+  }
 })
 
 test('a welded run out-produces the same floor area apart', () => {

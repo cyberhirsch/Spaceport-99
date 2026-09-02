@@ -533,7 +533,7 @@ export default function App() {
             </li>
             <li>
               <b>Decks are symmetrical</b> — five room slots each side of the lift shaft, built
-              outward from it. Fresh rooms of a kind side by side weld into one run: more output
+              outward from it. Rooms of a kind at the same level weld into one run: more output
               per segment, and a second upgrade a lone room never gets. Press and hold a room to
               pick it up and move it.
             </li>

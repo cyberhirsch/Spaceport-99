@@ -15,10 +15,10 @@ export const BuildMenu = ({ state, derived, placing, onPick }: Props) => {
   return (
     <div className="panel-body">
       <p className="panel-note">
-        Wings grow outward from the lift shaft, five rooms to a side. Fresh rooms of a kind set
-        side by side weld into one run — up to three wide, worth 15% more output per extra
-        segment, and it takes two upgrades where a room on its own takes one. Press and hold a room
-        to pick it up and move it, for a fee.
+        Wings grow outward from the lift shaft, five rooms to a side. Rooms of a kind at the same
+        level weld into one run — up to three wide, worth 15% more output per extra segment, and
+        it takes two upgrades where a room on its own takes one. Press and hold a room to pick it
+        up and move it, for a fee.
       </p>
       <ul className="build-list">
         {BUILDABLE.map((d) => {

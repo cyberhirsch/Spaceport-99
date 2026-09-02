@@ -46,6 +46,7 @@ import {
   teamSize,
   tradeInValue,
 } from './fleet.ts'
+import { SELL_MARGIN, TRADE_LOT, makeVisitor } from './visitors.ts'
 import type {
   Candidate,
   Crew,
@@ -60,6 +61,7 @@ import type {
   ResourceKey,
   StatKey,
   Tactic,
+  Visitor,
   StationModule,
 } from './types.ts'
 
@@ -209,6 +211,9 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     ships: [],
     missions: [],
     nextContractIn: 45,
+    visitors: [],
+    nextVisitorIn: 60,
+    standing: 0,
     seenIntro: false,
     gameOver: false,
   }
@@ -577,6 +582,36 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
 
   // --- random events --------------------------------------------------
   s.broadcastCooldown = Math.max(0, s.broadcastCooldown - dt)
+  // --- the clamps -----------------------------------------------------
+  s.nextVisitorIn -= dt
+  if (s.nextVisitorIn <= 0) {
+    s.nextVisitorIn = 80 + Math.random() * 120
+    if (s.visitors.length < visitorBerths(s)) {
+      const hail = makeVisitor()
+      s.visitors.push(hail)
+      log(s, `${hail.name} is requesting permission to dock.`, 'info')
+    }
+  }
+
+  for (const v of [...s.visitors]) {
+    v.timer -= dt
+    if (v.status === 'requesting') {
+      if (autoAccepting(s)) {
+        admitVisitor(s, v)
+        continue
+      }
+      if (v.timer <= 0) {
+        s.visitors = s.visitors.filter((x) => x.id !== v.id)
+        log(s, `${v.name} gave up waiting and moved on.`, 'info')
+      }
+      continue
+    }
+    s.credits += v.fee * dt
+    if (v.timer <= 0) {
+      s.visitors = s.visitors.filter((x) => x.id !== v.id)
+    }
+  }
+
   // --- the fleet ------------------------------------------------------
   s.nextContractIn -= dt
   if (s.nextContractIn <= 0) {
@@ -624,6 +659,67 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
   if (s.crew.length > 0 && s.crew.every((c) => c.dead) && !s.gameOver) {
     s.gameOver = true
     log(s, 'The last of the crew is gone. Spaceport-99 drifts dark and silent.', 'bad')
+  }
+}
+
+/** Opens the clamps and finds out what was actually aboard. */
+const admitVisitor = (s: GameState, v: Visitor): void => {
+  const cap = derive(s).storageCap
+  v.status = 'docked'
+  v.timer = 45 + Math.random() * 60
+  const dock = s.modules.find((m) => m.kind === 'dock' && !m.standby)
+
+  switch (v.kind) {
+    case 'trader': {
+      const paid = Math.round(60 + Math.random() * 140)
+      s.credits += paid
+      for (const key of ['power', 'air', 'food'] as const) {
+        s.resources[key] = clamp(s.resources[key] + Math.round(20 + Math.random() * 50), 0, cap)
+      }
+      log(s, `${v.name} berthed and sold off a hold. +${paid}c and cargo.`, 'good')
+      break
+    }
+    case 'courier': {
+      const paid = Math.round(90 + Math.random() * 120)
+      s.credits += paid
+      // Couriers carry paper, which sometimes means work.
+      if (s.missions.filter((m) => m.status === 'offered').length < 3) {
+        s.missions.push(makeMission(appeal(s)))
+        log(s, `${v.name} dropped a contract and a bill. +${paid}c.`, 'good')
+      } else {
+        log(s, `${v.name} dropped the mail. +${paid}c.`, 'good')
+      }
+      break
+    }
+    case 'patrol': {
+      const paid = Math.round(50 + Math.random() * 90)
+      s.credits += paid
+      s.standing = clamp(s.standing + 0.01, -0.2, 0.2)
+      log(s, `${v.name} took a berth and left the lane a little safer. +${paid}c.`, 'good')
+      break
+    }
+    case 'drifter': {
+      // Helping costs supplies now and buys goodwill that pays later.
+      const given = Math.round(30 + Math.random() * 40)
+      for (const key of ['air', 'food'] as const) {
+        s.resources[key] = Math.max(0, s.resources[key] - given)
+      }
+      s.standing = clamp(s.standing + 0.04, -0.2, 0.2)
+      log(s, `${v.name} was taken in and resupplied. Word gets around.`, 'good')
+      break
+    }
+    case 'smuggler': {
+      const stolen = Math.round(Math.min(s.credits, 40 + Math.random() * 120))
+      s.credits -= stolen
+      if (dock) startIncident(s, 'vermin', dock)
+      log(s, `${v.name} was not carrying what the manifest said. -${stolen}c.`, 'bad')
+      break
+    }
+    case 'raider': {
+      if (dock) startIncident(s, 'pirates', dock)
+      log(s, `${v.name} opened fire the moment the clamps closed.`, 'bad')
+      break
+    }
   }
 }
 
@@ -826,6 +922,11 @@ export type Action =
   | { type: 'renameShip'; shipId: string; name: string }
   | { type: 'renameCrew'; crewId: string; name: string }
   | { type: 'setStandby'; moduleId: string; standby: boolean }
+  | { type: 'acceptVisitor'; visitorId: string }
+  | { type: 'refuseVisitor'; visitorId: string }
+  | { type: 'setAutoAccept'; moduleId: string; autoAccept: boolean }
+  | { type: 'tradeVisitor'; visitorId: string; resource: ResourceKey; buy: boolean }
+  | { type: 'answerVisitor'; visitorId: string; yes: boolean }
   | { type: 'revive'; crewId: string }
   | { type: 'dismiss'; crewId: string }
   | { type: 'rename'; name: string }
@@ -864,8 +965,17 @@ export const appeal = (s: GameState): number => {
     ? (d.crewAlive.reduce((sum, c) => sum + c.morale, 0) / d.crewAlive.length) * 0.2
     : 0
   const funds = Math.min(1, s.credits / 2500) * 0.15
-  return clamp(size + room + surplus + spirit + funds, 0, 1)
+  // Goodwill: how the station treats people who turn up needing something.
+  return clamp(size + room + surplus + spirit + funds + s.standing, 0, 1)
 }
+
+/** How many ships can be at the clamps at once, waiting or berthed. */
+export const visitorBerths = (s: GameState): number =>
+  s.modules.filter((m) => m.kind === 'dock' && !m.standby).length * 2
+
+/** True when any docking port is set to wave arrivals straight in. */
+export const autoAccepting = (s: GameState): boolean =>
+  s.modules.some((m) => m.kind === 'dock' && m.autoAccept && !m.standby)
 
 /** Hull berths across every hangar bay. */
 export const fleetCapacity = (s: GameState): number =>
@@ -1262,6 +1372,121 @@ export const reducer = (state: GameState, action: Action): GameState => {
         `${def(m.kind).name} ${action.standby ? 'powered down to standby' : 'brought back online'}.`,
         'info',
       )
+      break
+    }
+    case 'acceptVisitor': {
+      const v = s.visitors.find((x) => x.id === action.visitorId)
+      if (!v || v.status !== 'requesting') return state
+      admitVisitor(s, v)
+      break
+    }
+    case 'refuseVisitor': {
+      const v = s.visitors.find((x) => x.id === action.visitorId)
+      if (!v || v.status !== 'requesting') return state
+      s.visitors = s.visitors.filter((x) => x.id !== v.id)
+      // Waving off a trader costs nothing. Turning away someone who is actually
+      // in trouble is remembered, whatever their manifest looked like.
+      if (v.kind === 'drifter') {
+        s.standing = clamp(s.standing - 0.03, -0.2, 0.2)
+        log(s, `${v.name} was refused a berth. They were not lying.`, 'warn')
+      } else {
+        log(s, `${v.name} was waved off.`, 'info')
+      }
+      break
+    }
+    case 'setAutoAccept': {
+      const m = s.modules.find((x) => x.id === action.moduleId)
+      if (!m || m.kind !== 'dock') return state
+      m.autoAccept = action.autoAccept
+      log(
+        s,
+        `Docking clamps set to ${action.autoAccept ? 'accept all traffic' : 'ask the commander'}.`,
+        'info',
+      )
+      break
+    }
+    case 'tradeVisitor': {
+      const v = s.visitors.find((x) => x.id === action.visitorId)
+      if (!v || v.status !== 'docked') return state
+      const cap = derive(s).storageCap
+      const unit = v.prices[action.resource]
+      if (action.buy) {
+        const room = cap - s.resources[action.resource]
+        const lot = Math.min(TRADE_LOT, Math.floor(room))
+        const cost = Math.round(lot * unit)
+        if (lot <= 0 || s.credits < cost) return state
+        s.credits -= cost
+        s.resources[action.resource] += lot
+      } else {
+        const lot = Math.min(TRADE_LOT, Math.floor(s.resources[action.resource]))
+        if (lot <= 0) return state
+        s.resources[action.resource] -= lot
+        s.credits += Math.round(lot * unit * SELL_MARGIN)
+      }
+      break
+    }
+    case 'answerVisitor': {
+      const v = s.visitors.find((x) => x.id === action.visitorId)
+      if (!v || v.status !== 'docked' || !v.offer) return state
+      const offer = v.offer
+      v.offer = null
+      if (!action.yes) break
+
+      if (offer.kind === 'mission') {
+        s.missions.push(makeMission(appeal(s)))
+        log(s, `${v.name} handed over a contract.`, 'good')
+        break
+      }
+      const effect = offer.effect
+      if (!effect) break
+      switch (effect.type) {
+        case 'credits':
+          s.credits += effect.amount
+          if (effect.standing) s.standing = clamp(s.standing + effect.standing, -0.2, 0.2)
+          log(s, `${v.name} settled up quietly. +${effect.amount}c.`, 'warn')
+          break
+        case 'passenger': {
+          if (s.crew.filter((c) => !c.dead).length >= derive(s).crewCap) {
+            log(s, `${v.name}'s passenger had nowhere to sleep and stayed aboard.`, 'warn')
+            break
+          }
+          const joiner = makeCrew({ portrait: allocatePortrait(s) })
+          s.crew.push(joiner)
+          log(s, `${joiner.name} came off ${v.name} and stayed.`, 'good')
+          break
+        }
+        case 'cheapShip': {
+          if (s.credits < effect.price || s.ships.length >= fleetCapacity(s)) {
+            log(s, `No berth or no money — the hull went back aboard ${v.name}.`, 'warn')
+            break
+          }
+          s.credits -= effect.price
+          const hull = makeShip(effect.cls)
+          hull.hull = Math.round(hull.maxHull * 0.7)
+          s.ships.push(hull)
+          log(s, `Bought the ${hull.name} off ${v.name}, no questions asked.`, 'good')
+          break
+        }
+        case 'repair': {
+          const worst = [...s.modules].sort((a, b) => a.condition - b.condition)[0]
+          if (worst) worst.condition = 1
+          log(s, `Their engineer put the ${worst ? def(worst.kind).name : 'station'} right.`, 'good')
+          break
+        }
+        case 'leadMission': {
+          const price = 150
+          if (s.credits < price) {
+            log(s, 'No money for coordinates.', 'warn')
+            break
+          }
+          s.credits -= price
+          const lead = makeMission(Math.min(1, appeal(s) + 0.3))
+          lead.payout.credits = Math.round(lead.payout.credits * 1.6)
+          s.missions.push(lead)
+          log(s, `Bought a lead off ${v.name}. It had better be good.`, 'info')
+          break
+        }
+      }
       break
     }
     case 'renameCrew': {

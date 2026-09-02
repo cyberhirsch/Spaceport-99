@@ -7,6 +7,7 @@ import { FleetPanel } from './components/FleetPanel.tsx'
 import { InterviewModal } from './components/InterviewModal.tsx'
 import { LaunchModal } from './components/LaunchModal.tsx'
 import { LogPanel } from './components/LogPanel.tsx'
+import { VisitorModal } from './components/VisitorModal.tsx'
 import { Modal } from './components/Modal.tsx'
 import { ModuleModal } from './components/ModuleModal.tsx'
 import { StationView } from './components/StationView.tsx'
@@ -36,6 +37,7 @@ export default function App() {
   const [crewId, setCrewId] = useState<string | null>(null)
   const [candidateId, setCandidateId] = useState<string | null>(null)
   const [missionId, setMissionId] = useState<string | null>(null)
+  const [visitorId, setVisitorId] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const panelOpen = wide || sheetOpen
 
@@ -80,6 +82,10 @@ export default function App() {
     (() => {
       const docked = state.candidates.filter((c) => c.arrivesIn <= 0).length
       return docked > 0 && `${docked} applicant${docked === 1 ? '' : 's'} waiting at the dock`
+    })(),
+    (() => {
+      const hailing = state.visitors.filter((v) => v.status === 'requesting').length
+      return hailing > 0 && `${hailing} ship${hailing === 1 ? '' : 's'} requesting permission to dock`
     })(),
     (() => {
       const filed = state.missions.filter((m) => m.status === 'report').length
@@ -129,6 +135,7 @@ export default function App() {
             setModuleId(id)
           }}
           onSelectCrew={(id) => setCrewId(id)}
+          onSelectVisitor={(id) => setVisitorId(id)}
           onEmptyCell={() => {
             setTab('build')
             if (!wide) setSheetOpen(true)
@@ -224,9 +231,29 @@ export default function App() {
           onUpgrade={() => act({ type: 'upgrade', moduleId })}
           onRush={() => act({ type: 'rush', moduleId })}
           onStandby={(standby) => act({ type: 'setStandby', moduleId, standby })}
+          onAutoAccept={(on) => act({ type: 'setAutoAccept', moduleId, autoAccept: on })}
           onDemolish={() => {
             act({ type: 'demolish', moduleId })
             setModuleId(null)
+          }}
+        />
+      )}
+
+      {visitorId && (
+        <VisitorModal
+          state={state}
+          visitorId={visitorId}
+          onClose={() => setVisitorId(null)}
+          onAccept={() => act({ type: 'acceptVisitor', visitorId })}
+          onRefuse={() => {
+            act({ type: 'refuseVisitor', visitorId })
+            setVisitorId(null)
+          }}
+          onTrade={(resource, buy) => act({ type: 'tradeVisitor', visitorId, resource, buy })}
+          onAnswer={(yes) => act({ type: 'answerVisitor', visitorId, yes })}
+          onAutoAccept={(on) => {
+            const dock = state.modules.find((m) => m.kind === 'dock')
+            if (dock) act({ type: 'setAutoAccept', moduleId: dock.id, autoAccept: on })
           }}
         />
       )}

@@ -26,6 +26,7 @@ interface Props {
   onRush: () => void
   onDemolish: () => void
   onStandby: (standby: boolean) => void
+  onAutoAccept: (on: boolean) => void
 }
 
 export const ModuleModal = ({
@@ -39,6 +40,7 @@ export const ModuleModal = ({
   onRush,
   onDemolish,
   onStandby,
+  onAutoAccept,
 }: Props) => {
   const m = state.modules.find((x) => x.id === moduleId)
   if (!m) return null
@@ -175,6 +177,20 @@ export const ModuleModal = ({
             ))}
           </div>
         </>
+      )}
+
+      {m.kind === 'dock' && (
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={Boolean(m.autoAccept)}
+            onChange={(e) => onAutoAccept(e.target.checked)}
+          />
+          <span>
+            Clear traffic automatically. Ships dock without asking — convenient, and nobody reads
+            the scan before the clamps open.
+          </span>
+        </label>
       )}
 
       {m.standby && (

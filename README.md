@@ -101,6 +101,20 @@ early know they are settling, and their standards are lower to match.
 Crew Quarters raise your bunk cap. Training rooms raise a single stat, one point
 per cycle, each point slower than the last.
 
+**The clamps are busy.** Ships hail for permission to dock. A scan reads their
+manifest — clean, thin, mismatched, or silent — and you decide. Most are worth
+taking: traders sell a hold cheap, couriers drop contracts, patrols pay for a
+berth. A few are lying, and open clamps mean an infestation or a boarding party.
+Waving off a trader costs nothing; turning away a ship that really was in
+trouble is remembered, and station standing is the same score that decides who
+HQ sends you and how good the contracts are. Set the docking port to clear
+traffic automatically and you stop being asked — and stop reading the scan.
+
+A berthed ship pays by the second, will trade resources in lots at its own
+prices, and sometimes has business to raise: a passenger who would rather stay,
+a hull going cheap and no questions about which yard, an inspection that need
+not happen. Those carry an exclamation mark in the bottom row.
+
 **Ships and missions.** A Hangar Bay berths one hull, and HQ issues a shuttle
 with your first one. A Command Module pulls contracts off the wire — salvage
 runs, surveys, rescues, escort patrols, recovery tows — each judged on one stat,

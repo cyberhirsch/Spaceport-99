@@ -13,6 +13,7 @@ import {
 import { incidentDef } from '../game/incidents.ts'
 import type { DragState } from '../hooks/useDragAssign.ts'
 import type { Crew, GameState, ModuleKind, StationModule } from '../game/types.ts'
+import { shipDef } from '../game/fleet.ts'
 import { CrewAvatar } from './CrewAvatar.tsx'
 
 interface Props {
@@ -24,6 +25,7 @@ interface Props {
   onCancelPlacing: () => void
   onSelectModule: (id: string) => void
   onSelectCrew: (id: string) => void
+  onSelectVisitor: (id: string) => void
   onEmptyCell: () => void
   onBuyDeck: () => void
 }
@@ -151,6 +153,7 @@ export const StationView = ({
   onCancelPlacing,
   onSelectModule,
   onSelectCrew,
+  onSelectVisitor,
   onEmptyCell,
   onBuyDeck,
 }: Props) => {
@@ -302,6 +305,35 @@ export const StationView = ({
             ))}
           </div>
         </div>
+
+        {state.visitors.length > 0 && (
+          <div className="dock dock--visitors">
+            <span className="dock__label">
+              Visitors <i>{state.visitors.length}</i>
+            </span>
+            <div className="dock__list">
+              {state.visitors.map((v) => (
+                <button
+                  key={v.id}
+                  className={`visitor-chip visitor-chip--${v.status}`}
+                  onClick={() => onSelectVisitor(v.id)}
+                  title={
+                    v.status === 'requesting'
+                      ? `${v.name} — requesting permission to dock`
+                      : `${v.name} — berthed`
+                  }
+                >
+                  <span className="visitor-chip__glyph">{shipDef(v.cls).glyph}</span>
+                  <span className="visitor-chip__name">{v.name}</span>
+                  {v.status === 'requesting' && <span className="visitor-chip__bang">?</span>}
+                  {v.status === 'docked' && v.offer && (
+                    <span className="visitor-chip__bang visitor-chip__bang--offer">!</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {awayCrew.length > 0 && (
           <div className="dock dock--away">

@@ -107,6 +107,8 @@ export interface StationModule {
   rushRisk: number
   /** Powered down to standby: no output, a tenth of the draw. */
   standby?: boolean
+  /** Docking ports only: wave arrivals in without asking the commander. */
+  autoAccept?: boolean
 }
 
 export type CrewState = 'idle' | 'working' | 'training' | 'fighting' | 'dead'
@@ -180,6 +182,52 @@ export interface Candidate {
   promised: string | null
   /** Seconds until they finish transit and appear at the dock. */
   arrivesIn: number
+}
+
+// --------------------------------------------------------------- visitors --
+
+/** What a ship at the clamps actually is, which is not always what it claims. */
+export type VisitorKind = 'trader' | 'courier' | 'patrol' | 'drifter' | 'smuggler' | 'raider'
+
+/** Something a docked ship wants to talk about. Marked with an exclamation. */
+export interface VisitorOffer {
+  /** A contract they hand over, or a conversation with two ways to answer. */
+  kind: 'mission' | 'dialogue'
+  title: string
+  prompt: string
+  /** Dialogue only: the two answers and what each does. */
+  yes?: string
+  no?: string
+  effect?: DialogueEffect
+}
+
+export type DialogueEffect =
+  | { type: 'credits'; amount: number; standing?: number }
+  | { type: 'passenger' }
+  | { type: 'cheapShip'; cls: ShipClass; price: number }
+  | { type: 'repair' }
+  | { type: 'leadMission' }
+
+export interface Visitor {
+  id: string
+  /** Ship name on the transponder. */
+  name: string
+  cls: ShipClass
+  /** The truth, revealed only once the clamps are open. */
+  kind: VisitorKind
+  /** What they say they are. Honest ships tell the truth. */
+  claim: VisitorKind
+  /** 0..1 scan reading. Trouble usually scans dirty, but not always. */
+  suspicion: number
+  status: 'requesting' | 'docked'
+  /** Seconds until they stop waiting, or until they undock. */
+  timer: number
+  /** Berthing fee they pay while docked, per second. */
+  fee: number
+  /** What they will sell a unit of each resource for while berthed. */
+  prices: { power: number; air: number; food: number }
+  /** Business they want to raise, if any. Cleared once it is dealt with. */
+  offer: VisitorOffer | null
 }
 
 // ------------------------------------------------------------------ fleet --
@@ -282,6 +330,15 @@ export interface GameState {
   missions: Mission[]
   /** Seconds until the command module posts another contract. */
   nextContractIn: number
+  /** Ships at the clamps: waiting on a decision, or berthed. */
+  visitors: Visitor[]
+  /** Seconds until the next ship hails for permission to dock. */
+  nextVisitorIn: number
+  /**
+   * Goodwill earned or spent by how the station treats people who need it.
+   * Folded into station standing alongside the things you can see.
+   */
+  standing: number
   /** Ids of crew that arrived but have not been greeted yet (for the toast). */
   seenIntro: boolean
   gameOver: boolean

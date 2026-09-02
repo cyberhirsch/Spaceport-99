@@ -77,11 +77,21 @@ Crew who drop below a quarter health fall back to the spine and return to their
 post once they have healed up. Automated suppression handles an unattended
 emergency eventually, but far too slowly to rely on.
 
-**Growth.** Crew Quarters raise your bunk cap; drifters dock on their own if you
-have a spare bunk and a well-run station. A staffed Comms Array lets you spend
-credits to broadcast a recruitment beacon, and high-Luck operators pull in better
-people. Training rooms raise a single stat, one point per cycle, each point
-slower than the last.
+**Hiring is a negotiation.** Nobody wanders in. A staffed Comms Array puts a
+request to HQ, who dispatch someone; they fly out, dock at your Docking Port, and
+wait — not indefinitely. Then you interview them, with three tactics you can each
+use once: pay their signing bonus, pitch the station, or promise them a specific
+post. Offer them a contract and their interest is the odds they take it, so a
+half-convinced applicant is a coin toss and a wasted request.
+
+Who turns up depends on **station standing** — size, whether you run a real
+surplus, how the crew are holding up, and what is in the account. HQ does not
+send its best people to a dark, hungry outpost, which is why the strongest
+applicants only appear once the place is worth joining. The ones who do come
+early know they are settling, and their standards are lower to match.
+
+Crew Quarters raise your bunk cap. Training rooms raise a single stat, one point
+per cycle, each point slower than the last.
 
 **Money** comes from docking fees (scaled with crew and station size), the
 Fabricator, the Comms Array, and salvage from emergencies you put down. Spend it

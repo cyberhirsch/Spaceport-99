@@ -137,16 +137,30 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     kind: 'comms',
     name: 'Comms Array',
     short: 'Comms',
-    blurb: 'Broadcasts a recruitment beacon into the shipping lanes.',
+    blurb: 'Puts a crew request through to HQ, and sells the spare bandwidth.',
     glyph: '((·))',
     hue: 320,
-    cost: 620,
-    unlockAtCrew: 8,
+    cost: 420,
+    unlockAtCrew: 3,
     slotsPerSegment: 1,
     stat: 'L',
     credits: 12,
     cycleSeconds: 24,
     powerDraw: 3,
+  },
+  dock: {
+    kind: 'dock',
+    name: 'Docking Port',
+    short: 'Dock',
+    blurb: 'Berths for visiting traffic, and where you talk applicants into staying.',
+    glyph: '⚓',
+    hue: 205,
+    cost: 340,
+    unlockAtCrew: 0,
+    slotsPerSegment: 1,
+    stat: 'A',
+    berths: 2,
+    powerDraw: 0.6,
   },
   gym: {
     kind: 'gym',
@@ -289,5 +303,9 @@ export const capacityBonus = (m: StationModule): number =>
 
 export const storageBonus = (m: StationModule): number =>
   (def(m.kind).storageBonus ?? 0) * m.width * m.level
+
+/** How many applicants the station can have waiting at once. */
+export const berths = (m: StationModule): number =>
+  (def(m.kind).berths ?? 0) * m.width * m.level
 
 export const moduleLabel = (m: StationModule): string => def(m.kind).name

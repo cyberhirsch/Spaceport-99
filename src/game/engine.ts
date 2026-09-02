@@ -11,6 +11,7 @@ import {
   deckCost,
   def,
   powerDraw,
+  berths,
   staffSlots,
   storageBonus,
   touchesLift,
@@ -20,7 +21,9 @@ import {
 import { MAX_STAT, effectiveness, grantXp, makeCrew, rollStats, uid } from './crew.ts'
 import { incidentDef } from './incidents.ts'
 import { RESOURCE_INFO } from './types.ts'
+import { STAT_KEYS } from './types.ts'
 import type {
+  Candidate,
   Crew,
   ModuleDef,
   GameState,
@@ -29,6 +32,7 @@ import type {
   ModuleKind,
   ResourceKey,
   StatKey,
+  Tactic,
   StationModule,
 } from './types.ts'
 
@@ -40,9 +44,19 @@ export const AIR_PER_CREW = 0.06
 export const FOOD_PER_CREW = 0.05
 export const MAX_LOG = 60
 
-/** Passing traffic pays to dock. A bigger, better-crewed port draws more of it. */
-export const dockingFees = (crewCount: number, roomCount: number): number =>
-  0.1 + crewCount * 0.035 + roomCount * 0.02
+/**
+ * Passing traffic pays to dock. A bigger, better-crewed port draws more of it,
+ * and a staffed docking port is the berth they actually pay to use — which is
+ * what funds the recruiting the same room exists to do.
+ */
+export const dockingFees = (s: GameState): number => {
+  const alive = s.crew.filter((c) => !c.dead).length
+  let fees = 0.1 + alive * 0.035 + s.modules.length * 0.02
+  for (const m of s.modules) {
+    if (m.kind === 'dock') fees += 0.3 * m.width * m.level
+  }
+  return fees
+}
 /** Longest stretch of offline time we will simulate on load. */
 export const MAX_CATCHUP_SECONDS = 4 * 60 * 60
 
@@ -109,7 +123,7 @@ export const derive = (s: GameState): Derived => {
 
   airRate -= crewAlive.length * AIR_PER_CREW
   foodRate -= crewAlive.length * FOOD_PER_CREW
-  creditRate += dockingFees(crewAlive.length, s.modules.length)
+  creditRate += dockingFees(s)
 
   return {
     crewAlive,
@@ -150,6 +164,7 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     credits: 500,
     resources: { power: 140, air: 140, food: 140 },
     modules: [
+      makeModule('dock', 0, WING - 2),
       makeModule('atmospherics', 0, WING - 1),
       makeModule('reactor', 0, WING),
       makeModule('hydroponics', 0, WING + 1),
@@ -162,7 +177,7 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     elapsed: 0,
     nextIncidentIn: 150,
     broadcastCooldown: 0,
-    nextArrivalIn: 120,
+    candidates: [],
     seenIntro: false,
     gameOver: false,
   }
@@ -308,6 +323,7 @@ const jobPriority = (m: StationModule): number => {
   if (d.produces === 'food') return 2
   if (d.heals) return 3
   if (d.credits) return 4
+  if (d.berths) return 5
   return 9
 }
 
@@ -431,7 +447,7 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
       continue
     }
     // Automated suppression works alone, just far too slowly to rely on.
-    let firepower = 0.3
+    let firepower = 0.45
     for (const id of m.staff) {
       const c = crewById.get(id)
       if (c && !c.dead) firepower += effectiveness(c, idef.counter) * 0.55
@@ -449,7 +465,7 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
       }
     }
     // Each disaster gnaws at a different supply while it burns.
-    if (inc.kind === 'breach') s.resources.air = Math.max(0, s.resources.air - 0.9 * dt)
+    if (inc.kind === 'breach') s.resources.air = Math.max(0, s.resources.air - 0.55 * dt)
     if (inc.kind === 'fire') s.resources.power = Math.max(0, s.resources.power - 0.8 * dt)
     if (inc.kind === 'vermin') s.resources.food = Math.max(0, s.resources.food - 0.7 * dt)
     if (inc.kind === 'pirates') s.credits = Math.max(0, s.credits - 1.5 * dt)
@@ -520,26 +536,25 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
     }
   }
 
-  s.credits += dockingFees(alive.length, s.modules.length) * dt
+  s.credits += dockingFees(s) * dt
 
   // --- random events --------------------------------------------------
   s.broadcastCooldown = Math.max(0, s.broadcastCooldown - dt)
-  s.nextArrivalIn -= dt
-  if (s.nextArrivalIn <= 0) {
-    s.nextArrivalIn = 140 + Math.random() * 160
-    // Word gets around. A station with a spare bunk, calm decks and a genuine
-    // surplus attracts drifters — one that cannot feed itself does not.
-    const roomy = alive.length < d.crewCap
-    const comfortable =
-      s.resources.air > 25 &&
-      s.resources.food > 25 &&
-      d.airRate > AIR_PER_CREW &&
-      d.foodRate > FOOD_PER_CREW &&
-      s.incidents.length === 0
-    if (roomy && comfortable) {
-      const arrival = makeCrew()
-      s.crew.push(arrival)
-      log(s, `${arrival.name} docked looking for work.`, 'good')
+  // Applicants HQ has dispatched: first they fly out, then they wait — and
+  // they do not wait forever.
+  for (const cand of [...s.candidates]) {
+    if (cand.arrivesIn > 0) {
+      cand.arrivesIn -= dt
+      if (cand.arrivesIn <= 0) {
+        cand.arrivesIn = 0
+        log(s, `${cand.name} docked for an interview.`, 'info')
+      }
+      continue
+    }
+    cand.patience -= dt
+    if (cand.patience <= 0) {
+      s.candidates = s.candidates.filter((x) => x.id !== cand.id)
+      log(s, `${cand.name} got tired of waiting and undocked.`, 'warn')
     }
   }
   s.nextIncidentIn -= dt
@@ -639,7 +654,10 @@ export type Action =
   | { type: 'rush'; moduleId: string }
   | { type: 'buyDeck' }
   | { type: 'resupply'; resource: ResourceKey }
-  | { type: 'broadcast' }
+  | { type: 'requestCrew' }
+  | { type: 'interview'; candidateId: string; tactic: Tactic; moduleId?: string }
+  | { type: 'offerContract'; candidateId: string }
+  | { type: 'turnAway'; candidateId: string }
   | { type: 'revive'; crewId: string }
   | { type: 'dismiss'; crewId: string }
   | { type: 'rename'; name: string }
@@ -654,8 +672,101 @@ export const resupplyAmount = (storageCap: number): number => Math.round(storage
 export const resupplyCost = (storageCap: number): number =>
   Math.round(resupplyAmount(storageCap) * RESUPPLY_PRICE_PER_UNIT)
 
-export const BROADCAST_COST = 150
-export const BROADCAST_SECONDS = 45
+export const REQUEST_COST = 70
+export const REQUEST_COOLDOWN = 70
+/** How long an applicant waits at the dock before giving up. */
+export const PATIENCE_SECONDS = 110
+/** Interest needed for a certainty; below it, an offer is a gamble. */
+export const SIGN_THRESHOLD = 100
+
+/**
+ * How attractive the station looks to someone deciding whether to move here:
+ * its size, whether it runs a genuine surplus, how the crew are holding up, and
+ * whether there is money in the account. HQ will not send its best people to a
+ * dark, hungry outpost, which is why the strongest applicants only turn up once
+ * the place is worth joining.
+ */
+export const appeal = (s: GameState): number => {
+  const d = derive(s)
+  const size = Math.min(1, s.modules.length / 14) * 0.25
+  const room = Math.min(1, s.decks / 4) * 0.1
+  const surplus =
+    (d.powerRate > 0 ? 0.1 : 0) + (d.airRate > 0 ? 0.1 : 0) + (d.foodRate > 0 ? 0.1 : 0)
+  const spirit = d.crewAlive.length
+    ? (d.crewAlive.reduce((sum, c) => sum + c.morale, 0) / d.crewAlive.length) * 0.2
+    : 0
+  const funds = Math.min(1, s.credits / 2500) * 0.15
+  return clamp(size + room + surplus + spirit + funds, 0, 1)
+}
+
+/** Applicant berths across every docking port. */
+export const dockBerths = (s: GameState): number =>
+  s.modules.filter((m) => m.kind === 'dock').reduce((n, m) => n + berths(m), 0)
+
+/** The best Adaptability among crew staffing a docking port — your recruiter. */
+export const recruiterSkill = (s: GameState): number => {
+  let best = 0
+  for (const m of s.modules.filter((x) => x.kind === 'dock')) {
+    for (const id of m.staff) {
+      const c = s.crew.find((x) => x.id === id)
+      if (c && !c.dead) best = Math.max(best, effectiveness(c, 'A'))
+    }
+  }
+  return best
+}
+
+/** Someone HQ has picked out, as good as the station deserves. */
+const makeCandidate = (s: GameState, luck: number): Candidate => {
+  const reach = clamp(appeal(s) + luck * 0.02 + (Math.random() * 0.3 - 0.15), 0, 1)
+  const stats = rollStats(6 + Math.round(reach * 8))
+  const crew = makeCrew({ stats })
+  return {
+    id: uid('a'),
+    name: crew.name,
+    seed: crew.seed,
+    stats,
+    tier: reach,
+    // Someone HQ rates highly knows it, and starts colder on a modest station.
+    interest: Math.round(clamp(appeal(s) * 70 - reach * 25, 5, 60)),
+    askingBonus: Math.round(60 + reach * 260),
+    patience: PATIENCE_SECONDS,
+    used: [],
+    promised: null,
+    arrivesIn: 25 + Math.random() * 30,
+  }
+}
+
+/** What a tactic would do to this applicant's interest, right now. */
+/** What the player can actually put on the table right now. */
+export const bonusOffer = (s: GameState, cand: Candidate): number =>
+  Math.min(Math.floor(s.credits), cand.askingBonus)
+
+export const tacticEffect = (
+  s: GameState,
+  cand: Candidate,
+  tactic: Tactic,
+  moduleId?: string,
+): number => {
+  // Paying part of what they asked for is worth part of the goodwill. Being
+  // broke should make hiring harder, not impossible.
+  if (tactic === 'bonus') {
+    return Math.round(35 * (bonusOffer(s, cand) / Math.max(1, cand.askingBonus)))
+  }
+  if (tactic === 'pitch') {
+    const standards = 30 + cand.tier * 45
+    return Math.round(
+      clamp(18 + (appeal(s) * 100 - standards) * 0.5 + recruiterSkill(s) * 4, 5, 45),
+    )
+  }
+  const m = s.modules.find((x) => x.id === moduleId)
+  if (!m) return 0
+  const stat = def(m.kind).stat
+  const ranked = STAT_KEYS.map((k) => ({ k, v: cand.stats[k] })).sort((a, b) => b.v - a.v)
+  if (ranked[0].k === stat) return 40
+  if (ranked[ranked.length - 1].k === stat) return -15
+  return 12
+}
+
 export const REVIVE_COST_PER_LEVEL = 90
 
 export const reducer = (state: GameState, action: Action): GameState => {
@@ -761,32 +872,75 @@ export const reducer = (state: GameState, action: Action): GameState => {
       log(s, `Emergency ${RESOURCE_INFO[action.resource].name} barge docked. -${cost}c.`, 'warn')
       break
     }
-    case 'broadcast': {
+    case 'requestCrew': {
       if (s.broadcastCooldown > 0) return state
-      if (s.credits < BROADCAST_COST) return state
+      if (s.credits < REQUEST_COST) return state
       const commsOnline = s.modules.some((m) => m.kind === 'comms' && m.staff.length > 0)
       if (!commsOnline) return state
-      const cap = derive(s).crewCap
-      if (s.crew.filter((c) => !c.dead).length >= cap) return state
-      s.credits -= BROADCAST_COST
-      s.broadcastCooldown = BROADCAST_SECONDS
-      // A staffed, high-Luck comms array pulls in better people.
+      const waiting = s.candidates.length
+      if (waiting >= dockBerths(s)) return state
+      const d = derive(s)
+      if (d.crewAlive.length >= d.crewCap) return state
+      s.credits -= REQUEST_COST
+      s.broadcastCooldown = REQUEST_COOLDOWN
+      // A sharp operator on the comms desk gets HQ to look a little harder.
       let luck = 0
       for (const m of s.modules.filter((x) => x.kind === 'comms')) {
         for (const id of m.staff) {
           const c = s.crew.find((x) => x.id === id)
-          if (c) luck += c.stats.L
+          if (c) luck = Math.max(luck, c.stats.L)
         }
       }
-      const recruit = makeCrew({ level: 1 })
-      const bonus = Math.min(6, Math.floor(luck / 3))
-      const keys = Object.keys(recruit.stats) as (keyof typeof recruit.stats)[]
-      for (let i = 0; i < bonus; i += 1) {
-        const k = keys[Math.floor(Math.random() * keys.length)]
-        if (recruit.stats[k] < MAX_STAT) recruit.stats[k] += 1
+      const cand = makeCandidate(s, luck)
+      s.candidates.push(cand)
+      log(s, `HQ is sending ${cand.name} over for an interview.`, 'info')
+      break
+    }
+    case 'interview': {
+      const cand = s.candidates.find((x) => x.id === action.candidateId)
+      if (!cand || cand.arrivesIn > 0) return state
+      if (cand.used.includes(action.tactic)) return state
+      let paid = 0
+      if (action.tactic === 'bonus') {
+        paid = bonusOffer(s, cand)
+        if (paid <= 0) return state
       }
-      s.crew.push(recruit)
-      log(s, `${recruit.name} answered the beacon and docked.`, 'good')
+      const delta = tacticEffect(s, cand, action.tactic, action.moduleId)
+      s.credits -= paid
+      if (action.tactic === 'posting') {
+        const m = s.modules.find((x) => x.id === action.moduleId)
+        if (!m || m.staff.length >= staffSlots(m)) return state
+        cand.promised = m.id
+      }
+      cand.interest = Math.round(clamp(cand.interest + delta, 0, SIGN_THRESHOLD))
+      cand.used.push(action.tactic)
+      break
+    }
+    case 'offerContract': {
+      const cand = s.candidates.find((x) => x.id === action.candidateId)
+      if (!cand || cand.arrivesIn > 0) return state
+      s.candidates = s.candidates.filter((x) => x.id !== cand.id)
+      const d = derive(s)
+      if (d.crewAlive.length >= d.crewCap) {
+        log(s, `${cand.name} was offered a berth the station does not have.`, 'warn')
+        break
+      }
+      // Interest is a probability, so a half-convinced applicant is a coin toss.
+      if (Math.random() * SIGN_THRESHOLD >= cand.interest) {
+        log(s, `${cand.name} turned the contract down and undocked.`, 'warn')
+        break
+      }
+      const hire = makeCrew({ name: cand.name, stats: cand.stats, seed: cand.seed })
+      s.crew.push(hire)
+      if (cand.promised) assign(s, hire.id, cand.promised)
+      log(s, `${cand.name} signed on.`, 'good')
+      break
+    }
+    case 'turnAway': {
+      const cand = s.candidates.find((x) => x.id === action.candidateId)
+      if (!cand) return state
+      s.candidates = s.candidates.filter((x) => x.id !== cand.id)
+      log(s, `${cand.name} was sent back to HQ.`, 'info')
       break
     }
     case 'revive': {

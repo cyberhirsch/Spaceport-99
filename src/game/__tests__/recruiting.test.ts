@@ -1,0 +1,142 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  PATIENCE_SECONDS,
+  REQUEST_COST,
+  WING,
+  advance,
+  appeal,
+  dockBerths,
+  newGame,
+  reducer,
+  tacticEffect,
+} from '../engine.ts'
+import { STAT_KEYS } from '../types.ts'
+import type { GameState, ModuleKind, Stats } from '../types.ts'
+
+const rich = (s: GameState): GameState => ({ ...s, credits: 50000 })
+const build = (s: GameState, kind: ModuleKind, col: number) =>
+  reducer(rich(s), { type: 'build', kind, deck: 0, col })
+
+/** A station with a staffed comms desk and a docking port, ready to recruit. */
+const staffed = (): GameState => {
+  let s = build(newGame(), 'comms', WING + 2)
+  s = build(s, 'dock', WING + 3)
+  // The founders are all posted already, so move two of them across; assign
+  // pulls them off their previous station.
+  for (const [i, kind] of (['comms', 'dock'] as ModuleKind[]).entries()) {
+    const m = s.modules.find((x) => x.kind === kind)!
+    s = reducer(s, { type: 'assign', crewId: s.crew[i].id, moduleId: m.id })
+  }
+  return rich(s)
+}
+
+test('HQ will not send anyone without a staffed comms desk', () => {
+  const bare = rich(newGame())
+  assert.ok(dockBerths(bare) > 0, 'the founding station already has its port')
+  assert.equal(
+    reducer(bare, { type: 'requestCrew' }).candidates.length,
+    0,
+    'but with nobody on comms to make the call, the request is refused',
+  )
+
+  const ready = staffed()
+  assert.ok(dockBerths(ready) > 0)
+  const asked = reducer(ready, { type: 'requestCrew' })
+  assert.equal(asked.candidates.length, 1, 'HQ dispatches someone')
+  assert.equal(asked.credits, ready.credits - REQUEST_COST, 'and charges for it')
+  assert.ok(asked.candidates[0].arrivesIn > 0, 'they start in transit, not at the door')
+})
+
+test('a request is refused while HQ is still busy', () => {
+  const once = reducer(staffed(), { type: 'requestCrew' })
+  assert.equal(reducer(once, { type: 'requestCrew' }).candidates.length, 1, 'no double-dipping')
+})
+
+test('applicants fly out, then wait, then give up', () => {
+  let s = reducer(staffed(), { type: 'requestCrew' })
+  s = advance(s, 60)
+  assert.equal(s.candidates.length, 1)
+  assert.equal(s.candidates[0].arrivesIn, 0, 'transit finished')
+  assert.ok(s.candidates[0].patience > 0, 'and the clock has started')
+
+  s = advance(s, PATIENCE_SECONDS + 5)
+  assert.equal(s.candidates.length, 0, 'nobody waits forever')
+})
+
+test('a promised posting swings on whether it suits them', () => {
+  let s = reducer(staffed(), { type: 'requestCrew' })
+  s = advance(s, 60)
+  const cand = s.candidates[0]
+  // Force a known shape so the best and worst posts are unambiguous.
+  const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, 2])) as Stats
+  stats.T = 8
+  stats.B = 1
+  s = { ...s, candidates: [{ ...cand, stats }] }
+
+  const reactor = s.modules.find((m) => m.kind === 'reactor')!
+  const farm = s.modules.find((m) => m.kind === 'hydroponics')!
+  const c = s.candidates[0]
+  assert.equal(tacticEffect(s, c, 'posting', reactor.id), 40, 'their strongest suit lands')
+  assert.equal(tacticEffect(s, c, 'posting', farm.id), -15, 'their weakest is an insult')
+})
+
+test('each tactic can only be used once, and the bonus costs its asking price', () => {
+  let s = reducer(staffed(), { type: 'requestCrew' })
+  s = advance(s, 60)
+  const id = s.candidates[0].id
+  const ask = s.candidates[0].askingBonus
+  const before = { interest: s.candidates[0].interest, credits: s.credits }
+
+  s = reducer(s, { type: 'interview', candidateId: id, tactic: 'bonus' })
+  assert.equal(s.credits, before.credits - ask, 'the bonus is actually paid')
+  assert.ok(s.candidates[0].interest > before.interest, 'and it moves them')
+
+  const after = s.candidates[0].interest
+  s = reducer(s, { type: 'interview', candidateId: id, tactic: 'bonus' })
+  assert.equal(s.candidates[0].interest, after, 'a second go changes nothing')
+  assert.deepEqual(s.candidates[0].used, ['bonus'])
+})
+
+test('a fully convinced applicant signs, and joins the post they were promised', () => {
+  let s = reducer(staffed(), { type: 'requestCrew' })
+  s = advance(s, 60)
+  s = build(s, 'gym', WING - 3)
+  const gym = s.modules.find((m) => m.kind === 'gym')!
+  const cand = { ...s.candidates[0], interest: 100, promised: gym.id }
+  s = { ...s, candidates: [cand] }
+  const crewBefore = s.crew.length
+
+  s = reducer(s, { type: 'offerContract', candidateId: cand.id })
+  assert.equal(s.candidates.length, 0, 'they leave the dock either way')
+  assert.equal(s.crew.length, crewBefore + 1, 'certain interest means a certain signature')
+  const hired = s.crew.at(-1)!
+  assert.equal(hired.name, cand.name)
+  assert.equal(hired.seed, cand.seed, 'they keep the face from their interview')
+  assert.equal(hired.assignment, gym.id, 'and the job they were promised')
+})
+
+test('an unconvinced applicant always walks', () => {
+  let s = reducer(staffed(), { type: 'requestCrew' })
+  s = advance(s, 60)
+  const cand = { ...s.candidates[0], interest: 0 }
+  s = { ...s, candidates: [cand] }
+  const crewBefore = s.crew.length
+  s = reducer(s, { type: 'offerContract', candidateId: cand.id })
+  assert.equal(s.crew.length, crewBefore, 'nobody signs at zero interest')
+  assert.equal(s.candidates.length, 0)
+})
+
+test('a better station attracts better people', () => {
+  const humble = appeal(newGame())
+  let grand = rich(newGame())
+  for (const [kind, col] of [
+    ['quarters', WING - 2], ['storage', WING + 2], ['reactor', WING + 3],
+    ['medbay', WING - 3], ['fabricator', WING + 4], ['comms', WING - 4],
+  ] as [ModuleKind, number][]) {
+    grand = build(grand, kind, col)
+  }
+  grand = { ...grand, decks: 4, credits: 5000 }
+  assert.ok(appeal(grand) > humble, 'a bigger, richer, better-run station rates higher')
+  assert.ok(appeal(grand) <= 1 && humble >= 0, 'appeal stays on its scale')
+})

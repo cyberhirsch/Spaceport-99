@@ -32,6 +32,7 @@ export type ModuleKind =
   | 'medbay'
   | 'fabricator'
   | 'comms'
+  | 'dock'
   | 'storage'
   | 'gym'
   | 'range'
@@ -76,6 +77,8 @@ export interface ModuleDef {
   credits?: number
   /** Heals assigned-deck crew; hp per second per level. */
   heals?: number
+  /** Applicant berths per segment per level, for the docking port. */
+  berths?: number
 }
 
 /** A built (possibly merged) room occupying contiguous slots on one deck. */
@@ -139,6 +142,34 @@ export interface LogEntry {
   tone: 'info' | 'good' | 'warn' | 'bad'
 }
 
+/** A tactic the player can use once per interview. */
+export type Tactic = 'bonus' | 'pitch' | 'posting'
+
+/**
+ * Someone HQ has sent over, waiting at the docking port. They are not crew yet
+ * and cost nothing until they sign.
+ */
+export interface Candidate {
+  id: string
+  name: string
+  seed: number
+  stats: Stats
+  /** 0..1 — how sought-after they are. Drives their stats and their standards. */
+  tier: number
+  /** 0..100. Cross their threshold and they will sign. */
+  interest: number
+  /** Credits they want up front. */
+  askingBonus: number
+  /** Seconds left before they give up and undock. */
+  patience: number
+  /** Tactics already spent on them. */
+  used: Tactic[]
+  /** Module they were promised, honoured when they sign. */
+  promised: string | null
+  /** Seconds until they finish transit and appear at the dock. */
+  arrivesIn: number
+}
+
 export interface Resources {
   power: number
   air: number
@@ -163,10 +194,10 @@ export interface GameState {
   elapsed: number
   /** Seconds until the next random incident roll. */
   nextIncidentIn: number
-  /** Seconds until the comms array can broadcast for a new recruit again. */
+  /** Seconds until HQ will take another crew request. */
   broadcastCooldown: number
-  /** Seconds until the next drifter might dock looking for work. */
-  nextArrivalIn: number
+  /** People HQ has dispatched: in transit, or waiting at the dock. */
+  candidates: Candidate[]
   /** Ids of crew that arrived but have not been greeted yet (for the toast). */
   seenIntro: boolean
   gameOver: boolean

@@ -11,8 +11,9 @@ const at = (s: GameState, col: number, deck = 0) =>
 
 test('the founding station straddles the lift shaft', () => {
   const g = newGame()
-  assert.equal(g.modules.length, 3)
+  assert.equal(g.modules.length, 4)
   assert.equal(g.decks, 1)
+  assert.equal(at(g, WING - 2)?.kind, 'dock', 'the port the founders arrived through')
   assert.equal(at(g, WING - 1)?.kind, 'atmospherics', 'air plant sits port of the shaft')
   assert.equal(at(g, WING)?.kind, 'reactor', 'reactor sits starboard of it')
   assert.equal(at(g, WING + 1)?.kind, 'hydroponics')
@@ -20,8 +21,9 @@ test('the founding station straddles the lift shaft', () => {
 
 test('wings only grow outward from the shaft', () => {
   const g = newGame()
-  assert.equal(canBuildAt(g, 0, WING - 2), true, 'next to the last port room')
-  assert.equal(canBuildAt(g, 0, WING - 3), false, 'but not with a gap between')
+  assert.equal(canBuildAt(g, 0, WING - 2), false, 'the dock already holds that slot')
+  assert.equal(canBuildAt(g, 0, WING - 3), true, 'next to the last port room')
+  assert.equal(canBuildAt(g, 0, WING - 4), false, 'but not with a gap between')
   assert.equal(canBuildAt(g, 0, 0), false, 'and never at the far end first')
   assert.equal(canBuildAt(g, 0, WING + 2), true, 'next to the last starboard room')
   assert.equal(canBuildAt(g, 0, WING + 3), false)
@@ -67,7 +69,8 @@ test('only the outer end of a run can be scrapped', () => {
   assert.equal(canDemolish(s, at(s, WING + 2)!), false, 'a room with one beyond it is stuck')
   assert.equal(canDemolish(s, at(s, WING + 3)!), true, 'the end of the run is free')
   assert.equal(canDemolish(s, at(s, WING)!), false, 'the innermost starboard room is stuck')
-  assert.equal(canDemolish(s, at(s, WING - 1)!), true, 'a lone port room is the end of its run')
+  assert.equal(canDemolish(s, at(s, WING - 1)!), false, 'the air plant has the dock outboard of it')
+  assert.equal(canDemolish(s, at(s, WING - 2)!), true, 'the dock is the end of the port run')
 
   const before = s.modules.length
   assert.equal(

@@ -1,4 +1,4 @@
-import { BROADCAST_COST, def } from '../game/engine.ts'
+import { REQUEST_COST, appeal, dockBerths, def } from '../game/engine.ts'
 import type { Derived } from '../game/engine.ts'
 import { xpForLevel } from '../game/crew.ts'
 import type { Crew, GameState } from '../game/types.ts'
@@ -12,27 +12,52 @@ interface Props {
   drag: DragState | null
   onDragStart: (crewId: string, e: React.PointerEvent) => void
   onSelect: (id: string) => void
+  onSelectCandidate: (id: string) => void
   onAutoAssign: () => void
-  onBroadcast: () => void
+  onRequestCrew: () => void
 }
 
 const bestStat = (c: Crew) =>
   (Object.entries(c.stats) as [keyof Crew['stats'], number][]).reduce((a, b) => (b[1] > a[1] ? b : a))
 
-export const CrewPanel = ({ state, derived, drag, onDragStart, onSelect, onAutoAssign, onBroadcast }: Props) => {
+export const CrewPanel = ({
+  state,
+  derived,
+  drag,
+  onDragStart,
+  onSelect,
+  onSelectCandidate,
+  onAutoAssign,
+  onRequestCrew,
+}: Props) => {
   const commsStaffed = state.modules.some((m) => m.kind === 'comms' && m.staff.length > 0)
   const full = derived.crewAlive.length >= derived.crewCap
   const roster = [...state.crew].sort(
     (a, b) => Number(a.dead) - Number(b.dead) || b.level - a.level || a.name.localeCompare(b.name),
   )
+  const berths = dockBerths(state)
+  const waiting = state.candidates.length
+  const standing = Math.round(appeal(state) * 100)
 
-  const broadcastLabel = !commsStaffed
-    ? 'Comms Array needs staff'
-    : full
-      ? 'No free bunks'
-      : state.broadcastCooldown > 0
-        ? `Beacon cooling ${Math.ceil(state.broadcastCooldown)}s`
-        : `Broadcast beacon — ${BROADCAST_COST}c`
+  const requestLabel = !berths
+    ? 'Build a Docking Port'
+    : !commsStaffed
+      ? 'Comms Array needs staff'
+      : full
+        ? 'No free bunks'
+        : waiting >= berths
+          ? 'Every berth is occupied'
+          : state.broadcastCooldown > 0
+            ? `HQ busy — ${Math.ceil(state.broadcastCooldown)}s`
+            : `Request crew from HQ — ${REQUEST_COST}c`
+
+  const canRequest =
+    Boolean(berths) &&
+    commsStaffed &&
+    !full &&
+    waiting < berths &&
+    state.broadcastCooldown <= 0 &&
+    state.credits >= REQUEST_COST
 
   return (
     <div className="panel-body">
@@ -40,14 +65,43 @@ export const CrewPanel = ({ state, derived, drag, onDragStart, onSelect, onAutoA
         <button className="btn btn--small" onClick={onAutoAssign} title="Send everyone to the job they are best at">
           Auto-assign roster
         </button>
-        <button
-          className="btn btn--small"
-          onClick={onBroadcast}
-          disabled={!commsStaffed || full || state.broadcastCooldown > 0 || state.credits < BROADCAST_COST}
-        >
-          {broadcastLabel}
+        <button className="btn btn--small" onClick={onRequestCrew} disabled={!canRequest}>
+          {requestLabel}
         </button>
       </div>
+
+      <p className="panel-note">
+        Station standing <b>{standing}%</b> — HQ sends people worth the posting, so the better this
+        reads, the better the applicants.
+      </p>
+
+      {waiting > 0 && (
+        <>
+          <h3 className="modal__sub">
+            Applicants ({waiting}/{berths})
+          </h3>
+          <ul className="crew-list crew-list--applicants">
+            {state.candidates.map((cand) => (
+              <li key={cand.id}>
+                <button className="crew-row" onClick={() => onSelectCandidate(cand.id)}>
+                  <CrewAvatar seed={cand.seed} size={38} />
+                  <span className="crew-row__text">
+                    <span className="crew-row__name">{cand.name}</span>
+                    <span className="crew-row__job">
+                      {cand.arrivesIn > 0
+                        ? `In transit — ${Math.ceil(cand.arrivesIn)}s out`
+                        : `Waiting · ${Math.round(cand.interest)}% interested · ${Math.ceil(
+                            cand.patience,
+                          )}s`}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <h3 className="modal__sub">Crew</h3>
+        </>
+      )}
 
       <ul className="crew-list">
         {roster.map((c) => {

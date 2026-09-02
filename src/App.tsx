@@ -3,6 +3,7 @@ import { BuildMenu } from './components/BuildMenu.tsx'
 import { CrewModal } from './components/CrewModal.tsx'
 import { CrewPanel } from './components/CrewPanel.tsx'
 import { DragGhost } from './components/DragGhost.tsx'
+import { InterviewModal } from './components/InterviewModal.tsx'
 import { LogPanel } from './components/LogPanel.tsx'
 import { Modal } from './components/Modal.tsx'
 import { ModuleModal } from './components/ModuleModal.tsx'
@@ -30,6 +31,7 @@ export default function App() {
   const [placing, setPlacing] = useState<ModuleKind | null>(null)
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [crewId, setCrewId] = useState<string | null>(null)
+  const [candidateId, setCandidateId] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const panelOpen = wide || sheetOpen
 
@@ -71,6 +73,10 @@ export default function App() {
     draining(state.resources.air, derived.airRate) && 'Oxygen deficit — add an Atmospherics Plant',
     draining(state.resources.food, derived.foodRate) && 'Ration deficit — add a Hydroponics Bay',
     derived.crewAlive.length >= derived.crewCap && 'No free bunks — build Crew Quarters',
+    (() => {
+      const docked = state.candidates.filter((c) => c.arrivesIn <= 0).length
+      return docked > 0 && `${docked} applicant${docked === 1 ? '' : 's'} waiting at the dock`
+    })(),
   ].filter(Boolean) as string[]
 
   return (
@@ -147,8 +153,9 @@ export default function App() {
               drag={drag}
               onDragStart={start}
               onSelect={(id) => setCrewId(id)}
+              onSelectCandidate={(id) => setCandidateId(id)}
               onAutoAssign={() => act({ type: 'autoAssign' })}
-              onBroadcast={() => act({ type: 'broadcast' })}
+              onRequestCrew={() => act({ type: 'requestCrew' })}
             />
           )}
           {tab === 'log' && <LogPanel state={state} />}
@@ -187,6 +194,23 @@ export default function App() {
           onDemolish={() => {
             act({ type: 'demolish', moduleId })
             setModuleId(null)
+          }}
+        />
+      )}
+
+      {candidateId && (
+        <InterviewModal
+          state={state}
+          candidateId={candidateId}
+          onClose={() => setCandidateId(null)}
+          onTactic={(tactic, moduleId) => act({ type: 'interview', candidateId, tactic, moduleId })}
+          onOffer={() => {
+            act({ type: 'offerContract', candidateId })
+            setCandidateId(null)
+          }}
+          onTurnAway={() => {
+            act({ type: 'turnAway', candidateId })
+            setCandidateId(null)
           }}
         />
       )}
@@ -259,6 +283,11 @@ export default function App() {
             <li>
               <b>Rushing</b> finishes a cycle instantly but can start a fire. <b>Emergencies</b> are
               fought by whoever is standing in that room.
+            </li>
+            <li>
+              <b>Hiring</b> runs through the Comms Array and a Docking Port: request someone from
+              HQ, wait out their transit, then interview them. You get three tactics to talk them
+              round, and the good ones will not join a station that is not worth joining yet.
             </li>
           </ul>
           <div className="modal__actions">

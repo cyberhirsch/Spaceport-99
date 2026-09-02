@@ -6,6 +6,7 @@ import {
   availableCrew,
   berthedShips,
   fleetCapacity,
+  missionBerths,
   missionCapacity,
   derive,
   newGame,
@@ -274,4 +275,22 @@ test('an away team comes back assignable', () => {
   for (const id of survivors) {
     assert.ok(back.includes(id), 'once home they are available again')
   }
+})
+
+test('a command module is worth what is sitting in it', () => {
+  let s = rich(newGame())
+  s = reducer(s, { type: 'build', kind: 'command', deck: 0, col: WING - 3 })
+  const room = s.modules.find((m) => m.kind === 'command')!
+  assert.ok(missionBerths(s) > 0, 'the berths exist')
+  assert.equal(missionCapacity(s), 0, 'but nobody is holding a channel open')
+
+  s = reducer(s, { type: 'assign', crewId: s.crew[0].id, moduleId: room.id })
+  assert.equal(missionCapacity(s), 1, 'one controller, one mission')
+
+  // A second body cannot beat the berths the room actually has.
+  s = reducer(s, { type: 'assign', crewId: s.crew[1].id, moduleId: room.id })
+  assert.equal(missionCapacity(s), Math.min(2, missionBerths(s)))
+
+  const dark = reducer(s, { type: 'setStandby', moduleId: room.id, standby: true })
+  assert.equal(missionCapacity(dark), 0, 'and a powered-down room flies nothing')
 })

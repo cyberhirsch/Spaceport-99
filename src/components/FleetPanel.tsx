@@ -164,7 +164,10 @@ export const FleetPanel = ({
     const steps = [
       { done: capacity > 0, text: 'Build a Hangar Bay — HQ issues a shuttle with your first one.' },
       { done: slots > 0, text: 'Build a Command Module to pull contracts off the wire.' },
-      { done: listening, text: 'Post a crew member to the Command Module — an empty room hears nothing.' },
+      {
+        done: listening,
+        text: 'Post crew to the Command Module — one controller holds one mission open, so the room is only worth what is sitting in it.',
+      },
     ]
     return (
       <div className="panel-body">

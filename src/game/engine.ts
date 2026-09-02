@@ -1265,8 +1265,26 @@ export const fleetCapacity = (s: GameState): number =>
   s.modules.reduce((n, m) => n + shipBerths(m), 0)
 
 /** Missions that can be in flight at once. */
-export const missionCapacity = (s: GameState): number =>
-  s.modules.reduce((n, m) => n + missionSlots(m), 0)
+/**
+ * Missions in flight at once. A command module provides the berths; somebody
+ * has to sit in it to hold each channel open, so capacity is whichever of the
+ * two runs out first. A room nobody is in hears nothing off the wire and
+ * cannot fly anything either.
+ */
+export const missionCapacity = (s: GameState): number => {
+  let berths = 0
+  let controllers = 0
+  for (const m of s.modules) {
+    if (missionSlots(m) <= 0 || m.standby) continue
+    berths += missionSlots(m)
+    controllers += m.staff.length
+  }
+  return Math.min(berths, controllers)
+}
+
+/** Berths the command module could hold open if it were fully crewed. */
+export const missionBerths = (s: GameState): number =>
+  s.modules.reduce((n, m) => n + (m.standby ? 0 : missionSlots(m)), 0)
 
 /** Ships sitting in a hangar rather than out on a job. */
 export const berthedShips = (s: GameState): Ship[] => s.ships.filter((x) => !x.missionId)

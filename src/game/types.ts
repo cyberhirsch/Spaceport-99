@@ -210,6 +210,22 @@ export type DialogueEffect =
   | { type: 'repair' }
   | { type: 'leadMission' }
 
+/**
+ * Someone off a berthed ship, walking your decks while their hull is clamped.
+ * Business gets raised by people, not by transponders.
+ */
+export interface Guest {
+  id: string
+  name: string
+  /** Their job aboard the ship they came in on. */
+  role: string
+  /** Portrait dealt from the same pool the crew draws on. */
+  portrait?: number
+  seed: number
+  /** What they want to talk to the commander about, if anything. */
+  offer: VisitorOffer | null
+}
+
 export interface Visitor {
   id: string
   /** Ship name on the transponder. */
@@ -221,7 +237,10 @@ export interface Visitor {
   claim: VisitorKind
   /** 0..1 scan reading. Trouble usually scans dirty, but not always. */
   suspicion: number
-  status: 'requesting' | 'docked'
+  /** On approach, hailing for a berth, or clamped on. */
+  status: 'inbound' | 'requesting' | 'docked'
+  /** Who came aboard off this hull. Empty until the clamps open. */
+  aboard: Guest[]
   /** Seconds until they stop waiting, or until they undock. */
   timer: number
   /** Berthing fee they pay while docked, per second. */

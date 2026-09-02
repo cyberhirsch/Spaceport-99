@@ -9,10 +9,11 @@ import { LaunchModal } from './components/LaunchModal.tsx'
 import { LogPanel } from './components/LogPanel.tsx'
 import { VisitorModal } from './components/VisitorModal.tsx'
 import { Modal } from './components/Modal.tsx'
+import { GuestModal } from './components/GuestModal.tsx'
 import { ModuleModal } from './components/ModuleModal.tsx'
 import { StationView } from './components/StationView.tsx'
 import { TopBar } from './components/TopBar.tsx'
-import { canMove, isAway, relocateAnchor, staffSlots } from './game/engine.ts'
+import { canMove, guestsAboard, isAway, relocateAnchor, staffSlots } from './game/engine.ts'
 import { useDragAssign } from './hooks/useDragAssign.ts'
 import { useGame } from './hooks/useGame.ts'
 import { useMediaQuery } from './hooks/useMediaQuery.ts'
@@ -40,6 +41,7 @@ export default function App() {
   const [candidateId, setCandidateId] = useState<string | null>(null)
   const [missionId, setMissionId] = useState<string | null>(null)
   const [visitorId, setVisitorId] = useState<string | null>(null)
+  const [guestId, setGuestId] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const panelOpen = wide || sheetOpen
 
@@ -104,6 +106,13 @@ export default function App() {
       return hailing > 0 && `${hailing} ship${hailing === 1 ? '' : 's'} requesting permission to dock`
     })(),
     (() => {
+      const waiting = guestsAboard(state).filter((x) => x.guest.offer)
+      if (waiting.length === 0) return false
+      return waiting.length === 1
+        ? `${waiting[0].guest.name} is aboard and wants a word`
+        : `${waiting.length} visitors aboard want a word`
+    })(),
+    (() => {
       const filed = state.missions.filter((m) => m.status === 'report').length
       return filed > 0 && `${filed} mission report${filed === 1 ? '' : 's'} to read`
     })(),
@@ -163,6 +172,7 @@ export default function App() {
           }}
           onSelectCrew={(id) => setCrewId(id)}
           onSelectVisitor={(id) => setVisitorId(id)}
+          onSelectGuest={(id) => setGuestId(id)}
           onEmptyCell={() => {
             setTab('build')
             if (!wide) setSheetOpen(true)
@@ -286,10 +296,26 @@ export default function App() {
             setVisitorId(null)
           }}
           onTrade={(resource, buy) => act({ type: 'tradeVisitor', visitorId, resource, buy })}
-          onAnswer={(yes) => act({ type: 'answerVisitor', visitorId, yes })}
+          onSelectGuest={(id) => {
+            setVisitorId(null)
+            setGuestId(id)
+          }}
           onAutoAccept={(on) => {
             const dock = state.modules.find((m) => m.kind === 'dock')
             if (dock) act({ type: 'setAutoAccept', moduleId: dock.id, autoAccept: on })
+          }}
+        />
+      )}
+
+      {guestId && (
+        <GuestModal
+          state={state}
+          guestId={guestId}
+          onClose={() => setGuestId(null)}
+          onAnswer={(yes) => act({ type: 'answerGuest', guestId, yes })}
+          onOpenShip={(id) => {
+            setGuestId(null)
+            setVisitorId(id)
           }}
         />
       )}

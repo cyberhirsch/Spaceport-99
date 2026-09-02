@@ -1,7 +1,8 @@
-import { autoAccepting, def } from '../game/engine.ts'
+import { PHASE_LABEL, autoAccepting, def, visitorPhase } from '../game/engine.ts'
 import { shipDef } from '../game/fleet.ts'
 import { SELL_MARGIN, TRADE_LOT, scanReading, visitorDef } from '../game/visitors.ts'
 import { RESOURCE_INFO, type GameState, type ResourceKey } from '../game/types.ts'
+import { CrewAvatar } from './CrewAvatar.tsx'
 import { Modal } from './Modal.tsx'
 
 interface Props {
@@ -11,7 +12,7 @@ interface Props {
   onAccept: () => void
   onRefuse: () => void
   onTrade: (resource: ResourceKey, buy: boolean) => void
-  onAnswer: (yes: boolean) => void
+  onSelectGuest: (guestId: string) => void
   onAutoAccept: (on: boolean) => void
 }
 
@@ -22,7 +23,7 @@ export const VisitorModal = ({
   onAccept,
   onRefuse,
   onTrade,
-  onAnswer,
+  onSelectGuest,
   onAutoAccept,
 }: Props) => {
   const v = state.visitors.find((x) => x.id === visitorId)
@@ -31,6 +32,27 @@ export const VisitorModal = ({
   const claimed = visitorDef(v.claim)
   const dock = state.modules.find((m) => m.kind === 'dock' && !m.standby)
   const auto = autoAccepting(state)
+  const phase = visitorPhase(v)
+
+  if (v.status === 'inbound') {
+    return (
+      <Modal onClose={onClose} title={<span className="modal__title">Traffic</span>}>
+        <div className="hail">
+          <span className="hail__glyph">{hull.glyph}</span>
+          <span>
+            <b>{v.name}</b>
+            <em>
+              {hull.name} · on approach, hailing in {Math.ceil(v.timer)}s
+            </em>
+          </span>
+        </div>
+        <p className="panel-note">
+          Still just a return on the board. Whatever they are, you will not know until they call
+          for a berth — and the scan will not be certain even then.
+        </p>
+      </Modal>
+    )
+  }
 
   if (v.status === 'requesting') {
     return (
@@ -91,24 +113,34 @@ export const VisitorModal = ({
         <span>
           <b>{visitorDef(v.kind).label}</b>
           <em>
-            {hull.name} · berthed, leaving in {Math.ceil(v.timer)}s
+            {hull.name} · {PHASE_LABEL[phase]}, leaving in {Math.ceil(v.timer)}s
           </em>
         </span>
       </div>
 
-      {v.offer && (
-        <div className="offer">
-          <strong>{v.offer.title}</strong>
-          <p>{v.offer.prompt}</p>
-          <div className="modal__actions">
-            <button className="btn btn--primary" onClick={() => onAnswer(true)}>
-              {v.offer.yes ?? 'Take it'}
-            </button>
-            <button className="btn" onClick={() => onAnswer(false)}>
-              {v.offer.no ?? 'Leave it'}
-            </button>
+      {v.aboard.length > 0 && (
+        <>
+          <h3 className="modal__sub">Came aboard</h3>
+          <div className="staff-grid">
+            {v.aboard.map((g) => (
+              <button
+                key={g.id}
+                className={`staff-chip staff-chip--add${g.offer ? ' staff-chip--offer' : ''}`}
+                onClick={() => onSelectGuest(g.id)}
+              >
+                <CrewAvatar who={g} size={30} />
+                <span>
+                  {g.name}
+                  <em>
+                    {g.role}
+                    {g.offer ? ' · wants a word' : ''}
+                  </em>
+                </span>
+                <i>{g.offer ? '!' : '›'}</i>
+              </button>
+            ))}
           </div>
-        </div>
+        </>
       )}
 
       <h3 className="modal__sub">Trade — {TRADE_LOT} at a time</h3>

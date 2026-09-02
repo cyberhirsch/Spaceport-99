@@ -7,17 +7,19 @@ import {
   autoAccepting,
   derive,
   newGame,
+  guestsAboard,
   reducer,
   visitorBerths,
+  visitorPhase,
 } from '../engine.ts'
 import { TRADE_LOT, makeVisitor } from '../visitors.ts'
 import type { GameState, Visitor } from '../types.ts'
 
 const rich = (s: GameState): GameState => ({ ...s, credits: 50000 })
 
-/** Puts a ship at the clamps without waiting for one to wander by. */
+/** Puts a ship at the clamps without waiting for one to fly in and hail. */
 const hailing = (s: GameState, over: Partial<Visitor> = {}): [GameState, Visitor] => {
-  const v = { ...makeVisitor(), ...over }
+  const v: Visitor = { ...makeVisitor(), status: 'requesting', timer: 90, ...over }
   return [{ ...s, visitors: [...s.visitors, v] }, v]
 }
 
@@ -102,21 +104,63 @@ test('a purchase is trimmed to the room in the hold, and priced to match', () =>
   assert.ok(purse - s.credits < Math.round(TRADE_LOT * v.prices.food), 'and you pay for ten, not fifty')
 })
 
-test('a visitor with business raises it once, and only once', () => {
+test('a ship shows on the board before it ever asks for a berth', () => {
+  const fresh = makeVisitor()
+  assert.equal(fresh.status, 'inbound', 'it is a return on the scope first')
+
+  const ready: GameState = { ...newGame(), visitors: [{ ...fresh, timer: 5 }] }
+  assert.equal(visitorPhase(ready.visitors[0]), 'inbound')
+  const s = advance(ready, 8)
+  assert.equal(s.visitors[0].status, 'requesting', 'and only then does it hail')
+  assert.equal(visitorPhase(s.visitors[0]), 'hailing')
+})
+
+test('a berthed hull sends people onto the station', () => {
+  const [ready, v] = hailing(newGame(), { kind: 'trader', claim: 'trader' })
+  assert.equal(ready.visitors[0].aboard.length, 0, 'nobody is aboard while they are outside')
+
+  const s = reducer(ready, { type: 'acceptVisitor', visitorId: v.id })
+  const aboard = s.visitors[0].aboard
+  assert.ok(aboard.length >= 1 && aboard.length <= 3, `a small party came off: ${aboard.length}`)
+  assert.ok(
+    aboard.every((g) => g.name && g.role && g.portrait),
+    'each with a name, a job and a face',
+  )
+  assert.equal(new Set(aboard.map((g) => g.portrait)).size, aboard.length, 'and no two alike')
+  assert.deepEqual(
+    guestsAboard(s).map((x) => x.guest.id),
+    aboard.map((g) => g.id),
+  )
+})
+
+test('business is raised by a person, once, and leaves with them', () => {
   const [ready, v] = hailing(rich(newGame()), {
     kind: 'trader',
     claim: 'trader',
     offer: { kind: 'mission', title: 'Paper', prompt: 'A contract.' },
   })
   let s = reducer(ready, { type: 'acceptVisitor', visitorId: v.id })
-  assert.ok(s.visitors[0].offer, 'the exclamation is there once they are in')
+  assert.equal(s.visitors[0].offer, null, 'the ship is no longer the one with something to say')
+  const speaker = s.visitors[0].aboard.find((g) => g.offer)
+  assert.ok(speaker, 'one of the party carries it instead')
+  assert.equal(s.visitors[0].aboard.filter((g) => g.offer).length, 1, 'and only one of them')
 
-  s = reducer(s, { type: 'answerVisitor', visitorId: v.id, yes: true })
+  s = reducer(s, { type: 'answerGuest', guestId: speaker.id, yes: true })
   assert.equal(s.missions.length, 1, 'the contract lands on the board')
-  assert.equal(s.visitors[0].offer, null, 'and the business is settled')
+  assert.equal(s.visitors[0].aboard.find((g) => g.id === speaker.id)?.offer, null, 'settled')
 
-  const again = reducer(s, { type: 'answerVisitor', visitorId: v.id, yes: true })
+  const again = reducer(s, { type: 'answerGuest', guestId: speaker.id, yes: true })
   assert.equal(again.missions.length, 1, 'asking twice changes nothing')
+})
+
+test('when the hull undocks, everyone who came off it goes with it', () => {
+  const [ready, v] = hailing(newGame(), { kind: 'trader', claim: 'trader' })
+  const docked = reducer(ready, { type: 'acceptVisitor', visitorId: v.id })
+  assert.ok(guestsAboard(docked).length > 0)
+
+  const later = advance({ ...docked, visitors: [{ ...docked.visitors[0], timer: 2 }] }, 5)
+  assert.equal(later.visitors.length, 0, 'the ship is gone')
+  assert.equal(guestsAboard(later).length, 0, 'and so is the boarding party')
 })
 
 test('trouble mostly scans dirty, and honest ships mostly do not', () => {
@@ -213,4 +257,11 @@ test('the bay leaves a room that is currently on fire alone', () => {
   }
   const after = advance(s, 30).modules.find((m) => m.id === farm.id)!
   assert.ok(after.condition <= 0.5, 'you cannot patch a room while it is burning')
+})
+
+test('a raider sends nobody friendly onto the decks', () => {
+  const [ready, raider] = hailing(newGame(), { kind: 'raider', claim: 'patrol' })
+  const s = reducer(ready, { type: 'acceptVisitor', visitorId: raider.id })
+  assert.equal(guestsAboard(s).length, 0, 'what came off that hull is an emergency, not a guest')
+  assert.equal(s.incidents.length, 1)
 })

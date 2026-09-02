@@ -18,6 +18,7 @@
   --ink-dim: #8298ad;
   --ink-faint: #5a6d80;
   --mint: #38e8b0;
+  --violet: #b48cff;
   --cyan: #57c9ff;
   --amber: #ffc45a;
   --rust: #ff7a59;
@@ -692,6 +693,26 @@ h3 {
 
 .dock-row > .dock {
   border-top: 0;
+  min-width: 0;
+}
+
+/* The side groups scroll their own contents on one line rather than growing
+   the row taller or squeezing the off-duty dock. */
+.dock--guests .dock__list,
+.dock--visitors .dock__list,
+.dock--away .dock__list {
+  flex-wrap: nowrap;
+  /* Room for the "!" badge, which sits proud of its chip and would otherwise
+     be clipped by the scroll box. */
+  padding: 6px 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dock--guests .dock__list::-webkit-scrollbar,
+.dock--visitors .dock__list::-webkit-scrollbar,
+.dock--away .dock__list::-webkit-scrollbar {
+  display: none;
 }
 
 .dock-row > .dock:first-child {
@@ -699,10 +720,60 @@ h3 {
   min-width: 0;
 }
 
+/* People off a berthed hull, walking your decks. Not yours to post anywhere. */
+.dock--guests {
+  flex: none;
+  max-width: 30%;
+  border-left: 1px solid var(--line);
+  background: #141024f5;
+}
+
+.dock--guests .dock__label i {
+  color: var(--violet);
+}
+
+.dock__crew--guest {
+  position: relative;
+  padding: 2px;
+  border: 1px solid var(--violet);
+  border-radius: 9px;
+  background: #150f22;
+  line-height: 0;
+}
+
+.dock__crew--guest .avatar {
+  filter: saturate(0.8);
+}
+
+.dock__crew--guest.has-offer {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+/* The "!" a visitor wears when they want a word. */
+.dock__bang {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--mint);
+  color: #0a1119;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.staff-chip--offer {
+  border-color: var(--mint);
+}
+
 /* Crew who are off-station: visible, accounted for, and not draggable. */
 .dock--away {
   flex: none;
-  max-width: 45%;
+  max-width: 30%;
   border-left: 1px solid var(--line);
   background: #0b1a24f5;
 }
@@ -753,9 +824,41 @@ h3 {
   color: var(--ink-faint);
 }
 
+.dock__label b {
+  font-weight: inherit;
+}
+
 .dock__label i {
   font-style: normal;
   color: var(--mint);
+}
+
+/* On a narrow screen three groups of words do not fit, so the word gives way
+   to a mark and the count carries the meaning. */
+.dock__mark {
+  display: none;
+  color: inherit;
+}
+
+@media (max-width: 720px) {
+  .dock__label b {
+    display: none;
+  }
+
+  .dock__mark {
+    display: inline;
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+
+  .dock {
+    gap: 6px;
+    padding: 7px 7px;
+  }
+
+  .visitor-chip__name {
+    max-width: 68px;
+  }
 }
 
 .dock__list {
@@ -770,6 +873,9 @@ h3 {
 .dock__empty {
   font-size: 12px;
   color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dock__crew {
@@ -1518,7 +1624,7 @@ h3 {
 
 .dock--visitors {
   flex: none;
-  max-width: 52%;
+  max-width: 46%;
   border-left: 1px solid var(--line);
   background: #0b1a1af5;
 }
@@ -1551,10 +1657,37 @@ h3 {
   text-overflow: ellipsis;
 }
 
-/* A ship waiting on an answer, or one with business to raise. */
-.visitor-chip--requesting {
+/* Where the hull is in its visit. */
+.visitor-chip--hailing {
   border-color: var(--amber);
   animation: pulse 1.6s ease-in-out infinite;
+}
+
+.visitor-chip--inbound {
+  border-style: dashed;
+  opacity: 0.72;
+}
+
+.visitor-chip--departing {
+  opacity: 0.6;
+}
+
+.visitor-chip__name em {
+  display: block;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 8.5px;
+  font-style: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.visitor-chip--hailing .visitor-chip__name em {
+  color: var(--amber);
+}
+
+.visitor-chip--docked .visitor-chip__name em {
+  color: var(--mint);
 }
 
 .visitor-chip__bang {

@@ -50,7 +50,7 @@ import {
   teamSize,
   tradeInValue,
 } from './fleet.ts'
-import { SELL_MARGIN, TRADE_LOT, makeVisitor } from './visitors.ts'
+import { SELL_MARGIN, TRADE_LOT, makeGuests, makeVisitor, visitorDef } from './visitors.ts'
 import type {
   Candidate,
   Crew,
@@ -65,11 +65,12 @@ import type {
   ResourceKey,
   StatKey,
   Tactic,
+  Guest,
   Visitor,
   StationModule,
 } from './types.ts'
 
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 export const BASE_CREW_CAP = 8
 export const BASE_STORAGE = 220
@@ -722,12 +723,20 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
     if (s.visitors.length < visitorBerths(s)) {
       const hail = makeVisitor()
       s.visitors.push(hail)
-      log(s, `${hail.name} is requesting permission to dock.`, 'info')
+      log(s, `${hail.name} is on approach.`, 'info')
     }
   }
 
   for (const v of [...s.visitors]) {
     v.timer -= dt
+    if (v.status === 'inbound') {
+      if (v.timer <= 0) {
+        v.status = 'requesting'
+        v.timer = 60 + Math.random() * 40
+        log(s, `${v.name} is requesting permission to dock.`, 'info')
+      }
+      continue
+    }
     if (v.status === 'requesting') {
       if (autoAccepting(s)) {
         admitVisitor(s, v)
@@ -800,6 +809,18 @@ const admitVisitor = (s: GameState, v: Visitor): void => {
   const cap = derive(s).storageCap
   v.status = 'docked'
   v.timer = 45 + Math.random() * 60
+  // The hull stays at the clamps; the people walk onto your decks. Whatever
+  // the ship was carrying to raise with you, one of them now raises it. Ships
+  // that came here to rob you send nobody friendly — they send a fire.
+  if (!visitorDef(v.kind).trouble) {
+    const dealt: number[] = []
+    v.aboard = makeGuests(v, () => {
+      const face = allocatePortrait(s, dealt)
+      dealt.push(face)
+      return face
+    })
+  }
+  v.offer = null
   const dock = s.modules.find((m) => m.kind === 'dock' && !m.standby)
 
   switch (v.kind) {
@@ -1060,7 +1081,7 @@ export type Action =
   | { type: 'refuseVisitor'; visitorId: string }
   | { type: 'setAutoAccept'; moduleId: string; autoAccept: boolean }
   | { type: 'tradeVisitor'; visitorId: string; resource: ResourceKey; buy: boolean }
-  | { type: 'answerVisitor'; visitorId: string; yes: boolean }
+  | { type: 'answerGuest'; guestId: string; yes: boolean }
   | { type: 'revive'; crewId: string }
   | { type: 'dismiss'; crewId: string }
   | { type: 'rename'; name: string }
@@ -1104,6 +1125,27 @@ export const appeal = (s: GameState): number => {
 }
 
 /** How many ships can be at the clamps at once, waiting or berthed. */
+/** Where a hull is in its visit, for the traffic board. */
+export const visitorPhase = (v: Visitor): 'inbound' | 'hailing' | 'docked' | 'departing' =>
+  v.status === 'inbound'
+    ? 'inbound'
+    : v.status === 'requesting'
+      ? 'hailing'
+      : v.timer <= 15
+        ? 'departing'
+        : 'docked'
+
+export const PHASE_LABEL: Record<ReturnType<typeof visitorPhase>, string> = {
+  inbound: 'inbound',
+  hailing: 'asking',
+  docked: 'docked',
+  departing: 'leaving',
+}
+
+/** Everyone currently walking the station off a berthed hull. */
+export const guestsAboard = (s: GameState): { guest: Guest; ship: Visitor }[] =>
+  s.visitors.flatMap((v) => v.aboard.map((guest) => ({ guest, ship: v })))
+
 export const visitorBerths = (s: GameState): number =>
   s.modules.filter((m) => m.kind === 'dock' && !m.standby).length * 2
 
@@ -1162,12 +1204,18 @@ export const recruiterSkill = (s: GameState): number => {
  * one of them is spoken for, and then the least-worn goes next — so a station of
  * six has six distinct faces rather than whatever the dice happened to give.
  */
-export const allocatePortrait = (s: GameState): number => {
+/**
+ * Deals the least-worn face on the station. `alsoWorn` covers faces spoken for
+ * but not yet in the state — a boarding party built one guest at a time.
+ */
+export const allocatePortrait = (s: GameState, alsoWorn: number[] = []): number => {
   const worn = new Map<number, number>()
   for (let i = 1; i <= PORTRAIT_COUNT; i += 1) worn.set(i, 0)
   const tally = (n: number) => worn.set(n, (worn.get(n) ?? 0) + 1)
   for (const c of s.crew) tally(crewPortrait(c))
   for (const cand of s.candidates) tally(crewPortrait(cand))
+  for (const v of s.visitors) for (const g of v.aboard) if (g.portrait) tally(g.portrait)
+  for (const n of alsoWorn) tally(n)
   const fewest = Math.min(...worn.values())
   const spare = [...worn.entries()].filter(([, n]) => n === fewest).map(([i]) => i)
   return spare[Math.floor(Math.random() * spare.length)]
@@ -1580,16 +1628,17 @@ export const reducer = (state: GameState, action: Action): GameState => {
       }
       break
     }
-    case 'answerVisitor': {
-      const v = s.visitors.find((x) => x.id === action.visitorId)
-      if (!v || v.status !== 'docked' || !v.offer) return state
-      const offer = v.offer
-      v.offer = null
+    case 'answerGuest': {
+      const v = s.visitors.find((x) => x.aboard.some((g) => g.id === action.guestId))
+      const g = v?.aboard.find((x) => x.id === action.guestId)
+      if (!v || !g || v.status !== 'docked' || !g.offer) return state
+      const offer = g.offer
+      g.offer = null
       if (!action.yes) break
 
       if (offer.kind === 'mission') {
         s.missions.push(makeMission(appeal(s)))
-        log(s, `${v.name} handed over a contract.`, 'good')
+        log(s, `${g.name} handed over a contract off ${v.name}.`, 'good')
         break
       }
       const effect = offer.effect
@@ -1598,11 +1647,11 @@ export const reducer = (state: GameState, action: Action): GameState => {
         case 'credits':
           s.credits += effect.amount
           if (effect.standing) s.standing = clamp(s.standing + effect.standing, -0.2, 0.2)
-          log(s, `${v.name} settled up quietly. +${effect.amount}c.`, 'warn')
+          log(s, `${g.name} settled up quietly. +${effect.amount}c.`, 'warn')
           break
         case 'passenger': {
           if (s.crew.filter((c) => !c.dead).length >= derive(s).crewCap) {
-            log(s, `${v.name}'s passenger had nowhere to sleep and stayed aboard.`, 'warn')
+            log(s, `${g.name}'s passenger had nowhere to sleep and stayed aboard.`, 'warn')
             break
           }
           const joiner = makeCrew({ portrait: allocatePortrait(s) })
@@ -1625,7 +1674,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
         case 'repair': {
           const worst = [...s.modules].sort((a, b) => a.condition - b.condition)[0]
           if (worst) worst.condition = 1
-          log(s, `Their engineer put the ${worst ? def(worst.kind).name : 'station'} right.`, 'good')
+          log(s, `${g.name} put the ${worst ? def(worst.kind).name : 'station'} right.`, 'good')
           break
         }
         case 'leadMission': {

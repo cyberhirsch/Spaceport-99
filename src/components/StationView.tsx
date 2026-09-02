@@ -6,10 +6,13 @@ import {
   def,
   awayCrewIds,
   idleCrew,
+  PHASE_LABEL,
+  guestsAboard,
   moduleAt,
   moveCost,
   relocateAnchor,
   staffSlots,
+  visitorPhase,
   workRate,
 } from '../game/engine.ts'
 import { incidentDef } from '../game/incidents.ts'
@@ -31,6 +34,7 @@ interface Props {
   onSelectModule: (id: string) => void
   onSelectCrew: (id: string) => void
   onSelectVisitor: (id: string) => void
+  onSelectGuest: (id: string) => void
   onEmptyCell: () => void
   onBuyDeck: () => void
 }
@@ -178,6 +182,7 @@ export const StationView = ({
   onSelectModule,
   onSelectCrew,
   onSelectVisitor,
+  onSelectGuest,
   onEmptyCell,
   onBuyDeck,
 }: Props) => {
@@ -191,6 +196,7 @@ export const StationView = ({
   const flightOf = (crewId: string) =>
     state.missions.find((m) => m.status === 'flying' && m.crewIds.includes(crewId))
   const nextDeck = deckCost(state.decks)
+  const aboard = guestsAboard(state)
   // A room is in hand either because it is being dragged or because its Move
   // button was tapped; both light up the same landing spots.
   const held = state.modules.find((m) => m.id === (drag?.roomId ?? moving)) ?? null
@@ -338,8 +344,9 @@ export const StationView = ({
           }`}
           data-drop-dock
         >
-          <span className="dock__label">
-            Off duty <i>{idle.length}</i>
+          <span className="dock__label" title="Crew off duty">
+            <b>Off duty</b>
+            <i className="dock__mark">☾</i> <i>{idle.length}</i>
           </span>
           <div className="dock__list">
             {idle.length === 0 && (
@@ -360,39 +367,70 @@ export const StationView = ({
           </div>
         </div>
 
-        {state.visitors.length > 0 && (
-          <div className="dock dock--visitors">
-            <span className="dock__label">
-              Visitors <i>{state.visitors.length}</i>
+        {aboard.length > 0 && (
+          <div className="dock dock--guests">
+            <span className="dock__label" title="Visitors walking the station">
+              <b>Aboard</b>
+              <i className="dock__mark">☺</i> <i>{aboard.length}</i>
             </span>
             <div className="dock__list">
-              {state.visitors.map((v) => (
+              {aboard.map(({ guest, ship }) => (
                 <button
-                  key={v.id}
-                  className={`visitor-chip visitor-chip--${v.status}`}
-                  onClick={() => onSelectVisitor(v.id)}
-                  title={
-                    v.status === 'requesting'
-                      ? `${v.name} — requesting permission to dock`
-                      : `${v.name} — berthed`
-                  }
+                  key={guest.id}
+                  className={`dock__crew dock__crew--guest${guest.offer ? ' has-offer' : ''}`}
+                  onClick={() => onSelectGuest(guest.id)}
+                  title={`${guest.name} — ${guest.role} off the ${ship.name}${
+                    guest.offer ? `, wants a word about ${guest.offer.title.toLowerCase()}` : ''
+                  }`}
                 >
-                  <span className="visitor-chip__glyph">{shipDef(v.cls).glyph}</span>
-                  <span className="visitor-chip__name">{v.name}</span>
-                  {v.status === 'requesting' && <span className="visitor-chip__bang">?</span>}
-                  {v.status === 'docked' && v.offer && (
-                    <span className="visitor-chip__bang visitor-chip__bang--offer">!</span>
-                  )}
+                  <CrewAvatar who={guest} size={38} />
+                  {guest.offer && <span className="dock__bang">!</span>}
                 </button>
               ))}
             </div>
           </div>
         )}
 
+        {state.visitors.length > 0 && (
+          <div className="dock dock--visitors">
+            <span className="dock__label" title="Ships in the vicinity">
+              <b>Traffic</b>
+              <i className="dock__mark">⚓</i> <i>{state.visitors.length}</i>
+            </span>
+            <div className="dock__list">
+              {state.visitors.map((v) => {
+                const phase = visitorPhase(v)
+                return (
+                  <button
+                    key={v.id}
+                    className={`visitor-chip visitor-chip--${phase}`}
+                    onClick={() => onSelectVisitor(v.id)}
+                    title={`${v.name} — ${
+                      phase === 'inbound'
+                        ? `on approach, hailing in ${Math.ceil(v.timer)}s`
+                        : phase === 'hailing'
+                          ? `requesting permission to dock, holding ${Math.ceil(v.timer)}s`
+                          : `berthed, leaving in ${Math.ceil(v.timer)}s`
+                    }`}
+                  >
+                    <span className="visitor-chip__glyph">{shipDef(v.cls).glyph}</span>
+                    <span className="visitor-chip__name">
+                      {v.name}
+                      <em>{PHASE_LABEL[phase]}</em>
+                    </span>
+                    {phase === 'hailing' && <span className="visitor-chip__bang">?</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {awayCrew.length > 0 && (
           <div className="dock dock--away">
-            <span className="dock__label">
-              Away <i>{awayCrew.length}</i>
+            <span className="dock__label" title="Crew away on missions">
+              <b>Away</b>
+              <i className="dock__mark">➤</i> <i>{awayCrew.length}</i>
             </span>
             <div className="dock__list">
               {awayCrew.map((c) => {

@@ -1,5 +1,5 @@
-import { uid } from './crew.ts'
-import type { ShipClass, Visitor, VisitorKind, VisitorOffer } from './types.ts'
+import { randomName, uid } from './crew.ts'
+import type { Guest, ShipClass, Visitor, VisitorKind, VisitorOffer } from './types.ts'
 
 /** How many units a single trade moves. */
 export const TRADE_LOT = 50
@@ -135,6 +135,41 @@ const MISSION_HANDOFF: VisitorOffer = {
   prompt: 'A contract, sealed, addressed to whoever is running this station.',
 }
 
+/** Who you actually meet when the clamps open, by what the ship turned out to be. */
+const CREW_ROLES: Record<VisitorKind, string[]> = {
+  trader: ['ship’s master', 'supercargo', 'deckhand', 'cook'],
+  courier: ['courier', 'pilot', 'signals clerk'],
+  patrol: ['lane officer', 'rating', 'flight surgeon'],
+  drifter: ['ship’s master', 'passenger', 'engineer', 'child'],
+  smuggler: ['ship’s master', 'deckhand', 'quartermaster'],
+  raider: ['boarding officer', 'gunner', 'deckhand'],
+}
+
+/**
+ * The party that comes aboard off a berthed hull. Small ships send one or two
+ * people; the business the ship was carrying is now something a person says to
+ * your face.
+ */
+export const makeGuests = (v: Visitor, deal: () => number): Guest[] => {
+  const roles = [...CREW_ROLES[v.kind]]
+  const count = 1 + Math.floor(Math.random() * 3)
+  const out: Guest[] = []
+  for (let i = 0; i < count; i += 1) {
+    const role = roles.splice(Math.floor(Math.random() * roles.length), 1)[0] ?? 'deckhand'
+    out.push({
+      id: uid('g'),
+      name: randomName(),
+      role,
+      portrait: deal(),
+      seed: Math.floor(Math.random() * 1e9),
+      offer: null,
+    })
+  }
+  // Whatever the ship wanted to raise, one of them is the one who raises it.
+  if (v.offer && out.length > 0) out[Math.floor(Math.random() * out.length)].offer = v.offer
+  return out
+}
+
 /** Rolls a ship at the clamps. Trouble usually scans dirty — usually. */
 export const makeVisitor = (): Visitor => {
   const pool = Object.values(VISITOR_DEFS)
@@ -176,8 +211,10 @@ export const makeVisitor = (): Visitor => {
     kind: def.kind,
     claim,
     suspicion,
-    status: 'requesting',
-    timer: 60 + Math.random() * 40,
+    // Traffic shows on the board well before anyone hails for a berth.
+    status: 'inbound',
+    aboard: [],
+    timer: 40 + Math.random() * 60,
     fee: 0.4 + Math.random() * 0.8,
     prices: {
       power: Math.round(1.4 * scarcity * 10) / 10,

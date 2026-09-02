@@ -29,6 +29,10 @@ jobs:
           cache: npm
 
       - run: npm ci
+        env:
+          # This job only checks and builds the web bundle. Electron's ~100MB
+          # binary is only needed by the Package workflow.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
       - name: Typecheck
         run: npx tsc -b

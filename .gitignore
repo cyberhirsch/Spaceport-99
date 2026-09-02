@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 seed.json
+
+# Native build output and the generated wrapper projects. `android/` is a
+# Capacitor template regenerated from capacitor.config.ts on every build, so it
+# is an artifact rather than source.
+release
+android
+ios
+

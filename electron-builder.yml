@@ -1,0 +1,59 @@
+# Packaging for the desktop builds. Everything the app needs is inside the
+# bundle: no runtime to install, no network at first run.
+appId: com.cyberhirsch.spaceport99
+productName: Spaceport-99
+copyright: Copyright © 2026 cyberhirsch
+
+directories:
+  output: release
+  buildResources: build
+
+# The web bundle and the shell that serves it, and nothing else. React is
+# already inside dist/, so node_modules would be dead weight.
+files:
+  - dist/**/*
+  - electron/main.cjs
+  - package.json
+  - '!node_modules/**/*'
+
+# Rebuilding from a clean tree every time; no incremental cache to go stale.
+buildDependenciesFromSource: false
+npmRebuild: false
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Spaceport-99
+  artifactName: Spaceport-99-${version}-windows-setup.${ext}
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.simulation-games
+  icon: build/icon.png
+  # No Developer ID here, so the app is signed ad-hoc. Gatekeeper will ask the
+  # player to right-click and Open the first time; see the README.
+  identity: null
+
+dmg:
+  artifactName: Spaceport-99-${version}-mac-${arch}.${ext}
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Game
+  icon: build/icon.png
+
+appImage:
+  artifactName: Spaceport-99-${version}-linux-x86_64.${ext}

@@ -1,0 +1,141 @@
+name: Package
+
+# Tag a version to cut a release; run it by hand to get the same three builds
+# as downloadable artifacts without publishing anything.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing should not hide whether the others work.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows installer
+            slug: windows
+            glob: release/*.exe
+          - os: macos-latest
+            label: macOS disk images
+            slug: macos
+            glob: release/*.dmg
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # `--base ./` so the bundle loads over app:// and file-relative paths
+      # rather than the absolute root a web server would give it.
+      - name: Build the web bundle
+        run: npm run build:native
+
+      - name: Package
+        run: npx electron-builder --publish never
+        env:
+          # Nothing is signed: there is no Developer ID or Windows certificate
+          # here. Left on, electron-builder would hunt for a keychain identity
+          # on macOS and fail the run rather than build unsigned.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spaceport-99-${{ matrix.slug }}
+          path: ${{ matrix.glob }}
+          if-no-files-found: error
+
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+
+      - name: Build the web bundle
+        run: npm run build:native
+
+      # The android/ project is a Capacitor template, generated fresh from
+      # capacitor.config.ts rather than committed.
+      - name: Generate the Android project
+        run: npx cap add android
+
+      - name: Generate launcher icons and splash
+        run: npx @capacitor/assets generate --android
+
+      - name: Copy the bundle in
+        run: npx cap sync android
+
+      # Debug-signed: an unsigned APK will not install on any device, and a
+      # release key would have to live in repository secrets. This one
+      # sideloads onto a phone with developer mode on, which is what it is for.
+      - name: Assemble
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Name it after the version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          mkdir -p release
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             "release/Spaceport-99-${version}-android.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spaceport-99-android
+          path: release/*.apk
+          if-no-files-found: error
+
+  release:
+    name: Publish the release
+    needs: [desktop, android]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - run: ls -lh artifacts
+
+      # `gh` is preinstalled on the runner, so no third-party action is needed
+      # to attach the builds to the tag.
+      - name: Attach the builds to the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "Spaceport-99 ${GITHUB_REF_NAME}" \
+            --notes-file .github/RELEASE_NOTES.md \
+            artifacts/*

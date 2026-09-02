@@ -12,15 +12,56 @@ same DOM unfolds into a two-column desktop layout at 900px.
 Built with React + TypeScript + Vite. No backend — the whole simulation runs in
 the browser and saves to `localStorage`.
 
-**Play it:** https://cyberhirsch.github.io/Spaceport-99/
+**Play it in a browser:** https://cyberhirsch.github.io/Spaceport-99/
+
+**Or download it:** the [latest release](https://github.com/cyberhirsch/Spaceport-99/releases/latest)
+carries a Windows installer, disk images for both Mac architectures, and an
+Android APK. Each one is standalone — no runtime to install, and the game never
+touches the network.
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm run test     # geometry rules, via node:test — no test framework needed
-npm run build    # typecheck + production bundle into dist/
+npm run dev           # http://localhost:5173
+npm run test          # geometry rules, via node:test — no test framework needed
+npm run build         # typecheck + production bundle into dist/
 npm run lint
+
+npm run electron      # run the desktop shell against a fresh bundle
+npm run pack:desktop  # installers for this machine's platform, into release/
 ```
+
+## Standalone builds
+
+The same bundle, wrapped twice. **Electron** serves it to a desktop window;
+**Capacitor** serves it to an Android WebView. Neither adds game code — the
+simulation, the save format and the interface are byte-identical to the web
+build, because they are literally the same `dist/`.
+
+Two details make that work. The bundle is built with `--base ./` so its asset
+URLs are relative rather than rooted at a web server's `/`. And the desktop
+shell serves it over a custom `app://` scheme rather than `file://`, because a
+`file://` page is an opaque origin — `localStorage` there is either refused or
+thrown away between runs, and `localStorage` is where the whole station lives.
+
+`android/` is not in the repository. It is a Capacitor template regenerated from
+`capacitor.config.ts` on every build, so it is an artifact rather than source;
+`npx cap add android` recreates it.
+
+Tag a version to cut a release:
+
+```bash
+npm version 1.0.1 && git push --follow-tags
+```
+
+The Package workflow then builds all three on their own runners and attaches
+them to the tag. Running it from the Actions tab builds the same three as
+downloadable artifacts without publishing anything.
+
+**Nothing is code-signed.** That needs a paid Apple Developer ID and a Windows
+code-signing certificate, so each system asks for convincing once: Windows
+SmartScreen wants *More info → Run anyway*, macOS wants a right-click → *Open*
+on the first launch, and the APK is debug-signed, which is enough to sideload
+but not to publish.
 
 ## How it plays
 

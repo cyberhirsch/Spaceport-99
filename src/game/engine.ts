@@ -10,6 +10,9 @@ import {
   cycleYield,
   deckCost,
   def,
+  maxLevel,
+  mergeBonus,
+  moveCost,
   powerDraw,
   berths,
   missionSlots,
@@ -19,6 +22,7 @@ import {
   touchesLift,
   upgradeCost,
   wingOf,
+  type Wing,
 } from './modules.ts'
 import {
   MAX_STAT,
@@ -256,6 +260,82 @@ export const canDemolish = (s: GameState, m: StationModule): boolean => {
     : !moduleAt(s, m.deck, m.col + m.width)
 }
 
+/** The columns of a wing, ordered outward from the lift shaft. */
+const wingColumns = (wing: Wing): number[] =>
+  wing === 'port'
+    ? Array.from({ length: WING }, (_, i) => WING - 1 - i)
+    : Array.from({ length: WING }, (_, i) => WING + i)
+
+/**
+ * A wing is one unbroken run hanging off the lift. Any arrangement that would
+ * strand a room behind a gap — or leave one straddling the shaft — is illegal,
+ * however it came about.
+ */
+const wingIsSound = (mods: StationModule[], deck: number, wing: Wing): boolean => {
+  const filled = new Set<number>()
+  for (const m of mods) {
+    if (m.deck !== deck) continue
+    for (let c = m.col; c < m.col + m.width; c += 1) if (wingOf(c) === wing) filled.add(c)
+  }
+  const order = wingColumns(wing)
+  for (let i = 0; i < order.length; i += 1) {
+    if (!filled.has(order[i])) return order.slice(i).every((c) => !filled.has(c))
+  }
+  return true
+}
+
+/**
+ * Whether a built room could be cut loose and set down at `col` on `deck`. The
+ * footprint must be clear, must stay on one side of the lift, and both the
+ * wing it leaves and the wing it lands in must still read as a single run.
+ */
+export const canRelocate = (
+  s: GameState,
+  m: StationModule,
+  deck: number,
+  col: number,
+): boolean => {
+  if (s.incidents.some((i) => i.moduleId === m.id)) return false
+  if (deck < 0 || deck >= s.decks) return false
+  if (col < 0 || col + m.width > DECK_WIDTH) return false
+  if (wingOf(col) !== wingOf(col + m.width - 1)) return false
+  if (deck === m.deck && col === m.col) return false
+  const others = s.modules.filter((o) => o.id !== m.id)
+  for (let c = col; c < col + m.width; c += 1) {
+    if (others.some((o) => o.deck === deck && c >= o.col && c < o.col + o.width)) return false
+  }
+  const after = [...others, { ...m, deck, col }]
+  for (let d = 0; d < s.decks; d += 1) {
+    if (!wingIsSound(after, d, 'port') || !wingIsSound(after, d, 'starboard')) return false
+  }
+  return true
+}
+
+/**
+ * Where a room dropped on one cell should actually come to rest. A wide run
+ * covers several columns, so slide it left until its whole footprint fits.
+ */
+export const relocateAnchor = (
+  s: GameState,
+  m: StationModule,
+  deck: number,
+  col: number,
+): number | null => {
+  for (let anchor = col; anchor > col - m.width; anchor -= 1) {
+    if (canRelocate(s, m, deck, anchor)) return anchor
+  }
+  return null
+}
+
+/** Whether a room can be picked up at all, wherever it might end up. */
+export const canMove = (s: GameState, m: StationModule): boolean => {
+  if (s.incidents.some((i) => i.moduleId === m.id)) return false
+  for (let d = 0; d < s.decks; d += 1) {
+    for (let c = 0; c < DECK_WIDTH; c += 1) if (canRelocate(s, m, d, c)) return true
+  }
+  return false
+}
+
 export const countOfKind = (s: GameState, kind: ModuleKind): number =>
   s.modules.filter((m) => m.kind === kind).length
 
@@ -264,11 +344,14 @@ const mergeNeighbours = (s: GameState, m: StationModule): StationModule => {
   let current = m
   for (let pass = 0; pass < 2; pass += 1) {
     // Rooms only merge with their own wing; the lift shaft is a hard divide.
+    // Shells weld together; fitted-out rooms do not. Upgrading is what you do
+    // *after* you have decided how wide the run is going to be.
+    if (current.level > 1) break
     const twin = (o: StationModule) =>
       o.id !== current.id &&
       o.deck === current.deck &&
       o.kind === current.kind &&
-      o.level === current.level &&
+      o.level === 1 &&
       wingOf(o.col) === wingOf(current.col)
     const left = s.modules.find((o) => twin(o) && o.col + o.width === current.col)
     const right = s.modules.find((o) => twin(o) && o.col === current.col + current.width)
@@ -482,7 +565,8 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
   for (const m of s.modules) {
     const md = def(m.kind)
     if (!md.heals) continue
-    healRate += md.heals * m.width * m.level * workRate(m, crewById) * Math.max(0.6, grid)
+    healRate +=
+      md.heals * m.width * m.level * mergeBonus(m) * workRate(m, crewById) * Math.max(0.6, grid)
   }
   if (!starving && !suffocating) healRate += 0.15
 
@@ -494,7 +578,8 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
   for (const m of s.modules) {
     const md = def(m.kind)
     if (!md.repairs || m.standby) continue
-    repairRate += md.repairs * m.width * m.level * workRate(m, crewById) * Math.max(0.6, grid)
+    repairRate +=
+      md.repairs * m.width * m.level * mergeBonus(m) * workRate(m, crewById) * Math.max(0.6, grid)
   }
   if (repairRate > 0) {
     const worst = s.modules
@@ -880,7 +965,7 @@ const trainingSeconds = (m: StationModule, crewById: Map<string, Crew>): number 
     if (c) worst = Math.max(worst, c.stats[stat])
   }
   // Each point of a stat takes noticeably longer than the last.
-  return (26 + worst * 16) / m.level
+  return (26 + worst * 16) / (m.level * mergeBonus(m))
 }
 
 const awardXp = (s: GameState, m: StationModule, amount: number): void => {
@@ -950,6 +1035,7 @@ export type Action =
   | { type: 'catchUp'; seconds: number }
   | { type: 'build'; kind: ModuleKind; deck: number; col: number }
   | { type: 'demolish'; moduleId: string }
+  | { type: 'relocate'; moduleId: string; deck: number; col: number }
   | { type: 'upgrade'; moduleId: string }
   | { type: 'assign'; crewId: string; moduleId: string | null }
   | { type: 'autoAssign' }
@@ -1182,6 +1268,27 @@ export const reducer = (state: GameState, action: Action): GameState => {
       }
       break
     }
+    case 'relocate': {
+      const m = s.modules.find((x) => x.id === action.moduleId)
+      if (!m) return state
+      const anchor = relocateAnchor(s, m, action.deck, action.col)
+      if (anchor === null) return state
+      const cost = moveCost(m)
+      if (s.credits < cost) return state
+      s.credits -= cost
+      const wasWidth = m.width
+      m.deck = action.deck
+      m.col = anchor
+      const final = mergeNeighbours(s, m)
+      log(
+        s,
+        final.width > wasWidth
+          ? `${def(final.kind).name} moved to deck ${action.deck + 1} and welded into a ${final.width}-wide run. −${cost}c.`
+          : `${def(final.kind).name} moved to deck ${action.deck + 1}. −${cost}c.`,
+        'info',
+      )
+      break
+    }
     case 'demolish': {
       const m = s.modules.find((x) => x.id === action.moduleId)
       if (!m || !canDemolish(s, m)) return state
@@ -1194,7 +1301,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
     }
     case 'upgrade': {
       const m = s.modules.find((x) => x.id === action.moduleId)
-      if (!m || m.level >= MAX_LEVEL) return state
+      if (!m || m.level >= maxLevel(m)) return state
       const cost = upgradeCost(m)
       if (s.credits < cost) return state
       s.credits -= cost
@@ -1577,4 +1684,19 @@ export const reducer = (state: GameState, action: Action): GameState => {
   return s
 }
 
-export { BUILDABLE, DECK_WIDTH, MAX_LEVEL, WING, buildCost, deckCost, def, staffSlots, upgradeCost, wingOf }
+export {
+  BUILDABLE,
+  DECK_WIDTH,
+  MAX_LEVEL,
+  MAX_MERGE,
+  WING,
+  buildCost,
+  deckCost,
+  def,
+  maxLevel,
+  mergeBonus,
+  moveCost,
+  staffSlots,
+  upgradeCost,
+  wingOf,
+}

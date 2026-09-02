@@ -12,7 +12,7 @@ import { Modal } from './components/Modal.tsx'
 import { ModuleModal } from './components/ModuleModal.tsx'
 import { StationView } from './components/StationView.tsx'
 import { TopBar } from './components/TopBar.tsx'
-import { isAway, staffSlots } from './game/engine.ts'
+import { canMove, isAway, relocateAnchor, staffSlots } from './game/engine.ts'
 import { useDragAssign } from './hooks/useDragAssign.ts'
 import { useGame } from './hooks/useGame.ts'
 import { useMediaQuery } from './hooks/useMediaQuery.ts'
@@ -33,6 +33,8 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('build')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [placing, setPlacing] = useState<ModuleKind | null>(null)
+  // A room picked up for relocation by tapping rather than dragging.
+  const [moving, setMoving] = useState<string | null>(null)
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [crewId, setCrewId] = useState<string | null>(null)
   const [candidateId, setCandidateId] = useState<string | null>(null)
@@ -41,7 +43,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const panelOpen = wide || sheetOpen
 
-  const canDrop = useCallback(
+  const canDropCrew = useCallback(
     (id: string, target: string) => {
       const m = state.modules.find((x) => x.id === target)
       const c = state.crew.find((x) => x.id === id)
@@ -51,10 +53,24 @@ export default function App() {
     [state],
   )
 
-  const { drag, start } = useDragAssign({
-    onDrop: (id, target) => act({ type: 'assign', crewId: id, moduleId: target }),
-    onTap: (id) => setCrewId(id),
-    canDrop,
+  const canDropRoom = useCallback(
+    (id: string, cell: { deck: number; col: number }) => {
+      const m = state.modules.find((x) => x.id === id)
+      if (!m) return false
+      return relocateAnchor(state, m, cell.deck, cell.col) !== null
+    },
+    [state],
+  )
+
+  const { drag, start, startRoom } = useDragAssign({
+    onDropCrew: (id, target) => act({ type: 'assign', crewId: id, moduleId: target }),
+    onDropRoom: (id, cell) => {
+      act({ type: 'relocate', moduleId: id, deck: cell.deck, col: cell.col })
+      setMoving(null)
+    },
+    onTap: (subject) => (subject.type === 'crew' ? setCrewId(subject.id) : setModuleId(subject.id)),
+    canDropCrew,
+    canDropRoom,
   })
 
   const openTab = (next: Tab) => {
@@ -118,15 +134,26 @@ export default function App() {
         <StationView
           state={state}
           placing={placing}
+          moving={moving}
           drag={drag}
           onDragStart={start}
+          onRoomDragStart={startRoom}
           onPlace={(deck, col) => {
+            if (moving) {
+              act({ type: 'relocate', moduleId: moving, deck, col })
+              setMoving(null)
+              return
+            }
             if (!placing) return
             act({ type: 'build', kind: placing, deck, col })
             setPlacing(null)
           }}
-          onCancelPlacing={() => setPlacing(null)}
+          onCancelPlacing={() => {
+            setPlacing(null)
+            setMoving(null)
+          }}
           onSelectModule={(id) => {
+            if (moving) return
             const kind = state.modules.find((m) => m.id === id)?.kind
             if (kind === 'hangar' || kind === 'command') {
               setTab('fleet')
@@ -229,6 +256,15 @@ export default function App() {
           onClose={() => setModuleId(null)}
           onAssign={(cid, mid) => act({ type: 'assign', crewId: cid, moduleId: mid })}
           onUpgrade={() => act({ type: 'upgrade', moduleId })}
+          canMove={(() => {
+            const m = state.modules.find((x) => x.id === moduleId)
+            return Boolean(m && canMove(state, m))
+          })()}
+          onMove={() => {
+            setMoving(moduleId)
+            setModuleId(null)
+            if (!wide) setSheetOpen(false)
+          }}
           onRush={() => act({ type: 'rush', moduleId })}
           onStandby={(standby) => act({ type: 'setStandby', moduleId, standby })}
           onAutoAccept={(on) => act({ type: 'setAutoAccept', moduleId, autoAccept: on })}
@@ -351,7 +387,9 @@ export default function App() {
             </li>
             <li>
               <b>Decks are symmetrical</b> — five room slots each side of the lift shaft, built
-              outward from it. Two identical rooms side by side merge into one bigger, faster room.
+              outward from it. Fresh rooms of a kind side by side weld into one run: more output
+              per segment, and a second upgrade a lone room never gets. Drag a room by its corner
+              grip to move it.
             </li>
             <li>
               <b>Rushing</b> finishes a cycle instantly but can start a fire. <b>Emergencies</b> are

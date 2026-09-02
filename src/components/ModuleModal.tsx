@@ -1,8 +1,11 @@
 import {
-  MAX_LEVEL,
+  MAX_MERGE,
   availableCrew,
   canDemolish,
   def,
+  maxLevel,
+  mergeBonus,
+  moveCost,
   staffSlots,
   upgradeCost,
   workRate,
@@ -27,6 +30,8 @@ interface Props {
   onDemolish: () => void
   onStandby: (standby: boolean) => void
   onAutoAccept: (on: boolean) => void
+  canMove: boolean
+  onMove: () => void
 }
 
 export const ModuleModal = ({
@@ -41,6 +46,8 @@ export const ModuleModal = ({
   onDemolish,
   onStandby,
   onAutoAccept,
+  canMove,
+  onMove,
 }: Props) => {
   const m = state.modules.find((x) => x.id === moduleId)
   if (!m) return null
@@ -54,7 +61,10 @@ export const ModuleModal = ({
   // good at the job the room normally does.
   const focus = idef ? idef.counter : d.stat
   const scrappable = canDemolish(state, m)
+  const top = maxLevel(m)
   const upCost = upgradeCost(m)
+  const bonus = Math.round((mergeBonus(m) - 1) * 100)
+  const nextSlots = staffSlots({ ...m, level: m.level + 1 })
   const staffed: Crew[] = m.staff.map((id) => crewById.get(id)).filter(Boolean) as Crew[]
   const bench = availableCrew(state)
     .filter((c) => c.assignment !== m.id)
@@ -72,7 +82,7 @@ export const ModuleModal = ({
           <i className="modal__glyph">{d.glyph}</i>
           {d.name}
           <em>
-            Lv{m.level} · deck {m.deck + 1} · {m.width}×
+            Lv{m.level}/{top} · deck {m.deck + 1} · {m.width}×
           </em>
         </span>
       }
@@ -124,6 +134,12 @@ export const ModuleModal = ({
           <dt>Power draw</dt>
           <dd>
             {powerDraw(m).toFixed(1)} /s{m.standby ? ' · standby' : ''}
+          </dd>
+        </div>
+        <div>
+          <dt>Run</dt>
+          <dd>
+            {m.width} wide{bonus > 0 ? ` · +${bonus}% output` : ''}
           </dd>
         </div>
         <div>
@@ -184,6 +200,17 @@ export const ModuleModal = ({
         </>
       )}
 
+      {d.slotsPerSegment > 0 && (
+        <p className="panel-note">
+          {m.width < MAX_MERGE && m.level === 1
+            ? `Park another ${d.name} against this one and they weld into a single run — up to ${MAX_MERGE} wide, worth 15% more output per extra segment. Upgrade first and the shell is sealed: a room on its own only ever reaches level 2.`
+            : m.width > 1
+              ? `A ${m.width}-wide run: +${bonus}% output over the same floor apart, and two upgrades instead of one.`
+              : 'Sealed at level 2 — a room this size takes one upgrade. Merged runs take two.'}
+          {m.level < top ? ` Level ${m.level + 1} works ${nextSlots}.` : ''}
+        </p>
+      )}
+
       {d.repairs && (
         <p className="panel-note">
           While staffed, its damage-control party works the station's worst-damaged rooms back
@@ -213,6 +240,18 @@ export const ModuleModal = ({
       )}
 
       <div className="modal__actions">
+        <button
+          className="btn"
+          disabled={!canMove || state.credits < moveCost(m)}
+          onClick={onMove}
+          title={
+            canMove
+              ? 'Cut it loose and set it down somewhere else'
+              : 'Nowhere to put it — free a slot at the end of a wing first'
+          }
+        >
+          Move — {moveCost(m)}c
+        </button>
         <button className="btn" onClick={() => onStandby(!m.standby)} disabled={Boolean(incident)}>
           {m.standby ? 'Bring online' : 'Power down'}
         </button>
@@ -228,10 +267,11 @@ export const ModuleModal = ({
         )}
         <button
           className="btn"
-          disabled={m.level >= MAX_LEVEL || state.credits < upCost || m.standby}
+          disabled={m.level >= top || state.credits < upCost || m.standby}
           onClick={onUpgrade}
+          title={m.level >= top && m.width === 1 ? 'Merge it into a run to go further' : undefined}
         >
-          {m.level >= MAX_LEVEL ? 'Max level' : `Upgrade — ${upCost}c`}
+          {m.level >= top ? (m.width === 1 ? 'Max — merge to go on' : 'Max level') : `Upgrade — ${upCost}c`}
         </button>
         <button
           className="btn btn--danger"

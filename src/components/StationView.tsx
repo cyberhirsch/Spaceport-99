@@ -7,6 +7,8 @@ import {
   awayCrewIds,
   idleCrew,
   moduleAt,
+  moveCost,
+  relocateAnchor,
   staffSlots,
   workRate,
 } from '../game/engine.ts'
@@ -19,8 +21,11 @@ import { CrewAvatar } from './CrewAvatar.tsx'
 interface Props {
   state: GameState
   placing: ModuleKind | null
+  /** Id of a room picked up for relocation by tapping its Move button. */
+  moving: string | null
   drag: DragState | null
   onDragStart: (crewId: string, e: React.PointerEvent) => void
+  onRoomDragStart: (roomId: string, e: React.PointerEvent) => void
   onPlace: (deck: number, col: number) => void
   onCancelPlacing: () => void
   onSelectModule: (id: string) => void
@@ -39,21 +44,25 @@ const Room = ({
   crewById,
   incident,
   drag,
+  lifted,
   onOpen,
   onDragStart,
+  onRoomDragStart,
 }: {
   module: StationModule
   crewById: Map<string, Crew>
   incident: GameState['incidents'][number] | undefined
   drag: DragState | null
+  lifted: boolean
   onOpen: () => void
   onDragStart: (crewId: string, e: React.PointerEvent) => void
+  onRoomDragStart: (roomId: string, e: React.PointerEvent) => void
 }) => {
   const d = def(module.kind)
   const slots = staffSlots(module)
   const running = workRate(module, crewById) > 0
   const showProgress = Boolean(d.cycleSeconds || d.trains)
-  const room = drag && slots > 0
+  const room = Boolean(drag?.crewId) && slots > 0
   const full = module.staff.length >= slots && !module.staff.includes(drag?.crewId ?? '')
 
   return (
@@ -63,8 +72,10 @@ const Room = ({
         incident ? 'room--alarm' : '',
         running ? '' : 'room--idle',
         module.standby ? 'room--standby' : '',
+        module.width > 1 ? 'room--merged' : '',
         room ? (full ? 'room--dropno' : 'room--dropok') : '',
-        drag?.overModule === module.id ? 'is-over' : '',
+        drag?.crewId && drag.overModule === module.id ? 'is-over' : '',
+        lifted ? 'room--lifted' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -85,6 +96,17 @@ const Room = ({
       }}
       title={`${d.name} — level ${module.level}`}
     >
+      <span
+        className="room__move grip"
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          onRoomDragStart(module.id, e)
+        }}
+        onClick={(e) => e.stopPropagation()}
+        title={`Drag to move this room — ${moveCost(module)}c`}
+      >
+        ⠿
+      </span>
       <span className="room__glyph">{d.glyph}</span>
       {module.standby && <span className="room__standby">off</span>}
       <span className="room__title">
@@ -147,8 +169,10 @@ const Room = ({
 export const StationView = ({
   state,
   placing,
+  moving,
   drag,
   onDragStart,
+  onRoomDragStart,
   onPlace,
   onCancelPlacing,
   onSelectModule,
@@ -167,6 +191,9 @@ export const StationView = ({
   const flightOf = (crewId: string) =>
     state.missions.find((m) => m.status === 'flying' && m.crewIds.includes(crewId))
   const nextDeck = deckCost(state.decks)
+  // A room is in hand either because it is being dragged or because its Move
+  // button was tapped; both light up the same landing spots.
+  const held = state.modules.find((m) => m.id === (drag?.roomId ?? moving)) ?? null
 
   // The station is wider than a phone, so open it centred on the lift shaft —
   // that is where the station starts and where the empty slots worth building
@@ -209,8 +236,10 @@ export const StationView = ({
             crewById={crewById}
             incident={state.incidents.find((i) => i.moduleId === m.id)}
             drag={drag}
+            lifted={held?.id === m.id}
             onOpen={() => onSelectModule(m.id)}
             onDragStart={onDragStart}
+            onRoomDragStart={onRoomDragStart}
           />,
         )
         col += m.width
@@ -220,17 +249,31 @@ export const StationView = ({
       // handler must not read the loop's later value.
       const at = col
       const buildable = canBuildAt(state, deck, at)
+      const landing = held ? relocateAnchor(state, held, deck, at) !== null : false
       cells.push(
         <button
           key={`${deck}-${at}`}
           className={`cell${buildable ? ' cell--open' : ''}${
             placing && buildable ? ' cell--target' : ''
-          }`}
-          disabled={!buildable && !placing}
-          onClick={() => (placing && buildable ? onPlace(deck, at) : onEmptyCell())}
-          title={buildable ? 'Empty slot' : 'Unreachable — build outward from the lift'}
+          }${landing ? ' cell--target cell--landing' : ''}`}
+          data-drop-cell={`${deck}:${at}`}
+          disabled={!buildable && !placing && !landing}
+          onClick={() => {
+            if (held && landing) onPlace(deck, at)
+            else if (placing && buildable) onPlace(deck, at)
+            else onEmptyCell()
+          }}
+          title={
+            held
+              ? landing
+                ? `Set the ${def(held.kind).short} down here — ${moveCost(held)}c`
+                : 'The room will not fit here'
+              : buildable
+                ? 'Empty slot'
+                : 'Unreachable — build outward from the lift'
+          }
         >
-          {buildable ? '+' : ''}
+          {held ? (landing ? '⇲' : '') : buildable ? '+' : ''}
         </button>,
       )
       col += 1
@@ -240,9 +283,18 @@ export const StationView = ({
 
   return (
     <div className="stage">
-      {placing && (
+      {(placing || moving) && (
         <div className="station__hint">
-          Placing <strong>{def(placing).name}</strong> — pick a highlighted slot.
+          {placing ? (
+            <>
+              Placing <strong>{def(placing).name}</strong> — pick a highlighted slot.
+            </>
+          ) : (
+            <>
+              Moving <strong>{held ? def(held.kind).name : 'room'}</strong>
+              {held ? ` — ${moveCost(held)}c` : ''}. Pick a highlighted slot.
+            </>
+          )}
           <button className="btn btn--tiny" onClick={onCancelPlacing}>
             Cancel
           </button>
@@ -253,7 +305,7 @@ export const StationView = ({
         className="station"
         ref={scroller}
         onContextMenu={(e) => {
-          if (placing) {
+          if (placing || moving) {
             e.preventDefault()
             onCancelPlacing()
           }
@@ -281,7 +333,9 @@ export const StationView = ({
 
       <div className="dock-row">
         <div
-          className={`dock${drag ? ' is-armed' : ''}${drag?.overDock ? ' is-over' : ''}`}
+          className={`dock${drag?.crewId ? ' is-armed' : ''}${
+            drag?.crewId && drag.overDock ? ' is-over' : ''
+          }`}
           data-drop-dock
         >
           <span className="dock__label">
@@ -290,7 +344,7 @@ export const StationView = ({
           <div className="dock__list">
             {idle.length === 0 && (
               <span className="dock__empty">
-                {drag ? 'Drop here to stand down' : 'Everyone is at their post.'}
+                {drag?.crewId ? 'Drop here to stand down' : 'Everyone is at their post.'}
               </span>
             )}
             {idle.map((c) => (

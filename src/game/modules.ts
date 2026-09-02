@@ -4,6 +4,7 @@ import type { ModuleDef, ModuleKind, StationModule } from './types.ts'
 export const WING = 5
 export const DECK_WIDTH = WING * 2
 export const MAX_MERGE = 3
+/** Ceiling on room level. Only a merged run ever reaches it. */
 export const MAX_LEVEL = 3
 
 export type Wing = 'port' | 'starboard'
@@ -309,19 +310,48 @@ export const upgradeCost = (m: StationModule): number =>
 /** Each new deck is markedly pricier than the last. */
 export const deckCost = (decks: number): number => Math.round(260 * Math.pow(decks, 1.5))
 
-export const staffSlots = (m: StationModule): number => def(m.kind).slotsPerSegment * m.width
+/**
+ * A room standing on its own takes a single upgrade. Weld it into a run of its
+ * own kind and the extra volume buys a second — so width is not just more of
+ * the same room, it is a deeper one.
+ */
+export const maxLevel = (m: StationModule): number => (m.width > 1 ? MAX_LEVEL : 2)
+
+/**
+ * Rooms of a kind welded together share plant, power and hands, so a run puts
+ * out more than the segments would apart. 15% per extra segment.
+ */
+export const mergeBonus = (m: StationModule): number => 1 + (m.width - 1) * 0.15
+
+/**
+ * Hands on shift. Every segment brings its own workstations, and the final
+ * fit-out repacks the run to find room for one more — a fully merged, fully
+ * upgraded Crew Quarters works seven.
+ */
+export const staffSlots = (m: StationModule): number => {
+  const per = def(m.kind).slotsPerSegment
+  if (per === 0) return 0
+  return per * m.width + (m.level >= maxLevel(m) ? 1 : 0)
+}
+
+/**
+ * Cutting a room loose from its mounts and re-welding it elsewhere. Far
+ * cheaper than building fresh, and it keeps the crew and the fit-out.
+ */
+export const moveCost = (m: StationModule): number =>
+  Math.round(def(m.kind).cost * 0.3 * m.width * m.level)
 
 /** Yield of one completed production cycle at full effectiveness. */
 export const cycleYield = (m: StationModule): number => {
   const d = def(m.kind)
   if (!d.baseYield) return 0
-  return d.baseYield * m.width * (1 + (m.level - 1) * 0.6)
+  return d.baseYield * m.width * (1 + (m.level - 1) * 0.6) * mergeBonus(m)
 }
 
 export const cycleCredits = (m: StationModule): number => {
   const d = def(m.kind)
   if (!d.credits) return 0
-  return d.credits * m.width * (1 + (m.level - 1) * 0.6)
+  return d.credits * m.width * (1 + (m.level - 1) * 0.6) * mergeBonus(m)
 }
 
 /** What a room on standby still costs: heaters, sensors, and the lights. */
@@ -334,10 +364,10 @@ export const powerDraw = (m: StationModule): number =>
   (m.standby ? STANDBY_DRAW : 1)
 
 export const capacityBonus = (m: StationModule): number =>
-  (def(m.kind).crewCapacity ?? 0) * m.width * m.level
+  Math.round((def(m.kind).crewCapacity ?? 0) * m.width * m.level * mergeBonus(m))
 
 export const storageBonus = (m: StationModule): number =>
-  (def(m.kind).storageBonus ?? 0) * m.width * m.level
+  Math.round((def(m.kind).storageBonus ?? 0) * m.width * m.level * mergeBonus(m))
 
 /** How many applicants the station can have waiting at once. */
 export const berths = (m: StationModule): number =>

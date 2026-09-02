@@ -204,7 +204,7 @@ export type ItemSlot = 'sidearm' | 'armour'
 
 export type ItemId = 'cutter' | 'sidearm' | 'lance' | 'vest' | 'plate' | 'carapace'
 
-/** The powers with a claim on the Verge, plus everyone off their books. */
+/** The powers whose space the traffic comes from, plus everyone off their books. */
 export type FactionId = 'terran' | 'concern' | 'compact' | 'unlisted'
 
 /** Something a docked ship wants to talk about. Marked with an exclamation. */

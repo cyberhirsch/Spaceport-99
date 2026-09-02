@@ -29,9 +29,10 @@ export const PowersPanel = ({ state, onDeclare, onResign }: Props) => {
   return (
     <div className="panel-body">
       <p className="panel-note">
-        Three powers hold a claim on this patch of the Verge, and the station sits where the
-        claims overlap. Whose paper you fly decides who HQ sends you and how nasty the contracts
-        get. The front moves; the right flag this year is not next year's.
+        Three powers run the space your traffic comes from and goes back to. This station is
+        nobody's prize — a small independent post all three find it convenient to leave alone —
+        but whose paper you fly decides who deals with you, who HQ sends, and how nasty the
+        contracts get. Reputations move; the right flag this year is not next year's.
       </p>
 
       <div className={`flag${patron ? ' flag--flown' : ''}`}>

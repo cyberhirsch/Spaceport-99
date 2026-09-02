@@ -1,10 +1,14 @@
 import type { FactionId, VisitorKind } from './types.ts'
 
 /**
- * The powers with a claim on the Verge, and the people who fell off their
- * books. Three of them can be flown as a flag; the Unlisted are a filing
- * status rather than a patron, so you can only ever stand well or badly with
- * them.
+ * The powers whose space the station's traffic comes from and goes back to,
+ * and the people who fell off their books. Three of them can be flown as a
+ * flag; the Unlisted are a filing status rather than a patron, so you can only
+ * ever stand well or badly with them.
+ *
+ * None of them is circling this station. It is a small independent post that
+ * all three find it convenient to leave alone, which is exactly why it is
+ * worth flying somebody's paper.
  */
 export interface FactionDef {
   id: FactionId
@@ -14,6 +18,7 @@ export interface FactionDef {
   glyph: string
   /** Room-accent hue, so the interface can colour a hull by who sent it. */
   hue: number
+  /** What their authority rests on. */
   claim: string
   /** What flying their flag is worth. */
   offer: string
@@ -30,7 +35,7 @@ export const FACTION_DEFS: Record<FactionId, FactionDef> = {
     short: 'Terran',
     glyph: '✶',
     hue: 42,
-    claim: 'Writ. The Verge was surveyed under Confederation charter and no member world has ever voted to give it up.',
+    claim: 'Writ. Confederation charter still covers most of settled space, and no member world has ever voted to give any of it back.',
     offer: 'Applicants on Confederation pay, contracts on a schedule, and a patrol that will answer — eventually.',
     exit: 'They strike the station from the roll. You keep the place and lose the only vote that ever counted it.',
     patronable: true,

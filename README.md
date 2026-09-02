@@ -65,13 +65,14 @@ but not to publish.
 
 ## The powers
 
-Three powers hold a claim on the patch of the Verge the station sits in, and the station sits
-where the claims overlap — which is the only reason a charter was ever granted, since each of
-them preferred an independent station there to one of the other two.
+Three powers run the space the station's traffic comes from and goes back to. Spaceport-99 is
+not a prize any of them is circling: it is a small independent post, far enough out that all
+three find it convenient to leave alone. Whose paper you fly is still the most consequential
+decision the commander makes.
 
-- **The Terran Confederation** claims by writ: the Verge was surveyed under Confederation
-  charter and no member world has ever voted to give it up. It dispatches applicants on
-  Confederation pay, and its patrols answer eventually.
+- **The Terran Confederation** claims by writ: Confederation charter still covers most of
+  settled space and no member world has ever voted to give any of it back. It dispatches
+  applicants on Confederation pay, and its patrols answer eventually.
 - **The Meridian Concern** claims the lanes. Best prices at your clamps, credit when a reactor
   goes, and everything itemised.
 - **The Vantric Compact** claims by enrolment. It does not take stations; it invites them, once

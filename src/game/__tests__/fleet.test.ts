@@ -31,8 +31,10 @@ const flightReady = (): GameState => {
 }
 
 /** Drops a contract straight onto the board so tests do not wait for the wire. */
+// These tests are about the fixed-clock job. Shapes with their own rules get
+// their own tests below.
 const withOffer = (s: GameState, over: Partial<Mission> = {}): [GameState, Mission] => {
-  const m = { ...makeMission(0.4), ...over }
+  const m = { ...makeMission(0.4, { shape: 'contract' }), ...over }
   return [{ ...s, missions: [...s.missions, m] }, m]
 }
 

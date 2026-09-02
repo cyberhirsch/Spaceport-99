@@ -3,6 +3,7 @@ import {
   berthedShips,
   fleetCapacity,
   defence,
+  inContact,
   missionCapacity,
 } from '../game/engine.ts'
 import {
@@ -18,6 +19,7 @@ import {
   teamSize,
   tradeInValue,
 } from '../game/fleet.ts'
+import { factionDef } from '../game/factions.ts'
 import { STAT_INFO, type GameState, type Ship, type ShipClass } from '../game/types.ts'
 import { EditableName } from './EditableName.tsx'
 import { hpStyle } from './meters.ts'
@@ -26,6 +28,8 @@ interface Props {
   state: GameState
   onOpenMission: (id: string) => void
   onDecline: (id: string) => void
+  onRecall: (id: string) => void
+  onAnswer: (id: string, choice: number) => void
   onFileReport: (id: string) => void
   onBuy: (cls: ShipClass) => void
   onRefit: (id: string) => void
@@ -140,6 +144,8 @@ export const FleetPanel = ({
   state,
   onOpenMission,
   onDecline,
+  onRecall,
+  onAnswer,
   onFileReport,
   onBuy,
   onRefit,
@@ -149,7 +155,8 @@ export const FleetPanel = ({
 }: Props) => {
   const capacity = fleetCapacity(state)
   const slots = missionCapacity(state)
-  const flying = state.missions.filter((m) => m.status === 'flying')
+  const flying = state.missions.filter((m) => m.status === 'flying' || m.status === 'calling')
+  const reachable = inContact(state)
   const offers = state.missions.filter((m) => m.status === 'offered')
   const reports = state.missions.filter((m) => m.status === 'report')
   const free = berthedShips(state)
@@ -229,18 +236,98 @@ export const FleetPanel = ({
             In flight ({flying.length}/{slots})
           </h3>
           <ul className="mission-list">
-            {flying.map((m) => (
-              <li key={m.id} className="mission mission--flying">
-                <span className="mission__name">{m.name}</span>
-                <span className="mission__meta">
-                  {state.ships.find((x) => x.id === m.shipId)?.name ?? 'ship lost'} ·{' '}
-                  {m.crewIds.length} aboard · {clock(m.remaining)} out
-                </span>
-                <span className="mission__bar">
-                  <i style={{ width: `${(1 - m.remaining / m.seconds) * 100}%` }} />
-                </span>
-              </li>
-            ))}
+            {flying.map((m) => {
+              const heard = reachable.has(m.id)
+              const open = m.shape === 'open' && !m.recalled
+              return (
+                <li
+                  key={m.id}
+                  className={`mission mission--flying${m.status === 'calling' ? ' mission--calling' : ''}${
+                    heard ? '' : ' mission--silent'
+                  }`}
+                >
+                  <span className="mission__name">
+                    {m.name}
+                    {!heard && <em className="mission__silent">out of contact</em>}
+                  </span>
+                  <span className="mission__meta">
+                    {state.ships.find((x) => x.id === m.shipId)?.name ?? 'ship lost'} ·{' '}
+                    {m.crewIds.length} aboard ·{' '}
+                    {open
+                      ? `${clock(m.aloft)} out, no end time`
+                      : m.recalled
+                        ? `${clock(m.remaining)} from home`
+                        : `${clock(m.remaining)} out`}
+                  </span>
+
+                  {open ? (
+                    <>
+                      <span className="mission__meta">
+                        hold ×{m.haul.toFixed(2)} · strain{' '}
+                        <b className={m.strain > 1 ? 'is-hot' : ''}>{m.strain.toFixed(2)}</b>
+                        {m.strain > 1 ? ' — every minute now is a gamble' : ''}
+                      </span>
+                      <span className="mission__bar">
+                        <i
+                          className={m.strain > 1 ? 'is-hot' : ''}
+                          style={{ width: `${Math.min(100, m.strain * 50)}%` }}
+                        />
+                      </span>
+                      <span className="mission__acts">
+                        <button
+                          className="btn btn--tiny"
+                          disabled={!heard}
+                          onClick={() => onRecall(m.id)}
+                          title={heard ? undefined : 'No controller is holding their channel'}
+                        >
+                          {heard ? 'Order them home' : 'No channel'}
+                        </button>
+                      </span>
+                    </>
+                  ) : (
+                    <span className="mission__bar">
+                      <i style={{ width: `${(1 - m.remaining / m.seconds) * 100}%` }} />
+                    </span>
+                  )}
+
+                  {m.status === 'calling' && m.call && (
+                    <span className="hail">
+                      <b>They are asking.</b>
+                      <span className="hail__text">{m.call.text}</span>
+                      {heard ? (
+                        m.call.options.map((o, i) => {
+                          const short = o.cost !== undefined && state.credits < o.cost
+                          return (
+                            <button
+                              key={o.label}
+                              className="hail__opt"
+                              disabled={short}
+                              onClick={() => onAnswer(m.id, i)}
+                            >
+                              <b>{o.label}</b>
+                              <em>
+                                {o.detail}
+                                {o.cost ? ` — ${o.cost}c` : ''}
+                                {short ? ' · not in the account' : ''}
+                              </em>
+                            </button>
+                          )
+                        })
+                      ) : (
+                        <span className="hail__text">
+                          Nobody is on the channel. They will stop waiting and decide for
+                          themselves.
+                        </span>
+                      )}
+                    </span>
+                  )}
+
+                  {m.choices.length > 0 && (
+                    <span className="mission__blurb">{m.choices[m.choices.length - 1]}</span>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         </>
       )}
@@ -264,12 +351,24 @@ export const FleetPanel = ({
             <li key={m.id} className="mission">
               <span className="mission__name">{m.name}</span>
               <span className="mission__meta">
-                {STAT_INFO[m.stat].name} · {teamSize(m)} crew · {clock(m.seconds)} ·{' '}
+                {STAT_INFO[m.stat].name} · {teamSize(m)} crew ·{' '}
+                {m.shape === 'open' ? 'no end time' : clock(m.seconds)} ·{' '}
                 <b className={m.danger > 0.6 ? 'is-hot' : ''}>
                   danger {Math.round(m.danger * 100)}%
                 </b>
               </span>
-              <span className="mission__blurb">{d.blurb}</span>
+              <span className="mission__blurb">
+                {d.blurb}
+                {m.shape === 'open' &&
+                  ' They stay out until you call them home, and the longer they stay the more they bring and the worse the odds.'}
+                {m.shape === 'unfolding' && ' Expect them to hail before it is over.'}
+              </span>
+              {m.obligation && m.standing && (
+                <span className="mission__duty">
+                  Tasked by {factionDef(m.standing[0]).name}. There is no fee — passing it is what
+                  costs.
+                </span>
+              )}
               <span className="mission__pay">
                 ◈ {m.payout.credits}c
                 {m.payout.power > 0 && ` · ⚡ ${m.payout.power}`}

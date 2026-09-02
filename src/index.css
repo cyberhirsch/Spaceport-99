@@ -3028,3 +3028,98 @@ input.rename:focus {
   line-height: 1.35;
   color: var(--ink-faint);
 }
+
+/* ---------------------------------------------------------------- hail -- */
+
+/* A job the station has lost the channel to: still out there, still working,
+   and no longer listening. */
+.mission--silent {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.mission__silent {
+  margin-left: 7px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.mission--calling {
+  border-color: var(--amber);
+}
+
+.mission__duty {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--amber);
+  background: #1a1407;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+/* The away team asking a question the contract did not cover. */
+.hail {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px 11px;
+  border: 1px solid var(--amber);
+  border-radius: var(--radius);
+  background: #16120a;
+}
+
+.hail > b {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.hail__text {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hail__opt {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-hot);
+  border-radius: var(--radius);
+  background: #0d1621;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hail__opt:hover:not(:disabled) {
+  border-color: var(--amber);
+}
+
+.hail__opt:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.hail__opt b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hail__opt em {
+  font-size: 11.5px;
+  font-style: normal;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.mission__bar i.is-hot {
+  background: var(--red);
+}

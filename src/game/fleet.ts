@@ -2,8 +2,10 @@ import { effectiveness, uid } from './crew.ts'
 import { STAT_INFO, STAT_KEYS } from './types.ts'
 import type {
   Crew,
+  FactionId,
   Mission,
   MissionKind,
+  MissionShape,
   MissionOutcome,
   Ship,
   ShipClass,
@@ -150,18 +152,49 @@ const PLACES = [
 ]
 
 /** Rolls a contract sized to what the station can plausibly take on. */
-export const makeMission = (standing: number): Mission => {
+/** Which shapes each kind of work naturally comes in. */
+const SHAPES: Record<MissionKind, MissionShape[]> = {
+  // A dead hull can be stripped for as long as you dare stay alongside it.
+  salvage: ['contract', 'open', 'open', 'unfolding'],
+  // Charting is open-ended by nature; you stop when you stop.
+  survey: ['open', 'open', 'contract', 'unfolding'],
+  // Somebody is either brought back or not. It is never a standing job.
+  rescue: ['unfolding', 'unfolding', 'contract'],
+  // A lane is patrolled until you call the ship home.
+  patrol: ['open', 'open', 'contract'],
+  // A tow is a fixed job with a hull on the end of it.
+  tow: ['contract', 'contract', 'unfolding'],
+}
+
+/** How long an open job waits between hails, and how fast its strain climbs. */
+export const OPEN_HAUL_PER_MINUTE = 0.55
+export const OPEN_STRAIN_PER_MINUTE = 0.4
+
+interface MissionOpts {
+  /** Force a shape, for obligations and questline work. */
+  shape?: MissionShape
+  /** A power's standing this job pays, or costs to refuse. */
+  standing?: [FactionId, number]
+  obligation?: boolean
+  name?: string
+}
+
+export const makeMission = (standing: number, opts: MissionOpts = {}): Mission => {
   const kinds = Object.keys(MISSION_KINDS) as MissionKind[]
   const kind = kinds[Math.floor(Math.random() * kinds.length)]
   const d = missionDef(kind)
+  const pool = SHAPES[kind]
+  const shape = opts.shape ?? pool[Math.floor(Math.random() * pool.length)]
   // A better-run station gets offered better, nastier work.
   const danger = Math.min(1, Math.max(0.1, standing * 0.8 + Math.random() * 0.35 - 0.1))
-  const seconds = Math.round(90 + danger * 240)
+  // An open job has no clock of its own; `seconds` is only its trip home.
+  const seconds = shape === 'open' ? Math.round(40 + danger * 60) : Math.round(90 + danger * 240)
   const scale = 90 + danger * 420
   return {
     id: uid('m'),
-    name: `${d.label} — ${PLACES[Math.floor(Math.random() * PLACES.length)]}`,
+    name: opts.name ?? `${d.label} — ${PLACES[Math.floor(Math.random() * PLACES.length)]}`,
     kind,
+    shape,
     danger,
     stat: d.stat,
     seconds,
@@ -176,6 +209,18 @@ export const makeMission = (standing: number): Mission => {
       air: Math.round(scale * d.pays.air * 0.5),
       food: Math.round(scale * d.pays.food * 0.5),
     },
+    // An open job starts with nothing gathered. Everything else is paid on the
+    // strength of the work, not the length of it.
+    haul: shape === 'open' ? 0 : 1,
+    strain: 0,
+    aloft: 0,
+    recalled: false,
+    odds: 0,
+    choices: [],
+    call: null,
+    nextCall: shape === 'unfolding' ? Math.round(seconds * (0.25 + Math.random() * 0.2)) : 0,
+    standing: opts.standing ?? null,
+    obligation: Boolean(opts.obligation),
     outcome: null,
     report: null,
     find: null,
@@ -200,7 +245,10 @@ export const successOdds = (crew: Crew[], m: Mission, ship: Ship | null): number
 }
 
 export const rollOutcome = (crew: Crew[], m: Mission, ship: Ship | null): MissionOutcome => {
-  const margin = teamScore(crew, m, ship) - missionTarget(m)
+  // Choices already made shift the margin, and an open job that stayed out too
+  // long is carrying its own weight into the roll.
+  const margin =
+    teamScore(crew, m, ship) - missionTarget(m) + m.odds * 30 - Math.max(0, m.strain - 1) * 9
   const roll = margin + (Math.random() * 20 - 10)
   if (roll > 12) return 'triumph'
   if (roll > 0) return 'success'

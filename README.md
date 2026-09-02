@@ -85,6 +85,25 @@ fly decides which of those four opinions feeds `appeal()`, and so who HQ sends a
 contracts get. Changing sides is expected out here and never free; the Compact is the one flag
 that cannot be struck.
 
+## Three shapes of work
+
+Not every job is a contract with a fee on the end of it.
+
+A **contract** runs a fixed clock and settles when the team gets home. An **open** job has no
+clock at all: it accrues a hold and a strain for as long as the team stays out, and nothing
+brings them back but the commander saying so — the longer they stay the more they bring and the
+worse the odds get. An **unfolding** job runs a clock but interrupts it: the away team hails
+with something the contract did not cover, and somebody has to answer. Open the sealed hold or
+finish the manifest. Go back for the second signal or come home with the one you have.
+
+Some work pays in a power's opinion rather than in credits, and some is handed to you because of
+the flag you fly — an **obligation** has no fee, and refusing it is the whole cost.
+
+All of it runs through the command module, and a controller holds one channel. Pull people out
+and the missions beyond your capacity go **out of contact**: still flying, still gathering, and
+no longer reachable. You cannot recall them, and when they hail they stop waiting and decide for
+themselves — which they do cautiously, because they are the ones out there.
+
 ## Defending the place
 
 Four things decide whether a station can say no. A **Defence Battery** is two hardpoints and a

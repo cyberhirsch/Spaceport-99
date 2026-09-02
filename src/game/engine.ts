@@ -38,6 +38,7 @@ import {
 } from './crew.ts'
 import { incidentDef } from './incidents.ts'
 import { SLOTS, itemDef, stock } from './gear.ts'
+import { rollCall, unattended } from './calls.ts'
 import {
   DEFECTION_COST,
   DEFECTION_CREDIT,
@@ -51,6 +52,8 @@ import { RESOURCE_INFO } from './types.ts'
 import { STAT_KEYS } from './types.ts'
 import {
   OUTCOME_INFO,
+  OPEN_HAUL_PER_MINUTE,
+  OPEN_STRAIN_PER_MINUTE,
   makeMission,
   makeShip,
   refitCost,
@@ -842,17 +845,80 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
     // A command module has to be crewed for anyone to be listening to the wire.
     const listening = s.modules.some((m) => m.kind === 'command' && m.staff.length > 0)
     const offers = s.missions.filter((m) => m.status === 'offered').length
-    if (listening && offers < 3) s.missions.push(makeMission(appeal(s)))
+    if (listening && offers < 3) {
+      // A power you fly for does not only offer work. Sometimes it assigns it,
+      // and the only reward is not being the station that said no.
+      const patron = s.patron
+      const duty = patron !== null && Math.random() < 0.22
+      s.missions.push(
+        patron && duty
+          ? makeMission(appeal(s), {
+              obligation: true,
+              standing: [patron, 0.05],
+              name: `${factionDef(patron).short} tasking`,
+            })
+          : makeMission(appeal(s)),
+      )
+      if (patron && duty) log(s, `${factionDef(patron).name} has tasked the station.`, 'warn')
+    }
   }
 
+  const reachable = inContact(s)
   for (const m of [...s.missions]) {
     if (m.status === 'offered') {
       m.expiresIn -= dt
       if (m.expiresIn <= 0) s.missions = s.missions.filter((x) => x.id !== m.id)
       continue
     }
+    // A job waiting on an answer is not counting down. Nothing happens out
+    // there until somebody says something.
+    if (m.status === 'calling') {
+      if (!reachable.has(m.id) && m.call) {
+        // Out of contact, the team stops waiting and decides for themselves.
+        answerCall(s, m, unattended(m.call), true)
+      }
+      continue
+    }
     if (m.status !== 'flying') continue
+    m.aloft += dt
+
+    if (m.shape === 'open') {
+      // No clock but the one the commander is watching. Every minute out is
+      // more in the hold and more wear on the people carrying it.
+      if (m.recalled) {
+        m.remaining -= dt
+        if (m.remaining <= 0) resolveMission(s, m)
+        continue
+      }
+      m.haul += (OPEN_HAUL_PER_MINUTE / 60) * dt
+      m.strain += (OPEN_STRAIN_PER_MINUTE / 60) * dt * (0.6 + m.danger)
+      // Strain is not a timer. It is the odds getting worse while you decide:
+      // a per-second chance that grows once the team is past what they can
+      // comfortably carry.
+      if (m.strain > 1 && Math.random() < (m.strain - 1) * 0.004 * dt) {
+        log(s, `${m.name} is in trouble and nobody called them home.`, 'bad')
+        m.odds -= 0.3
+        m.recalled = true
+        m.remaining = m.seconds
+      }
+      continue
+    }
+
     m.remaining -= dt
+
+    if (m.shape === 'unfolding' && m.nextCall > 0) {
+      m.nextCall -= dt
+      if (m.nextCall <= 0) {
+        const call = rollCall(m)
+        if (call) {
+          m.call = call
+          m.status = 'calling'
+          log(s, `${m.name} is hailing. They want an answer.`, 'warn')
+          continue
+        }
+      }
+    }
+
     if (m.remaining <= 0) resolveMission(s, m)
   }
 
@@ -967,6 +1033,29 @@ const admitVisitor = (s: GameState, v: Visitor): void => {
  * the common cost of a bad run; losing the ship takes a disaster, and losing
  * people takes a disaster that goes badly on top of that.
  */
+/**
+ * Answers a hail. `theirs` marks a decision the away team made themselves
+ * because nobody at the station was listening, which reads differently in the
+ * report and is never the greedy option.
+ */
+const answerCall = (s: GameState, m: Mission, index: number, theirs = false): void => {
+  const call = m.call
+  const choice = call?.options[index]
+  if (!call || !choice) return
+  if (choice.cost && s.credits < choice.cost) return
+  if (choice.cost) s.credits -= choice.cost
+  m.odds += choice.odds ?? 0
+  m.haul *= choice.haul ?? 1
+  m.strain += choice.strain ?? 0
+  if (choice.standing) shift(s, choice.standing[0], choice.standing[1])
+  m.choices.push(theirs ? `${choice.note} Nobody was on the channel to say otherwise.` : choice.note)
+  m.call = null
+  m.status = 'flying'
+  // One hail is rarely the end of it.
+  m.nextCall = m.remaining > 90 ? Math.round(m.remaining * (0.4 + Math.random() * 0.3)) : 0
+  if (theirs) log(s, `${m.name} stopped waiting for an answer and made the call themselves.`, 'warn')
+}
+
 const resolveMission = (s: GameState, m: Mission): void => {
   const ship = s.ships.find((x) => x.id === m.shipId) ?? null
   const team = m.crewIds
@@ -977,7 +1066,10 @@ const resolveMission = (s: GameState, m: Mission): void => {
   m.outcome = outcome
   m.remaining = 0
 
-  const yieldOf = { triumph: 1.5, success: 1, setback: 0.35, disaster: 0 }[outcome]
+  // An open job brings home what it gathered; everything else is judged on
+  // the work rather than the hours.
+  const yieldOf =
+    { triumph: 1.5, success: 1, setback: 0.35, disaster: 0 }[outcome] * Math.max(0, m.haul)
   const cargo = ship ? shipCargo(ship) : 1
   const cap = derive(s).storageCap
   let credits = 0
@@ -988,6 +1080,13 @@ const resolveMission = (s: GameState, m: Mission): void => {
       const amount = Math.round(m.payout[key] * yieldOf * cargo)
       s.resources[key] = clamp(s.resources[key] + amount, 0, cap)
     }
+  }
+
+  // Some work is paid in somebody's opinion rather than in credits.
+  if (m.standing) {
+    const [who, amount] = m.standing
+    const earned = { triumph: 1.2, success: 1, setback: 0.2, disaster: -0.6 }[outcome]
+    shift(s, who, Math.abs(amount) * earned)
   }
 
   // Damage: the ship takes it first, the crew take what is left.
@@ -1169,6 +1268,9 @@ export type Action =
   | { type: 'answerGuest'; guestId: string; yes: boolean }
   | { type: 'persuadeGuest'; guestId: string; tactic: Tactic; moduleId?: string }
   | { type: 'signGuest'; guestId: string }
+  | { type: 'recall'; missionId: string }
+  | { type: 'answerCall'; missionId: string; choice: number }
+  | { type: 'declineMission'; missionId: string }
   | { type: 'buyGear'; visitorId: string; item: ItemId }
   | { type: 'issueGear'; crewId: string; item: ItemId }
   | { type: 'stowGear'; crewId: string; slot: ItemSlot }
@@ -1285,6 +1387,16 @@ export const missionCapacity = (s: GameState): number => {
 /** Berths the command module could hold open if it were fully crewed. */
 export const missionBerths = (s: GameState): number =>
   s.modules.reduce((n, m) => n + (m.standby ? 0 : missionSlots(m)), 0)
+
+/**
+ * Jobs the station still has a channel open to, oldest first. Capacity is the
+ * number of controllers, so pulling people out of the command module does not
+ * bring anybody home — it just stops you being able to tell them anything.
+ */
+export const inContact = (s: GameState): Set<string> => {
+  const flying = s.missions.filter((m) => m.status === 'flying' || m.status === 'calling')
+  return new Set(flying.slice(0, missionCapacity(s)).map((m) => m.id))
+}
 
 /** Ships sitting in a hangar rather than out on a job. */
 export const berthedShips = (s: GameState): Ship[] => s.ships.filter((x) => !x.missionId)
@@ -1679,6 +1791,12 @@ export const reducer = (state: GameState, action: Action): GameState => {
       const m = s.missions.find((x) => x.id === action.missionId)
       if (!m || m.status !== 'offered') return state
       s.missions = s.missions.filter((x) => x.id !== m.id)
+      // Refusing work you were handed because of the flag you fly is the whole
+      // cost of that work. There was never a reward to forgo.
+      if (m.obligation && m.standing) {
+        shift(s, m.standing[0], -Math.abs(m.standing[1]))
+        log(s, `${m.name} declined. ${factionDef(m.standing[0]).name} was told.`, 'warn')
+      }
       break
     }
     case 'fileReport': {
@@ -1935,6 +2053,25 @@ export const reducer = (state: GameState, action: Action): GameState => {
           log(s, `No berth for the ${hull.name}, so she went dockside. +${paid}c.`, 'info')
         }
       }
+      break
+    }
+    case 'recall': {
+      const m = s.missions.find((x) => x.id === action.missionId)
+      if (!m || m.status !== 'flying' || m.shape !== 'open' || m.recalled) return state
+      // You cannot tell them anything without a controller on their channel.
+      if (!inContact(s).has(m.id)) return state
+      m.recalled = true
+      m.remaining = m.seconds
+      log(s, `${m.name} recalled. ${Math.ceil(m.remaining)}s out.`, 'info')
+      break
+    }
+    case 'answerCall': {
+      const m = s.missions.find((x) => x.id === action.missionId)
+      if (!m || m.status !== 'calling') return state
+      if (!inContact(s).has(m.id)) return state
+      const before = m.call
+      answerCall(s, m, action.choice)
+      if (m.call === before) return state
       break
     }
     case 'buyGear': {

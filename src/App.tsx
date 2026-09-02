@@ -279,6 +279,8 @@ export default function App() {
               state={state}
               onOpenMission={(id) => setMissionId(id)}
               onDecline={(id) => act({ type: 'declineMission', missionId: id })}
+              onRecall={(id) => act({ type: 'recall', missionId: id })}
+              onAnswer={(id, choice) => act({ type: 'answerCall', missionId: id, choice })}
               onFileReport={(id) => act({ type: 'fileReport', missionId: id })}
               onBuy={(cls) => act({ type: 'buyShip', cls })}
               onRefit={(id) => act({ type: 'refitShip', shipId: id })}

@@ -340,10 +340,48 @@ export interface MissionFind {
   detail: string
 }
 
+/**
+ * A hail from the away team, mid-flight. Something happened that is not the
+ * commander's to decide from here, except that it is.
+ */
+export interface MissionCall {
+  text: string
+  options: MissionChoice[]
+}
+
+export interface MissionChoice {
+  label: string
+  /** What the commander is actually agreeing to. */
+  detail: string
+  /** Shifts the odds of the final roll, up or down. */
+  odds?: number
+  /** Multiplies what the run brings home. */
+  haul?: number
+  /** Costs credits up front; the option is hidden if the station cannot pay. */
+  cost?: number
+  /** Adds to the strain the team is carrying. */
+  strain?: number
+  /** Moves a power's opinion of the station. */
+  standing?: [FactionId, number]
+  /** Line written into the after-action report. */
+  note: string
+}
+
+/**
+ * How a job is shaped, which is not the same as what it is.
+ *
+ * `contract` runs a fixed clock and settles on return. `open` has no end: it
+ * accrues a haul and a strain for as long as the team stays out, and only a
+ * recall brings them home. `unfolding` runs a clock but interrupts it — the
+ * team hails, and somebody has to answer.
+ */
+export type MissionShape = 'contract' | 'open' | 'unfolding'
+
 export interface Mission {
   id: string
   name: string
   kind: MissionKind
+  shape: MissionShape
   /** 0..1. Drives the difficulty, the payout and how badly it can go. */
   danger: number
   /** The stat the away team is judged on. */
@@ -354,10 +392,36 @@ export interface Mission {
   remaining: number
   /** Seconds before an unclaimed offer expires. */
   expiresIn: number
-  status: 'offered' | 'flying' | 'report'
+  /** `calling` is flying, paused on a hail nobody has answered yet. */
+  status: 'offered' | 'flying' | 'calling' | 'report'
   shipId: string | null
   crewIds: string[]
   payout: { credits: number; power: number; air: number; food: number }
+  /**
+   * Open jobs only: what the team has gathered so far, as a multiplier on the
+   * payout, and what it is costing them to keep gathering it.
+   */
+  haul: number
+  strain: number
+  /** Seconds the team has been out. Open jobs have no other clock. */
+  aloft: number
+  /** Open jobs only: the commander said come home, and they are on the way. */
+  recalled: boolean
+  /** Adjustment to the final roll from choices already made. */
+  odds: number
+  /** Lines the commander's answers wrote into the report. */
+  choices: string[]
+  /** The hail waiting on an answer, when status is `calling`. */
+  call: MissionCall | null
+  /** Seconds until the next hail on an unfolding job. */
+  nextCall: number
+  /** Standing the job pays, or costs if it is declined. */
+  standing: [FactionId, number] | null
+  /**
+   * Handed to the station because of the flag it flies. There is no reward
+   * beyond not being the kind of station that says no.
+   */
+  obligation: boolean
   outcome: MissionOutcome | null
   /** Written when the mission resolves, read in the after-action report. */
   report: string | null

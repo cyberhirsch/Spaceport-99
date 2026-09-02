@@ -1,4 +1,4 @@
-import { REQUEST_COST, appeal, dockBerths, def } from '../game/engine.ts'
+import { REQUEST_COST, appeal, awayCrewIds, dockBerths, def } from '../game/engine.ts'
 import type { Derived } from '../game/engine.ts'
 import { xpForLevel } from '../game/crew.ts'
 import type { Crew, GameState } from '../game/types.ts'
@@ -35,6 +35,7 @@ export const CrewPanel = ({
   const roster = [...state.crew].sort(
     (a, b) => Number(a.dead) - Number(b.dead) || b.level - a.level || a.name.localeCompare(b.name),
   )
+  const away = awayCrewIds(state)
   const berths = dockBerths(state)
   const waiting = state.candidates.length
   const standing = Math.round(appeal(state) * 100)
@@ -109,11 +110,17 @@ export const CrewPanel = ({
           const [statKey, statValue] = bestStat(c)
           return (
             <li key={c.id}>
-              <div className={`crew-row${c.dead ? ' is-dead' : ''}${drag?.crewId === c.id ? ' is-lifted' : ''}`}>
+              <div
+                className={`crew-row${c.dead ? ' is-dead' : ''}${
+                  away.has(c.id) ? ' is-away' : ''
+                }${drag?.crewId === c.id ? ' is-lifted' : ''}`}
+              >
                 <span
                   className="grip"
-                  onPointerDown={(e) => (c.dead ? undefined : onDragStart(c.id, e))}
-                  title={c.dead ? c.name : `${c.name} — drag to a room`}
+                  onPointerDown={(e) => (c.dead || away.has(c.id) ? undefined : onDragStart(c.id, e))}
+                  title={
+                    c.dead || away.has(c.id) ? c.name : `${c.name} — drag to a room`
+                  }
                 >
                   <CrewAvatar seed={c.seed} size={38} dead={c.dead} />
                 </span>
@@ -122,7 +129,13 @@ export const CrewPanel = ({
                     {c.name} <em>Lv{c.level}</em>
                   </span>
                   <span className="crew-row__job">
-                    {c.dead ? 'Deceased' : job ? def(job.kind).name : 'Off duty'}
+                    {c.dead
+                      ? 'Deceased'
+                      : away.has(c.id)
+                        ? 'Away on a mission'
+                        : job
+                          ? def(job.kind).name
+                          : 'Off duty'}
                     <i> · best {statKey} {statValue}</i>
                   </span>
                   <span className="crew-row__bars">

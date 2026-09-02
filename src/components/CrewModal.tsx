@@ -1,4 +1,4 @@
-import { REVIVE_COST_PER_LEVEL, def, staffSlots } from '../game/engine.ts'
+import { REVIVE_COST_PER_LEVEL, def, isAway, staffSlots } from '../game/engine.ts'
 import { effectiveness, portraitIndex, statTotal, xpForLevel } from '../game/crew.ts'
 import type { GameState } from '../game/types.ts'
 import { CrewAvatar } from './CrewAvatar.tsx'
@@ -33,6 +33,8 @@ export const CrewModal = ({
     .filter((m) => staffSlots(m) > 0 && m.id !== c.assignment && m.staff.length < staffSlots(m))
     .sort((a, b) => effectiveness(c, def(b.kind).stat) - effectiveness(c, def(a.kind).stat))
   const reviveCost = REVIVE_COST_PER_LEVEL * c.level
+  const away = isAway(state, c.id)
+  const flying = state.missions.find((m) => m.status === 'flying' && m.crewIds.includes(c.id))
   // A stable, human-looking service number so the dossier reads like a record.
   const serial = `SP99-${String(portraitIndex(c.seed)).padStart(2, '0')}-${String(
     Math.abs(Math.trunc(c.seed)) % 10000,
@@ -60,7 +62,9 @@ export const CrewModal = ({
             </div>
             <div>
               <dt>Posting</dt>
-              <dd>{c.dead ? '—' : job ? def(job.kind).name : 'Off duty'}</dd>
+              <dd>
+                {c.dead ? '—' : away ? 'Away on a mission' : job ? def(job.kind).name : 'Off duty'}
+              </dd>
             </div>
             <div>
               <dt>Aptitude</dt>
@@ -110,6 +114,20 @@ export const CrewModal = ({
             Commit to the void
           </button>
         </div>
+      ) : away ? (
+        <>
+          <h3 className="modal__sub">Posting</h3>
+          <p className="panel-note">
+            Out on {flying ? <b>{flying.name}</b> : 'a mission'}
+            {flying && <> — {Math.ceil(flying.remaining)}s from home</>}. They cannot take a shift
+            here until they are back.
+          </p>
+          <div className="modal__actions">
+            <button className="btn btn--danger" onClick={onDismiss}>
+              Dismiss from station
+            </button>
+          </div>
+        </>
       ) : (
         <>
           <h3 className="modal__sub">Posting</h3>

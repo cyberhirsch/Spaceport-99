@@ -646,6 +646,46 @@ h3 {
 
 /* --------------------------------------------------------------- dock -- */
 
+.dock-row {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--line);
+}
+
+.dock-row > .dock {
+  border-top: 0;
+}
+
+.dock-row > .dock:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Crew who are off-station: visible, accounted for, and not draggable. */
+.dock--away {
+  flex: none;
+  max-width: 45%;
+  border-left: 1px solid var(--line);
+  background: #0b1a24f5;
+}
+
+.dock--away .dock__label i {
+  color: var(--cyan);
+}
+
+.dock__crew--away {
+  padding: 2px;
+  border: 1px dashed var(--cyan);
+  border-radius: 9px;
+  background: #0d1621;
+  line-height: 0;
+}
+
+.dock__crew--away .avatar {
+  filter: saturate(0.55) brightness(0.85);
+}
+
 .dock {
   flex: none;
   display: flex;
@@ -968,6 +1008,17 @@ h3 {
 
 .crew-row.is-dead {
   opacity: 0.5;
+}
+
+/* Away crew stay listed, but nothing about them is draggable. */
+.crew-row.is-away {
+  opacity: 0.7;
+  border-left: 3px solid var(--cyan);
+}
+
+.crew-row.is-away .grip {
+  cursor: default;
+  touch-action: auto;
 }
 
 .crew-row.is-lifted {

@@ -11,7 +11,7 @@ import { Modal } from './components/Modal.tsx'
 import { ModuleModal } from './components/ModuleModal.tsx'
 import { StationView } from './components/StationView.tsx'
 import { TopBar } from './components/TopBar.tsx'
-import { staffSlots } from './game/engine.ts'
+import { isAway, staffSlots } from './game/engine.ts'
 import { useDragAssign } from './hooks/useDragAssign.ts'
 import { useGame } from './hooks/useGame.ts'
 import { useMediaQuery } from './hooks/useMediaQuery.ts'
@@ -43,7 +43,7 @@ export default function App() {
     (id: string, target: string) => {
       const m = state.modules.find((x) => x.id === target)
       const c = state.crew.find((x) => x.id === id)
-      if (!m || !c || c.dead) return false
+      if (!m || !c || c.dead || isAway(state, id)) return false
       return m.staff.includes(id) || m.staff.length < staffSlots(m)
     },
     [state],
@@ -128,6 +128,7 @@ export default function App() {
             }
             setModuleId(id)
           }}
+          onSelectCrew={(id) => setCrewId(id)}
           onEmptyCell={() => {
             setTab('build')
             if (!wide) setSheetOpen(true)

@@ -222,3 +222,56 @@ test('powering down a room actually relieves the grid', () => {
   const after = derive(reducer(s, { type: 'setStandby', moduleId: farm.id, standby: true })).powerRate
   assert.ok(after > before, `switching a room off should free power: ${before} -> ${after}`)
 })
+
+test('crew on a mission are not on the station to be assigned', () => {
+  const [ready, offer] = withOffer(flightReady())
+  const flying = availableCrew(ready).slice(0, 2)
+  const flyingIds = flying.map((c) => c.id)
+  let s = reducer(ready, {
+    type: 'launch',
+    missionId: offer.id,
+    shipId: ready.ships[0].id,
+    crewIds: flyingIds,
+  })
+
+  // Launching clears their posting, which is exactly what made them look free.
+  for (const id of flyingIds) {
+    assert.equal(s.crew.find((c) => c.id === id)!.assignment, null)
+  }
+
+  s = reducer(s, { type: 'autoAssign' })
+  for (const id of flyingIds) {
+    assert.equal(
+      s.crew.find((c) => c.id === id)!.assignment,
+      null,
+      'auto-assign must not post someone who is light-minutes away',
+    )
+  }
+
+  // Nor should assigning them by hand work.
+  const room = s.modules.find((m) => m.kind === 'reactor')!
+  const forced = reducer(s, { type: 'assign', crewId: flyingIds[0], moduleId: room.id })
+  assert.equal(
+    forced.crew.find((c) => c.id === flyingIds[0])!.assignment,
+    null,
+    'and neither should dragging them onto a room',
+  )
+  assert.ok(!forced.modules.some((m) => m.staff.includes(flyingIds[0])), 'no phantom staff')
+})
+
+test('an away team comes back assignable', () => {
+  const [ready, offer] = withOffer(flightReady(), { seconds: 15, remaining: 15 })
+  const flyingIds = availableCrew(ready).slice(0, 2).map((c) => c.id)
+  let s = reducer(ready, {
+    type: 'launch',
+    missionId: offer.id,
+    shipId: ready.ships[0].id,
+    crewIds: flyingIds,
+  })
+  s = advance(s, 60)
+  const survivors = flyingIds.filter((id) => !s.crew.find((c) => c.id === id)!.dead)
+  const back = availableCrew(s).map((c) => c.id)
+  for (const id of survivors) {
+    assert.ok(back.includes(id), 'once home they are available again')
+  }
+})

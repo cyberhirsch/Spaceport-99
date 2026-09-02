@@ -1,4 +1,12 @@
-import { MAX_LEVEL, canDemolish, def, staffSlots, upgradeCost, workRate } from '../game/engine.ts'
+import {
+  MAX_LEVEL,
+  availableCrew,
+  canDemolish,
+  def,
+  staffSlots,
+  upgradeCost,
+  workRate,
+} from '../game/engine.ts'
 import { effectiveness } from '../game/crew.ts'
 import { cycleCredits, cycleYield, powerDraw } from '../game/modules.ts'
 import { incidentDef } from '../game/incidents.ts'
@@ -42,8 +50,8 @@ export const ModuleModal = ({
   const scrappable = canDemolish(state, m)
   const upCost = upgradeCost(m)
   const staffed: Crew[] = m.staff.map((id) => crewById.get(id)).filter(Boolean) as Crew[]
-  const bench = state.crew
-    .filter((c) => !c.dead && c.assignment !== m.id)
+  const bench = availableCrew(state)
+    .filter((c) => c.assignment !== m.id)
     .sort((a, b) => effectiveness(b, d.stat) - effectiveness(a, d.stat))
 
   const cycle = d.cycleSeconds

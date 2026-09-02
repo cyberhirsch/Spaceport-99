@@ -1,5 +1,15 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { WING, canBuildAt, deckCost, def, moduleAt, staffSlots, workRate } from '../game/engine.ts'
+import {
+  WING,
+  canBuildAt,
+  deckCost,
+  def,
+  awayCrewIds,
+  idleCrew,
+  moduleAt,
+  staffSlots,
+  workRate,
+} from '../game/engine.ts'
 import { incidentDef } from '../game/incidents.ts'
 import type { DragState } from '../hooks/useDragAssign.ts'
 import type { Crew, GameState, ModuleKind, StationModule } from '../game/types.ts'
@@ -13,6 +23,7 @@ interface Props {
   onPlace: (deck: number, col: number) => void
   onCancelPlacing: () => void
   onSelectModule: (id: string) => void
+  onSelectCrew: (id: string) => void
   onEmptyCell: () => void
   onBuyDeck: () => void
 }
@@ -139,12 +150,19 @@ export const StationView = ({
   onPlace,
   onCancelPlacing,
   onSelectModule,
+  onSelectCrew,
   onEmptyCell,
   onBuyDeck,
 }: Props) => {
   const scroller = useRef<HTMLDivElement>(null)
   const crewById = new Map(state.crew.map((c) => [c.id, c]))
-  const idle = state.crew.filter((c) => !c.dead && !c.assignment)
+  const idle = idleCrew(state)
+  // Crew who are off the station are still worth seeing — they are just not
+  // yours to post anywhere until they are home.
+  const awayIds = awayCrewIds(state)
+  const awayCrew = state.crew.filter((c) => awayIds.has(c.id) && !c.dead)
+  const flightOf = (crewId: string) =>
+    state.missions.find((m) => m.status === 'flying' && m.crewIds.includes(crewId))
   const nextDeck = deckCost(state.decks)
 
   // The station is wider than a phone, so open it centred on the lift shaft —
@@ -258,27 +276,59 @@ export const StationView = ({
         </div>
       </section>
 
-      <div className={`dock${drag ? ' is-armed' : ''}${drag?.overDock ? ' is-over' : ''}`} data-drop-dock>
-        <span className="dock__label">
-          Off duty <i>{idle.length}</i>
-        </span>
-        <div className="dock__list">
-          {idle.length === 0 && (
-            <span className="dock__empty">
-              {drag ? 'Drop here to stand down' : 'Everyone is at their post.'}
-            </span>
-          )}
-          {idle.map((c) => (
-            <span
-              key={c.id}
-              className={`grip dock__crew${drag?.crewId === c.id ? ' is-lifted' : ''}`}
-              onPointerDown={(e) => onDragStart(c.id, e)}
-              title={`${c.name} — drag to a room`}
-            >
-              <CrewAvatar seed={c.seed} size={38} />
-            </span>
-          ))}
+      <div className="dock-row">
+        <div
+          className={`dock${drag ? ' is-armed' : ''}${drag?.overDock ? ' is-over' : ''}`}
+          data-drop-dock
+        >
+          <span className="dock__label">
+            Off duty <i>{idle.length}</i>
+          </span>
+          <div className="dock__list">
+            {idle.length === 0 && (
+              <span className="dock__empty">
+                {drag ? 'Drop here to stand down' : 'Everyone is at their post.'}
+              </span>
+            )}
+            {idle.map((c) => (
+              <span
+                key={c.id}
+                className={`grip dock__crew${drag?.crewId === c.id ? ' is-lifted' : ''}`}
+                onPointerDown={(e) => onDragStart(c.id, e)}
+                title={`${c.name} — drag to a room`}
+              >
+                <CrewAvatar seed={c.seed} size={38} />
+              </span>
+            ))}
+          </div>
         </div>
+
+        {awayCrew.length > 0 && (
+          <div className="dock dock--away">
+            <span className="dock__label">
+              Away <i>{awayCrew.length}</i>
+            </span>
+            <div className="dock__list">
+              {awayCrew.map((c) => {
+                const flight = flightOf(c.id)
+                return (
+                  <button
+                    key={c.id}
+                    className="dock__crew dock__crew--away"
+                    onClick={() => onSelectCrew(c.id)}
+                    title={
+                      flight
+                        ? `${c.name} — out on ${flight.name}, ${Math.ceil(flight.remaining)}s from home`
+                        : `${c.name} — on a mission`
+                    }
+                  >
+                    <CrewAvatar seed={c.seed} size={38} />
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

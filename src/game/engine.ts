@@ -301,6 +301,8 @@ const assign = (s: GameState, crewId: string, moduleId: string): boolean => {
   const c = s.crew.find((x) => x.id === crewId)
   const m = s.modules.find((x) => x.id === moduleId)
   if (!c || !m || c.dead) return false
+  // Someone light-minutes away cannot take a shift here.
+  if (awayCrewIds(s).has(crewId)) return false
   if (m.staff.length >= staffSlots(m) && !m.staff.includes(crewId)) return false
   unassign(s, crewId)
   m.staff.push(crewId)
@@ -321,7 +323,7 @@ export const autoAssignInto = (s: GameState): number => {
       (m) => staffSlots(m) > 0 && !m.standby && !s.incidents.some((i) => i.moduleId === m.id),
     )
     .sort((a, b) => jobPriority(a) - jobPriority(b))
-  const free = new Set(s.crew.filter((c) => !c.dead && !c.assignment).map((c) => c.id))
+  const free = new Set(idleCrew(s).map((c) => c.id))
   for (const m of jobs) {
     const stat = def(m.kind).stat
     while (m.staff.length < staffSlots(m) && free.size > 0) {
@@ -865,11 +867,24 @@ export const missionCapacity = (s: GameState): number =>
 /** Ships sitting in a hangar rather than out on a job. */
 export const berthedShips = (s: GameState): Ship[] => s.ships.filter((x) => !x.missionId)
 
+/**
+ * Everyone currently off the station on a job. Launching clears their posting,
+ * so without this they look exactly like idle crew to anything that assigns.
+ */
+export const awayCrewIds = (s: GameState): Set<string> =>
+  new Set(s.missions.flatMap((m) => (m.status === 'flying' ? m.crewIds : [])))
+
+export const isAway = (s: GameState, crewId: string): boolean => awayCrewIds(s).has(crewId)
+
 /** Crew not already flying, dead, or otherwise spoken for. */
 export const availableCrew = (s: GameState): Crew[] => {
-  const flying = new Set(s.missions.flatMap((m) => (m.status === 'flying' ? m.crewIds : [])))
-  return s.crew.filter((c) => !c.dead && !flying.has(c.id))
+  const away = awayCrewIds(s)
+  return s.crew.filter((c) => !c.dead && !away.has(c.id))
 }
+
+/** Crew on the station and not posted to a room. */
+export const idleCrew = (s: GameState): Crew[] =>
+  availableCrew(s).filter((c) => !c.assignment)
 
 /** Applicant berths across every docking port. */
 export const dockBerths = (s: GameState): number =>

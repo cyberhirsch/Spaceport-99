@@ -219,11 +219,40 @@ export interface Guest {
   name: string
   /** Their job aboard the ship they came in on. */
   role: string
+  /** True for the ship's master. Talk them round and the hull comes too. */
+  captain: boolean
+  /** How tightly they are bound to that hull, 0..1. A captain is 1. */
+  grip: number
+  stats: Stats
+  /** 0..1 — how sought-after they are, which sets their standards. */
+  tier: number
+  /** 0..100. Cross their threshold and they will sign. */
+  interest: number
+  /** Credits they want up front to walk away from their berth. */
+  askingBonus: number
+  /** Tactics already spent on them. */
+  used: Tactic[]
+  /** Module they were promised, honoured when they sign. */
+  promised: string | null
   /** Portrait dealt from the same pool the crew draws on. */
   portrait?: number
   seed: number
   /** What they want to talk to the commander about, if anything. */
   offer: VisitorOffer | null
+}
+
+/**
+ * Anyone you are talking round: an applicant HQ sent, or someone off a hull at
+ * your clamps. The tactics work the same on both; only what it takes differs.
+ */
+export interface Prospect {
+  stats: Stats
+  tier: number
+  interest: number
+  askingBonus: number
+  used: Tactic[]
+  /** Attachment to a ship they would have to leave. Absent for HQ applicants. */
+  grip?: number
 }
 
 export interface Visitor {

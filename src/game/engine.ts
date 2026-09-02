@@ -50,10 +50,11 @@ import {
   teamSize,
   tradeInValue,
 } from './fleet.ts'
-import { SELL_MARGIN, TRADE_LOT, makeGuests, makeVisitor, visitorDef } from './visitors.ts'
+import { SELL_MARGIN, TRADE_LOT, makeGuests, makeVisitor } from './visitors.ts'
 import type {
   Candidate,
   Crew,
+  Prospect,
   Mission,
   Ship,
   ShipClass,
@@ -810,9 +811,10 @@ const admitVisitor = (s: GameState, v: Visitor): void => {
   v.status = 'docked'
   v.timer = 45 + Math.random() * 60
   // The hull stays at the clamps; the people walk onto your decks. Whatever
-  // the ship was carrying to raise with you, one of them now raises it. Ships
-  // that came here to rob you send nobody friendly — they send a fire.
-  if (!visitorDef(v.kind).trouble) {
+  // the ship was carrying to raise with you, one of them now raises it. A
+  // smuggler's crew still come ashore — being dodgy is not being hostile — but
+  // a raider sends no one friendly. It sends a fight.
+  if (v.kind !== 'raider') {
     const dealt: number[] = []
     v.aboard = makeGuests(v, () => {
       const face = allocatePortrait(s, dealt)
@@ -1082,6 +1084,8 @@ export type Action =
   | { type: 'setAutoAccept'; moduleId: string; autoAccept: boolean }
   | { type: 'tradeVisitor'; visitorId: string; resource: ResourceKey; buy: boolean }
   | { type: 'answerGuest'; guestId: string; yes: boolean }
+  | { type: 'persuadeGuest'; guestId: string; tactic: Tactic; moduleId?: string }
+  | { type: 'signGuest'; guestId: string }
   | { type: 'revive'; crewId: string }
   | { type: 'dismiss'; crewId: string }
   | { type: 'rename'; name: string }
@@ -1243,24 +1247,33 @@ const makeCandidate = (s: GameState, luck: number): Candidate => {
   }
 }
 
-/** What a tactic would do to this applicant's interest, right now. */
 /** What the player can actually put on the table right now. */
-export const bonusOffer = (s: GameState, cand: Candidate): number =>
-  Math.min(Math.floor(s.credits), cand.askingBonus)
+export const bonusOffer = (s: GameState, p: Prospect): number =>
+  Math.min(Math.floor(s.credits), p.askingBonus)
 
+/**
+ * Money and a promised post move someone who is already looking for a berth.
+ * Someone who has one is that much harder to shift — a deckhand can be bought,
+ * a ship's master mostly cannot, and only the pitch works on them at full
+ * strength. Which is to say: a captain comes down to whether the station is
+ * genuinely worth moving to.
+ */
+const holdOut = (p: Prospect): number => 1 - (p.grip ?? 0) * 0.55
+
+/** What a tactic would do to this prospect's interest, right now. */
 export const tacticEffect = (
   s: GameState,
-  cand: Candidate,
+  p: Prospect,
   tactic: Tactic,
   moduleId?: string,
 ): number => {
   // Paying part of what they asked for is worth part of the goodwill. Being
   // broke should make hiring harder, not impossible.
   if (tactic === 'bonus') {
-    return Math.round(35 * (bonusOffer(s, cand) / Math.max(1, cand.askingBonus)))
+    return Math.round(35 * (bonusOffer(s, p) / Math.max(1, p.askingBonus)) * holdOut(p))
   }
   if (tactic === 'pitch') {
-    const standards = 30 + cand.tier * 45
+    const standards = 30 + p.tier * 45
     return Math.round(
       clamp(18 + (appeal(s) * 100 - standards) * 0.5 + recruiterSkill(s) * 4, 5, 45),
     )
@@ -1268,10 +1281,20 @@ export const tacticEffect = (
   const m = s.modules.find((x) => x.id === moduleId)
   if (!m) return 0
   const stat = def(m.kind).stat
-  const ranked = STAT_KEYS.map((k) => ({ k, v: cand.stats[k] })).sort((a, b) => b.v - a.v)
-  if (ranked[0].k === stat) return 40
+  const ranked = STAT_KEYS.map((k) => ({ k, v: p.stats[k] })).sort((a, b) => b.v - a.v)
+  if (ranked[0].k === stat) return Math.round(40 * holdOut(p))
   if (ranked[ranked.length - 1].k === stat) return -15
-  return 12
+  return Math.round(12 * holdOut(p))
+}
+
+/** The guest, and the hull they came in on. */
+export const guestAboard = (
+  s: GameState,
+  guestId: string,
+): { guest: Guest; ship: Visitor } | null => {
+  const ship = s.visitors.find((v) => v.aboard.some((g) => g.id === guestId))
+  const guest = ship?.aboard.find((g) => g.id === guestId)
+  return ship && guest ? { guest, ship } : null
 }
 
 export const REVIVE_COST_PER_LEVEL = 90
@@ -1689,6 +1712,75 @@ export const reducer = (state: GameState, action: Action): GameState => {
           s.missions.push(lead)
           log(s, `Bought a lead off ${v.name}. It had better be good.`, 'info')
           break
+        }
+      }
+      break
+    }
+    case 'persuadeGuest': {
+      const found = guestAboard(s, action.guestId)
+      if (!found || found.ship.status !== 'docked') return state
+      const { guest } = found
+      if (guest.used.includes(action.tactic)) return state
+      let paid = 0
+      if (action.tactic === 'bonus') {
+        paid = bonusOffer(s, guest)
+        if (paid <= 0) return state
+      }
+      const delta = tacticEffect(s, guest, action.tactic, action.moduleId)
+      s.credits -= paid
+      if (action.tactic === 'posting') {
+        const m = s.modules.find((x) => x.id === action.moduleId)
+        if (!m || m.staff.length >= staffSlots(m)) return state
+        guest.promised = m.id
+      }
+      guest.interest = Math.round(clamp(guest.interest + delta, 0, SIGN_THRESHOLD))
+      guest.used.push(action.tactic)
+      break
+    }
+    case 'signGuest': {
+      const found = guestAboard(s, action.guestId)
+      if (!found || found.ship.status !== 'docked') return state
+      const { guest, ship } = found
+      const d = derive(s)
+      if (d.crewAlive.length >= d.crewCap) {
+        log(s, `${guest.name} would come aboard, but there is no bunk free.`, 'warn')
+        break
+      }
+      // Interest is a probability, so a half-convinced spacer is a coin toss.
+      // Either way the asking is over: they go back up the gangway.
+      ship.aboard = ship.aboard.filter((g) => g.id !== guest.id)
+      if (Math.random() * SIGN_THRESHOLD >= guest.interest) {
+        log(s, `${guest.name} thought about it and stayed with the ${ship.name}.`, 'warn')
+        break
+      }
+
+      const hire = makeCrew({
+        name: guest.name,
+        stats: guest.stats,
+        seed: guest.seed,
+        portrait: crewPortrait(guest),
+      })
+      s.crew.push(hire)
+      if (guest.promised) assign(s, hire.id, guest.promised)
+      log(s, `${guest.name} signed off the ${ship.name} and onto the station.`, 'good')
+
+      // Taking someone under contract is noticed. Taking their master is
+      // noticed considerably more.
+      s.standing = clamp(s.standing - (guest.captain ? 0.05 : 0.015), -0.2, 0.2)
+
+      if (guest.captain) {
+        // A master does not leave the hull behind. It comes with them if there
+        // is a berth for it, and is sold on the dock if there is not.
+        const hull = makeShip(ship.cls, ship.name)
+        hull.hull = Math.round(hull.maxHull * (0.6 + Math.random() * 0.25))
+        s.visitors = s.visitors.filter((v) => v.id !== ship.id)
+        if (s.ships.length < fleetCapacity(s)) {
+          s.ships.push(hull)
+          log(s, `The ${hull.name} came with them. She is yours.`, 'good')
+        } else {
+          const paid = tradeInValue(hull)
+          s.credits += paid
+          log(s, `No berth for the ${hull.name}, so she went dockside. +${paid}c.`, 'info')
         }
       }
       break

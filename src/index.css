@@ -598,16 +598,34 @@ h3 {
   box-shadow: 0 0 6px hsl(var(--hue) 80% 60%);
 }
 
+/* The shift always reads as one row. Columns share the room's width, so a
+   three-wide run showing seven slots and a single room showing two both fill
+   the space they have rather than wrapping onto a second line. */
 .room__staff {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 2px;
   min-height: 22px;
+  max-width: 100%;
+}
+
+.room__staff > * {
+  min-width: 0;
+  /* Cells share the width evenly, but a portrait never grows past its natural
+     size just because the room is half empty. */
+  max-width: 30px;
+}
+
+.room__staff .avatar,
+.room__slot {
+  width: 100%;
+  height: auto;
+  max-height: 30px;
+  aspect-ratio: 1;
 }
 
 .room__slot {
-  width: 22px;
-  height: 22px;
   border: 1px dashed #ffffff2e;
   border-radius: 5px;
 }

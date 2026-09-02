@@ -363,7 +363,15 @@ export default function App() {
           state={state}
           guestId={guestId}
           onClose={() => setGuestId(null)}
+          crewRoom={derived.crewCap - derived.crewAlive.length}
           onAnswer={(yes) => act({ type: 'answerGuest', guestId, yes })}
+          onTactic={(tactic, mid) =>
+            act({ type: 'persuadeGuest', guestId, tactic, moduleId: mid })
+          }
+          onSign={() => {
+            act({ type: 'signGuest', guestId })
+            setGuestId(null)
+          }}
           onOpenShip={(id) => {
             setGuestId(null)
             setVisitorId(id)
@@ -532,6 +540,11 @@ export default function App() {
             <li>
               <b>Rushing</b> finishes a cycle instantly but can start a fire. <b>Emergencies</b> are
               fought by whoever is standing in that room.
+            </li>
+            <li>
+              <b>Anyone who docks can be poached.</b> People come off a berthed hull and walk your
+              decks; every one of them can be talked into staying. A ship's master is the hard one,
+              and only a station worth moving to will manage it — but their hull comes with them.
             </li>
             <li>
               <b>Hiring</b> runs through the Comms Array and a Docking Port: request someone from

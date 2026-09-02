@@ -1,4 +1,4 @@
-import { randomName, uid } from './crew.ts'
+import { randomName, rollStats, uid } from './crew.ts'
 import type { Guest, ShipClass, Visitor, VisitorKind, VisitorOffer } from './types.ts'
 
 /** How many units a single trade moves. */
@@ -135,14 +135,53 @@ const MISSION_HANDOFF: VisitorOffer = {
   prompt: 'A contract, sealed, addressed to whoever is running this station.',
 }
 
-/** Who you actually meet when the clamps open, by what the ship turned out to be. */
-const CREW_ROLES: Record<VisitorKind, string[]> = {
-  trader: ['ship’s master', 'supercargo', 'deckhand', 'cook'],
-  courier: ['courier', 'pilot', 'signals clerk'],
-  patrol: ['lane officer', 'rating', 'flight surgeon'],
-  drifter: ['ship’s master', 'passenger', 'engineer', 'child'],
-  smuggler: ['ship’s master', 'deckhand', 'quartermaster'],
-  raider: ['boarding officer', 'gunner', 'deckhand'],
+/**
+ * Who you actually meet when the clamps open. `grip` is how tightly they are
+ * bound to the hull they came in on: a passenger is already looking for a way
+ * off, a ship's master has to be prised loose, and only a station worth moving
+ * to will manage it. `points` is the stat budget they were built with, which is
+ * also the reason you would want them.
+ */
+interface RoleDef {
+  label: string
+  grip: number
+  points: number
+  captain?: boolean
+}
+
+const CREW_ROLES: Record<VisitorKind, RoleDef[]> = {
+  trader: [
+    { label: 'ship’s master', grip: 1, points: 16, captain: true },
+    { label: 'supercargo', grip: 0.55, points: 11 },
+    { label: 'deckhand', grip: 0.3, points: 7 },
+    { label: 'cook', grip: 0.25, points: 6 },
+  ],
+  courier: [
+    { label: 'courier', grip: 1, points: 14, captain: true },
+    { label: 'pilot', grip: 0.6, points: 12 },
+    { label: 'signals clerk', grip: 0.4, points: 9 },
+  ],
+  patrol: [
+    { label: 'lane officer', grip: 1, points: 17, captain: true },
+    { label: 'rating', grip: 0.45, points: 9 },
+    { label: 'flight surgeon', grip: 0.6, points: 13 },
+  ],
+  drifter: [
+    { label: 'ship’s master', grip: 0.85, points: 12, captain: true },
+    { label: 'passenger', grip: 0.1, points: 6 },
+    { label: 'engineer', grip: 0.4, points: 11 },
+    { label: 'deckhand', grip: 0.25, points: 7 },
+  ],
+  smuggler: [
+    { label: 'ship’s master', grip: 1, points: 15, captain: true },
+    { label: 'deckhand', grip: 0.3, points: 8 },
+    { label: 'quartermaster', grip: 0.6, points: 12 },
+  ],
+  raider: [
+    { label: 'boarding officer', grip: 1, points: 16, captain: true },
+    { label: 'gunner', grip: 0.5, points: 11 },
+    { label: 'deckhand', grip: 0.3, points: 8 },
+  ],
 }
 
 /**
@@ -155,11 +194,26 @@ export const makeGuests = (v: Visitor, deal: () => number): Guest[] => {
   const count = 1 + Math.floor(Math.random() * 3)
   const out: Guest[] = []
   for (let i = 0; i < count; i += 1) {
-    const role = roles.splice(Math.floor(Math.random() * roles.length), 1)[0] ?? 'deckhand'
+    const role = roles.splice(Math.floor(Math.random() * roles.length), 1)[0] ?? {
+      label: 'deckhand',
+      grip: 0.3,
+      points: 7,
+    }
+    const tier = Math.min(1, Math.max(0.15, role.points / 18))
     out.push({
       id: uid('g'),
       name: randomName(),
-      role,
+      role: role.label,
+      captain: Boolean(role.captain),
+      grip: role.grip,
+      stats: rollStats(role.points),
+      tier,
+      // Someone with a berth already has less reason to listen than someone HQ
+      // sent looking for one.
+      interest: Math.round(Math.max(2, 55 - role.grip * 52)),
+      askingBonus: Math.round(60 + role.points * 22 + role.grip * 120),
+      used: [],
+      promised: null,
       portrait: deal(),
       seed: Math.floor(Math.random() * 1e9),
       offer: null,

@@ -6,6 +6,7 @@ import { DragGhost } from './components/DragGhost.tsx'
 import { FleetPanel } from './components/FleetPanel.tsx'
 import { LaunchModal } from './components/LaunchModal.tsx'
 import { LogPanel } from './components/LogPanel.tsx'
+import { ConfirmModal } from './components/ConfirmModal.tsx'
 import { TalkModal } from './components/TalkModal.tsx'
 import { VisitorModal } from './components/VisitorModal.tsx'
 import { Modal } from './components/Modal.tsx'
@@ -52,6 +53,13 @@ export default function App() {
   const [visitorId, setVisitorId] = useState<string | null>(null)
   const [guestId, setGuestId] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  /** A question the station is waiting on, and what to do if the answer is yes. */
+  const [asking, setAsking] = useState<{
+    title: string
+    body: string
+    confirmLabel: string
+    go: () => void
+  } | null>(null)
   // Set down at the title screen: saved, and asking nothing of you.
   const [parked, setParked] = useState(false)
   // Re-read whenever the menu opens or a save is written, not every render.
@@ -163,23 +171,48 @@ export default function App() {
       'Docking Port unstaffed — nothing can come alongside',
   ].filter(Boolean) as string[]
 
+  // Whatever raised it, the question renders the same way and over everything.
+  const question = asking && (
+    <ConfirmModal
+      title={asking.title}
+      confirmLabel={asking.confirmLabel}
+      onCancel={() => setAsking(null)}
+      onConfirm={() => {
+        const go = asking.go
+        setAsking(null)
+        go()
+      }}
+    >
+      {asking.body}
+    </ConfirmModal>
+  )
+
   if (parked) {
     return (
-      <TitleScreen
-        state={state}
-        derived={derived}
-        slot={slot}
-        onResume={() => setParked(false)}
-        onLoad={() => {
-          if (restore()) setParked(false)
-        }}
-        onScuttle={() => {
-          if (!confirm('Scuttle the station and start over? Your manual save is kept.')) return
-          hardReset()
-          setSlot(slotInfo())
-          setParked(false)
-        }}
-      />
+      <>
+        <TitleScreen
+          state={state}
+          derived={derived}
+          slot={slot}
+          onResume={() => setParked(false)}
+          onLoad={() => {
+            if (restore()) setParked(false)
+          }}
+          onScuttle={() =>
+            setAsking({
+              title: 'Scuttle Spaceport-99?',
+              body: 'Everything aboard goes with it and a new station starts from nothing. Your manual save is kept and can be loaded afterwards.',
+              confirmLabel: 'Scuttle it',
+              go: () => {
+                hardReset()
+                setSlot(slotInfo())
+                setParked(false)
+              },
+            })
+          }
+        />
+        {question}
+      </>
     )
   }
 
@@ -481,25 +514,37 @@ export default function App() {
             <button
               className="btn"
               disabled={!slot}
-              onClick={() => {
-                if (!confirm('Load the manual save? Everything since it is lost.')) return
-                if (!restore()) return
-                setMenuOpen(false)
-                setModuleId(null)
-                setCrewId(null)
-                setSavedAt(null)
-              }}
+              onClick={() =>
+                setAsking({
+                  title: 'Load the manual save?',
+                  body: 'The station goes back to how it was when you saved it. Everything since is lost.',
+                  confirmLabel: 'Load it',
+                  go: () => {
+                    if (!restore()) return
+                    setMenuOpen(false)
+                    setModuleId(null)
+                    setCrewId(null)
+                    setSavedAt(null)
+                  },
+                })
+              }
             >
               Load
             </button>
             <button
               className="btn"
               disabled={!slot}
-              onClick={() => {
-                if (!confirm('Throw away the manual save? There is no getting it back.')) return
-                discardSlot()
-                setSlot(null)
-              }}
+              onClick={() =>
+                setAsking({
+                  title: 'Throw away the manual save?',
+                  body: 'The bookmark is deleted. There is no getting it back, and the station you are playing is unaffected.',
+                  confirmLabel: 'Throw it away',
+                  go: () => {
+                    discardSlot()
+                    setSlot(null)
+                  },
+                })
+              }
             >
               Discard save
             </button>
@@ -522,14 +567,19 @@ export default function App() {
             <button
               className="btn btn--danger"
               onClick={() => {
-                if (confirm('Scuttle the station and start over? Your manual save is kept.')) {
-                  hardReset()
-                  setSlot(slotInfo())
-                  setSavedAt(null)
-                  setMenuOpen(false)
-                  setModuleId(null)
-                  setCrewId(null)
-                }
+                setAsking({
+                  title: 'Scuttle Spaceport-99?',
+                  body: 'Everything aboard goes with it and a new station starts from nothing. Your manual save is kept and can be loaded afterwards.',
+                  confirmLabel: 'Scuttle it',
+                  go: () => {
+                    hardReset()
+                    setSlot(slotInfo())
+                    setSavedAt(null)
+                    setMenuOpen(false)
+                    setModuleId(null)
+                    setCrewId(null)
+                  },
+                })
               }}
             >
               Scuttle and restart
@@ -606,6 +656,9 @@ export default function App() {
           </div>
         </Modal>
       )}
+
+      {/* Last, so a question asked from inside another modal sits on top of it. */}
+      {question}
     </div>
   )
 }

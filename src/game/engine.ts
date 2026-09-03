@@ -600,6 +600,15 @@ const jobPriority = (m: StationModule): number => {
 
 export const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
 
+/**
+ * What scrapping a room hands back: half what the *next* one of its kind would
+ * cost, per segment. Exported so the button that quotes the figure and the
+ * reducer that pays it cannot drift apart.
+ */
+export const scrapValue = (s: GameState, m: StationModule): number =>
+  Math.round(buildCost(m.kind, Math.max(0, countOfKind(s, m.kind) - 1)) * 0.5 * m.width)
+
+
 /** Every hull name currently in play, so a new one never collides. */
 const namesInPlay = (s: GameState): string[] => [
   ...s.ships.map((h) => h.name),
@@ -1930,9 +1939,9 @@ export const reducer = (state: GameState, action: Action): GameState => {
     case 'demolish': {
       const m = s.modules.find((x) => x.id === action.moduleId)
       if (!m || !canDemolish(s, m)) return state
+      const refund = scrapValue(s, m)
       for (const id of [...m.staff]) unassign(s, id)
       s.modules = s.modules.filter((x) => x.id !== m.id)
-      const refund = Math.round(buildCost(m.kind, Math.max(0, countOfKind(s, m.kind))) * 0.5 * m.width)
       s.credits += refund
       log(s, `${def(m.kind).name} scrapped. +${refund}c reclaimed.`, 'info')
       break

@@ -10,6 +10,7 @@ import {
   moveCost,
   newGame,
   reducer,
+  scrapValue,
   relocateAnchor,
   staffSlots,
 } from '../engine.ts'
@@ -182,4 +183,41 @@ test('a room on fire is bolted down until the emergency is over', () => {
   }
   assert.equal(canMove(burning, farm), false)
   assert.equal(canRelocate(burning, farm, 0, WING - 4), false)
+})
+
+test('the refund a scrap button quotes is the refund that gets paid', () => {
+  let s = rich(newGame())
+  s = reducer(s, { type: 'build', kind: 'quarters', deck: 0, col: WING - 3 })
+  const room = s.modules.find((m) => m.kind === 'quarters')!
+  const quoted = scrapValue(s, room)
+  assert.ok(quoted > 0)
+
+  const before = s.credits
+  const after = reducer(s, { type: 'demolish', moduleId: room.id })
+  assert.equal(after.credits - before, quoted, 'what the button says is what the till gets')
+  assert.equal(after.modules.length, s.modules.length - 1)
+})
+
+test('a wider run is worth more scrapped, and pays per segment', () => {
+  let s = rich(newGame())
+  s = reducer(s, { type: 'build', kind: 'quarters', deck: 0, col: WING - 3 })
+  const single = scrapValue(s, s.modules.find((m) => m.kind === 'quarters')!)
+
+  s = reducer(s, { type: 'build', kind: 'quarters', deck: 0, col: WING - 4 })
+  const run = s.modules.find((m) => m.kind === 'quarters')!
+  assert.equal(run.width, 2, 'they welded together')
+  assert.ok(scrapValue(s, run) > single, 'two segments are worth more than one')
+})
+
+test('scrapping stands its crew down rather than stranding them', () => {
+  let s = rich(newGame())
+  s = reducer(s, { type: 'build', kind: 'gym', deck: 0, col: WING - 3 })
+  const gym = s.modules.find((m) => m.kind === 'gym')!
+  const who = s.crew[0]
+  s = reducer(s, { type: 'assign', crewId: who.id, moduleId: gym.id })
+  assert.equal(s.crew.find((c) => c.id === who.id)!.assignment, gym.id)
+
+  const after = reducer(s, { type: 'demolish', moduleId: gym.id })
+  assert.equal(after.crew.find((c) => c.id === who.id)!.assignment, null, 'off duty, not lost')
+  assert.ok(after.crew.every((c) => !c.dead))
 })

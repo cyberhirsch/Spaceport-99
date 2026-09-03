@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   MAX_MERGE,
   availableCrew,
@@ -6,6 +7,7 @@ import {
   maxLevel,
   mergeBonus,
   moveCost,
+  scrapValue,
   staffSlots,
   upgradeCost,
   workRate,
@@ -22,6 +24,7 @@ import {
   type SpecId,
 } from '../game/types.ts'
 import type { DragState } from '../hooks/useDragAssign.ts'
+import { ConfirmModal } from './ConfirmModal.tsx'
 import { FabPanel, LabPanel } from './Workbench.tsx'
 import { CrewAvatar } from './CrewAvatar.tsx'
 import { Modal } from './Modal.tsx'
@@ -61,6 +64,7 @@ export const ModuleModal = ({
   onResearch,
   onFabricate,
 }: Props) => {
+  const [scrapping, setScrapping] = useState(false)
   const m = state.modules.find((x) => x.id === moduleId)
   if (!m) return null
   const d = def(m.kind)
@@ -73,6 +77,7 @@ export const ModuleModal = ({
   // good at the job the room normally does.
   const focus = idef ? idef.counter : d.stat
   const scrappable = canDemolish(state, m)
+  const refund = scrapValue(state, m)
   const top = maxLevel(m)
   const upCost = upgradeCost(m)
   const bonus = Math.round((mergeBonus(m) - 1) * 100)
@@ -293,7 +298,7 @@ export const ModuleModal = ({
         <button
           className="btn btn--danger"
           disabled={!scrappable}
-          onClick={onDemolish}
+          onClick={() => setScrapping(true)}
           title={
             incident
               ? 'Deal with the emergency first'
@@ -305,6 +310,28 @@ export const ModuleModal = ({
           Scrap
         </button>
       </div>
+
+      {scrapping && (
+        <ConfirmModal
+          title={`Scrap the ${d.name}?`}
+          confirmLabel={`Scrap it — +${refund}c`}
+          onCancel={() => setScrapping(false)}
+          onConfirm={() => {
+            setScrapping(false)
+            onDemolish()
+          }}
+        >
+          It comes apart for <b>{refund}c</b>, half what it cost to put up.
+          {staffed.length > 0 && (
+            <>
+              {' '}
+              The {staffed.length === 1 ? 'one person' : `${staffed.length} people`} working it
+              {staffed.length === 1 ? ' goes' : ' go'} off duty.
+            </>
+          )}{' '}
+          There is no putting it back without paying for it again.
+        </ConfirmModal>
+      )}
     </Modal>
   )
 }

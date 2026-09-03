@@ -5,19 +5,21 @@ interface Props {
   onClose: () => void
   children: ReactNode
   wide?: boolean
+  /** For a conversation there is no walking away from: no ✕, no scrim, no Escape. */
+  locked?: boolean
 }
 
-export const Modal = ({ title, onClose, children, wide = false }: Props) => {
+export const Modal = ({ title, onClose, children, wide = false, locked = false }: Props) => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !locked) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, locked])
 
   return (
-    <div className="scrim" onClick={onClose} role="presentation">
+    <div className="scrim" onClick={locked ? undefined : onClose} role="presentation">
       <div
         className={`modal${wide ? ' modal--wide' : ''}`}
         onClick={(e) => e.stopPropagation()}
@@ -26,9 +28,11 @@ export const Modal = ({ title, onClose, children, wide = false }: Props) => {
       >
         <header className="modal__head">
           <h2>{title}</h2>
-          <button className="btn btn--ghost" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
+          {!locked && (
+            <button className="btn btn--ghost" onClick={onClose} aria-label="Close">
+              ✕
+            </button>
+          )}
         </header>
         <div className="modal__body">{children}</div>
       </div>

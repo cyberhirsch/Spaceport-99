@@ -1,4 +1,5 @@
 import { effectiveness, uid } from './crew.ts'
+import { pickHullName } from './hulls.ts'
 import { STAT_INFO, STAT_KEYS } from './types.ts'
 import type {
   Crew,
@@ -76,17 +77,12 @@ export const refitCost = (s: Ship): number => Math.round(shipDef(s.cls).price * 
 export const tradeInValue = (s: Ship): number =>
   Math.round(shipDef(s.cls).price * 0.4 * (1 + (s.level - 1) * 0.3) * (s.hull / shipHull(s)))
 
-const HULL_NAMES = [
-  'Kestrel', 'Long Odds', 'Patient Wolf', 'Cold Start', 'Bright Anomaly', 'Sundog',
-  'Tin Halo', 'Second Wind', 'Quiet Margin', 'Salt and Iron', 'Backscatter', 'Slow Tuesday',
-  'Half Measure', 'Ninth Life', 'Loose Change', 'Dead Reckoning',
-]
 
-export const makeShip = (cls: ShipClass, name?: string): Ship => {
+export const makeShip = (cls: ShipClass, name?: string, taken: Iterable<string> = []): Ship => {
   const hull = Math.round(shipDef(cls).hull)
   return {
     id: uid('s'),
-    name: name ?? HULL_NAMES[Math.floor(Math.random() * HULL_NAMES.length)],
+    name: name ?? pickHullName(taken),
     cls,
     hull,
     maxHull: hull,

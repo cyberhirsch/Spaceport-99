@@ -4,10 +4,9 @@ import { CrewModal } from './components/CrewModal.tsx'
 import { CrewPanel } from './components/CrewPanel.tsx'
 import { DragGhost } from './components/DragGhost.tsx'
 import { FleetPanel } from './components/FleetPanel.tsx'
-import { InterviewModal } from './components/InterviewModal.tsx'
 import { LaunchModal } from './components/LaunchModal.tsx'
 import { LogPanel } from './components/LogPanel.tsx'
-import { PowersPanel } from './components/PowersPanel.tsx'
+import { TalkModal } from './components/TalkModal.tsx'
 import { VisitorModal } from './components/VisitorModal.tsx'
 import { Modal } from './components/Modal.tsx'
 import { GuestModal } from './components/GuestModal.tsx'
@@ -30,13 +29,12 @@ import { useGame } from './hooks/useGame.ts'
 import { useMediaQuery } from './hooks/useMediaQuery.ts'
 import type { ModuleKind } from './game/types.ts'
 
-type Tab = 'build' | 'crew' | 'fleet' | 'powers' | 'log'
+type Tab = 'build' | 'crew' | 'fleet' | 'log'
 
 const TABS: { id: Tab; label: string; glyph: string }[] = [
   { id: 'build', label: 'Build', glyph: '⊞' },
   { id: 'crew', label: 'Crew', glyph: '☺' },
   { id: 'fleet', label: 'Fleet', glyph: '⬢' },
-  { id: 'powers', label: 'Powers', glyph: '⬖' },
   { id: 'log', label: 'Log', glyph: '≡' },
 ]
 
@@ -50,7 +48,6 @@ export default function App() {
   const [moving, setMoving] = useState<string | null>(null)
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [crewId, setCrewId] = useState<string | null>(null)
-  const [candidateId, setCandidateId] = useState<string | null>(null)
   const [missionId, setMissionId] = useState<string | null>(null)
   const [visitorId, setVisitorId] = useState<string | null>(null)
   const [guestId, setGuestId] = useState<string | null>(null)
@@ -279,7 +276,9 @@ export default function App() {
               drag={drag}
               onDragStart={start}
               onSelect={(id) => setCrewId(id)}
-              onSelectCandidate={(id) => setCandidateId(id)}
+              onSelectCandidate={(id) =>
+                act({ type: 'talk', script: 'hire', with: { kind: 'candidate', id } })
+              }
               onAutoAssign={() => act({ type: 'autoAssign' })}
               onRequestCrew={() => act({ type: 'requestCrew' })}
             />
@@ -297,17 +296,6 @@ export default function App() {
               onRepair={(id) => act({ type: 'repairShip', shipId: id })}
               onTradeIn={(id) => act({ type: 'tradeInShip', shipId: id })}
               onRenameShip={(id, name) => act({ type: 'renameShip', shipId: id, name })}
-            />
-          )}
-          {tab === 'powers' && (
-            <PowersPanel
-              state={state}
-              onDeclare={(faction) => act({ type: 'declare', faction })}
-              onResign={() => {
-                if (confirm('Strike the flag? The power you leave will remember it.')) {
-                  act({ type: 'resign' })
-                }
-              }}
             />
           )}
           {tab === 'log' && <LogPanel state={state} />}
@@ -383,6 +371,10 @@ export default function App() {
             const dock = state.modules.find((m) => m.kind === 'dock')
             if (dock) act({ type: 'setAutoAccept', moduleId: dock.id, autoAccept: on })
           }}
+          onTalk={() => {
+            act({ type: 'talk', script: 'captain', with: { kind: 'visitor', id: visitorId } })
+            setVisitorId(null)
+          }}
         />
       )}
 
@@ -393,11 +385,8 @@ export default function App() {
           onClose={() => setGuestId(null)}
           crewRoom={derived.crewCap - derived.crewAlive.length}
           onAnswer={(yes) => act({ type: 'answerGuest', guestId, yes })}
-          onTactic={(tactic, mid) =>
-            act({ type: 'persuadeGuest', guestId, tactic, moduleId: mid })
-          }
-          onSign={() => {
-            act({ type: 'signGuest', guestId })
+          onTalk={() => {
+            act({ type: 'talk', script: 'hire', with: { kind: 'guest', id: guestId } })
             setGuestId(null)
           }}
           onOpenShip={(id) => {
@@ -419,23 +408,6 @@ export default function App() {
         />
       )}
 
-      {candidateId && (
-        <InterviewModal
-          state={state}
-          candidateId={candidateId}
-          onClose={() => setCandidateId(null)}
-          onTactic={(tactic, moduleId) => act({ type: 'interview', candidateId, tactic, moduleId })}
-          onOffer={() => {
-            act({ type: 'offerContract', candidateId })
-            setCandidateId(null)
-          }}
-          onTurnAway={() => {
-            act({ type: 'turnAway', candidateId })
-            setCandidateId(null)
-          }}
-        />
-      )}
-
       {crewId && (
         <CrewModal
           state={state}
@@ -450,6 +422,18 @@ export default function App() {
             act({ type: 'dismiss', crewId })
             setCrewId(null)
           }}
+          onTalk={() => {
+            act({ type: 'talk', script: 'crew', with: { kind: 'crew', id: crewId } })
+            setCrewId(null)
+          }}
+        />
+      )}
+
+      {state.talk && (
+        <TalkModal
+          state={state}
+          onSay={(reply) => act({ type: 'say', reply })}
+          onClose={() => act({ type: 'endTalk' })}
         />
       )}
 

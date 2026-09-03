@@ -10,9 +10,9 @@ import {
   dockBerths,
   newGame,
   reducer,
-  tacticEffect,
 } from '../engine.ts'
 import { PORTRAIT_COUNT, crewPortrait, makeCrew } from '../crew.ts'
+import { labels, open, say } from './talkHelp.ts'
 import { STAT_KEYS } from '../types.ts'
 import type { GameState, ModuleKind, Stats } from '../types.ts'
 
@@ -31,6 +31,20 @@ const staffed = (): GameState => {
     s = reducer(s, { type: 'assign', crewId: s.crew[i].id, moduleId: m.id })
   }
   return rich(s)
+}
+
+/** Interview an applicant the whole way through, then ask for their answer. */
+const interview = (s: GameState, id: string, ...moves: string[]): GameState => {
+  let out = open(s, 'hire', { kind: 'candidate', id })
+  out = say(out, 'What brought you out this far')
+  out = say(out, 'what would it take')
+  out = say(out, 'Make them an offer')
+  for (const m of moves) {
+    out = say(out, m)
+    out = say(out, 'Keep going')
+  }
+  out = say(out, 'Put it to them')
+  return say(out, 'Ask for their answer')
 }
 
 test('HQ will not send anyone without a staffed comms desk', () => {
@@ -76,28 +90,41 @@ test('a promised posting swings on whether it suits them', () => {
   stats.B = 1
   s = { ...s, candidates: [{ ...cand, stats }] }
 
-  const reactor = s.modules.find((m) => m.kind === 'reactor')!
-  const farm = s.modules.find((m) => m.kind === 'hydroponics')!
-  const c = s.candidates[0]
-  assert.equal(tacticEffect(s, c, 'posting', reactor.id), 40, 'their strongest suit lands')
-  assert.equal(tacticEffect(s, c, 'posting', farm.id), -15, 'their weakest is an insult')
+  // The conversation offers the room that fits them, and it is the reactor —
+  // the only Tech room the founding station has with a slot free.
+  let talking = open(s, 'hire', { kind: 'candidate', id: cand.id })
+  talking = say(talking, 'Make them an offer')
+  assert.ok(
+    labels(talking).some((l) => l.includes('Fusion Reactor')),
+    `their strongest suit is what gets offered: ${labels(talking).join(' | ')}`,
+  )
+
+  const after = say(talking, 'Fusion Reactor')
+  const promised = after.candidates[0]?.promised
+  assert.equal(promised, s.modules.find((m) => m.kind === 'reactor')!.id)
+  assert.ok(
+    (after.candidates[0]?.interest ?? 0) > cand.interest,
+    'and a posting that suits them moves them',
+  )
 })
 
-test('each tactic can only be used once, and the bonus costs its asking price', () => {
+test('the bonus costs its asking price, and can only be offered once', () => {
   let s = reducer(staffed(), { type: 'requestCrew' })
   s = advance(s, 60)
   const id = s.candidates[0].id
   const ask = s.candidates[0].askingBonus
-  const before = { interest: s.candidates[0].interest, credits: s.credits }
+  const before = s.credits
 
-  s = reducer(s, { type: 'interview', candidateId: id, tactic: 'bonus' })
-  assert.equal(s.credits, before.credits - ask, 'the bonus is actually paid')
-  assert.ok(s.candidates[0].interest > before.interest, 'and it moves them')
+  s = open(s, 'hire', { kind: 'candidate', id })
+  s = say(s, 'Make them an offer')
+  s = say(s, 'up front')
+  assert.equal(s.credits, before - ask, 'the bonus is actually paid')
 
-  const after = s.candidates[0].interest
-  s = reducer(s, { type: 'interview', candidateId: id, tactic: 'bonus' })
-  assert.equal(s.candidates[0].interest, after, 'a second go changes nothing')
-  assert.deepEqual(s.candidates[0].used, ['bonus'])
+  s = say(s, 'Keep going')
+  assert.ok(
+    !labels(s).some((l) => l.includes('up front')),
+    `and cannot be offered twice: ${labels(s).join(' | ')}`,
+  )
 })
 
 test('a fully convinced applicant signs, and joins the post they were promised', () => {
@@ -109,7 +136,7 @@ test('a fully convinced applicant signs, and joins the post they were promised',
   s = { ...s, candidates: [cand] }
   const crewBefore = s.crew.length
 
-  s = reducer(s, { type: 'offerContract', candidateId: cand.id })
+  s = interview(s, cand.id)
   assert.equal(s.candidates.length, 0, 'they leave the dock either way')
   assert.equal(s.crew.length, crewBefore + 1, 'certain interest means a certain signature')
   const hired = s.crew.at(-1)!
@@ -124,7 +151,7 @@ test('an unconvinced applicant always walks', () => {
   const cand = { ...s.candidates[0], interest: 0 }
   s = { ...s, candidates: [cand] }
   const crewBefore = s.crew.length
-  s = reducer(s, { type: 'offerContract', candidateId: cand.id })
+  s = interview(s, cand.id)
   assert.equal(s.crew.length, crewBefore, 'nobody signs at zero interest')
   assert.equal(s.candidates.length, 0)
 })
@@ -179,7 +206,7 @@ test('an applicant keeps the face you interviewed when they sign', () => {
     'and it is not one already aboard',
   )
 
-  s = reducer(s, { type: 'offerContract', candidateId: cand.id })
+  s = interview(s, cand.id)
   const hired = s.crew.at(-1)!
   assert.equal(crewPortrait(hired), cand.portrait, 'the face follows them onto the roster')
 })

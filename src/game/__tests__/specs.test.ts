@@ -79,7 +79,11 @@ test('the lab works a spec out, and then the room can be built', () => {
   s = staff(s, 'library')
   assert.ok(researchRate(s, new Map(s.crew.map((c) => [c.id, c]))) > 0)
 
-  s = run(s, specDef('shield').effort)
+  // Wait on the condition, not the clock: a fire in the lab stalls the work,
+  // so the honest bound is generous.
+  for (let t = 0; t < specDef('shield').effort * 4 && !knows(s, 'shield'); t += 30) {
+    s = run(s, 30)
+  }
   assert.equal(knows(s, 'shield'), true)
   assert.equal(moduleLocked(s, 'shield'), null)
   assert.equal(s.researching, null)

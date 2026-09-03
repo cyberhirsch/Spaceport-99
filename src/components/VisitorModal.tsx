@@ -17,6 +17,7 @@ interface Props {
   onBuyGear: (item: ItemId) => void
   onSelectGuest: (guestId: string) => void
   onAutoAccept: (on: boolean) => void
+  onTalk: () => void
 }
 
 export const VisitorModal = ({
@@ -29,6 +30,7 @@ export const VisitorModal = ({
   onBuyGear,
   onSelectGuest,
   onAutoAccept,
+  onTalk,
 }: Props) => {
   const v = state.visitors.find((x) => x.id === visitorId)
   if (!v) return null
@@ -96,6 +98,9 @@ export const VisitorModal = ({
             title={officers === 0 ? 'Nobody is working the docking desk' : undefined}
           >
             {officers === 0 ? 'Nobody on the desk' : 'Clear them to dock'}
+          </button>
+          <button className="btn" onClick={onTalk}>
+            Open a channel
           </button>
           <button className="btn btn--danger" onClick={onRefuse}>
             Wave them off
@@ -224,6 +229,12 @@ export const VisitorModal = ({
           </p>
         </>
       )}
+
+      <div className="modal__actions">
+        <button className="btn btn--primary" onClick={onTalk}>
+          Talk to the master
+        </button>
+      </div>
 
       {dock && (
         <label className="toggle">

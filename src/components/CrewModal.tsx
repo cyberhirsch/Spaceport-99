@@ -15,6 +15,7 @@ interface Props {
   onAssign: (crewId: string, moduleId: string | null) => void
   onRevive: () => void
   onDismiss: () => void
+  onTalk: () => void
   onRename: (name: string) => void
   onIssue: (item: ItemId) => void
   onStow: (slot: ItemSlot) => void
@@ -27,6 +28,7 @@ export const CrewModal = ({
   onAssign,
   onRevive,
   onDismiss,
+  onTalk,
   onRename,
   onIssue,
   onStow,
@@ -75,6 +77,17 @@ export const CrewModal = ({
               <dt>Aptitude</dt>
               <dd>{statTotal(c)} pts</dd>
             </div>
+            {SLOTS.map((slot) => {
+              const worn = c.gear?.[slot]
+              return (
+                <div key={slot}>
+                  <dt>{SLOT_LABEL[slot]}</dt>
+                  <dd className={worn ? 'dossier__kit' : 'dossier__kit is-empty'}>
+                    {worn ? itemDef(worn).name : 'None issued'}
+                  </dd>
+                </div>
+              )
+            })}
           </dl>
         </div>
       </div>
@@ -174,6 +187,9 @@ export const CrewModal = ({
             here until they are back.
           </p>
           <div className="modal__actions">
+            <button className="btn btn--primary" onClick={onTalk}>
+              Talk to them
+            </button>
             <button className="btn btn--danger" onClick={onDismiss}>
               Dismiss from station
             </button>
@@ -220,6 +236,9 @@ export const CrewModal = ({
             })}
           </div>
           <div className="modal__actions">
+            <button className="btn btn--primary" onClick={onTalk}>
+              Talk to them
+            </button>
             <button className="btn btn--danger" onClick={onDismiss}>
               Dismiss from station
             </button>

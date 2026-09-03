@@ -1,5 +1,6 @@
 import { randomName, rollStats, uid } from './crew.ts'
 import { rollOwner } from './factions.ts'
+import { pickHullName } from './hulls.ts'
 import type { Guest, ShipClass, Visitor, VisitorKind, VisitorOffer } from './types.ts'
 
 /** How many units a single trade moves. */
@@ -65,11 +66,6 @@ export const VISITOR_DEFS: Record<VisitorKind, VisitorDef> = {
 
 export const visitorDef = (kind: VisitorKind): VisitorDef => VISITOR_DEFS[kind]
 
-const HAILS = [
-  'Cormorant', 'Blue Marlin', 'Ten of Cups', 'Ashgrove', 'Penny Dreadful', 'Sunken Bell',
-  'Marigold', 'Iron Sparrow', 'Last Tuesday', 'Grey Vector', 'Wandering Albatross', 'Copper Kettle',
-  'Nightjar', 'Bad Weather', 'Fair Warning', 'Old Habit',
-]
 
 const HULLS: ShipClass[] = ['shuttle', 'hauler', 'scout', 'cutter']
 
@@ -213,7 +209,6 @@ export const makeGuests = (v: Visitor, deal: () => number): Guest[] => {
       // sent looking for one.
       interest: Math.round(Math.max(2, 55 - role.grip * 52)),
       askingBonus: Math.round(60 + role.points * 22 + role.grip * 120),
-      used: [],
       promised: null,
       portrait: deal(),
       seed: Math.floor(Math.random() * 1e9),
@@ -226,7 +221,11 @@ export const makeGuests = (v: Visitor, deal: () => number): Guest[] => {
 }
 
 /** Rolls a ship at the clamps. Trouble usually scans dirty — usually. */
-export const makeVisitor = (): Visitor => {
+/**
+ * A hull on the board. `taken` is every name already in play, so the same
+ * ship never arrives twice while the first one is still at the clamps.
+ */
+export const makeVisitor = (taken: Iterable<string> = []): Visitor => {
   const pool = Object.values(VISITOR_DEFS)
   const total = pool.reduce((n, d) => n + d.weight, 0)
   let roll = Math.random() * total
@@ -261,7 +260,7 @@ export const makeVisitor = (): Visitor => {
   const scarcity = 0.8 + Math.random() * 0.9
   return {
     id: uid('v'),
-    name: HAILS[Math.floor(Math.random() * HAILS.length)],
+    name: pickHullName(taken),
     cls: HULLS[Math.floor(Math.random() * HULLS.length)],
     kind: def.kind,
     claim,

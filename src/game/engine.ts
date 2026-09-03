@@ -39,18 +39,23 @@ import {
 import { incidentDef } from './incidents.ts'
 import { SLOTS, itemDef, stock } from './gear.ts'
 import { rollCall, unattended } from './calls.ts'
+// Importing the scripts is what registers them. Nothing else references these.
+import './talks/crew.ts'
+import './talks/hire.ts'
+import './talks/captain.ts'
+import { resolveFight } from './talks/conquest.ts'
 import { ITEM_SPEC, MODULE_SPEC, SPEC_IDS, specDef } from './specs.ts'
+import { beginTalk, labelOf, nodeOf, offered, speaker } from './talk.ts'
+import type { ScriptId, SpeakerRef, Talk, TalkCtx } from './talk.ts'
 import {
-  DEFECTION_COST,
-  DEFECTION_CREDIT,
   FACTION_IDS,
+  PATRONS,
   STANDING_CEILING,
   STANDING_FLOOR,
   blankStanding,
   factionDef,
 } from './factions.ts'
 import { RESOURCE_INFO } from './types.ts'
-import { STAT_KEYS } from './types.ts'
 import {
   OUTCOME_INFO,
   OPEN_HAUL_PER_MINUTE,
@@ -86,13 +91,12 @@ import type {
   ModuleKind,
   ResourceKey,
   StatKey,
-  Tactic,
   Guest,
   Visitor,
   StationModule,
 } from './types.ts'
 
-export const SAVE_VERSION = 5
+export const SAVE_VERSION = 6
 
 export const BASE_CREW_CAP = 8
 export const BASE_STORAGE = 220
@@ -172,6 +176,12 @@ export interface Defence {
   shield: number
   smallArms: number
 }
+
+/**
+ * The point at which a station's guns are worth talking behind. Below it, a
+ * hard word is a bluff; above it, it is a fact.
+ */
+export const ARMED_ENOUGH = 8
 
 export const defence = (s: GameState): Defence => {
   const crewById = new Map(s.crew.map((c) => [c.id, c]))
@@ -254,7 +264,7 @@ export const derive = (s: GameState): Derived => {
 
 // ------------------------------------------------------------------ setup --
 
-const log = (s: GameState, text: string, tone: LogEntry['tone'] = 'info'): void => {
+export const log = (s: GameState, text: string, tone: LogEntry['tone'] = 'info'): void => {
   s.log = [{ id: uid('l'), at: s.elapsed, text, tone }, ...s.log].slice(0, MAX_LOG)
 }
 
@@ -299,12 +309,16 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     visitors: [],
     nextVisitorIn: 60,
     standing: blankStanding(),
-    patron: null,
+    // Spaceport-99 is a Confederation post. It was never asked, and it has
+    // never been worth anybody's while to change that. Yet.
+    patron: 'terran',
     resigned: [],
     stores: {},
     specs: {},
     researching: null,
     fabricating: null,
+    talk: null,
+    nextTakeoverIn: 20 * 60 + Math.random() * 20 * 60,
     seenIntro: false,
     gameOver: false,
   }
@@ -560,7 +574,14 @@ const jobPriority = (m: StationModule): number => {
 
 // ------------------------------------------------------------------- tick --
 
-const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
+export const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
+
+/** Every hull name currently in play, so a new one never collides. */
+const namesInPlay = (s: GameState): string[] => [
+  ...s.ships.map((h) => h.name),
+  ...s.visitors.map((v) => v.name),
+]
+
 
 /**
  * Neighbours an emergency can spread into: along the same wing, or straight up
@@ -873,18 +894,32 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
 
   // --- random events --------------------------------------------------
   s.broadcastCooldown = Math.max(0, s.broadcastCooldown - dt)
+  // --- somebody coming for the station --------------------------------
+  // Only while nothing else is being said, and never to a station nobody
+  // would bother with.
+  if (!offline && !s.talk && s.elapsed > CONQUEST_EARLIEST && worthTaking(s)) {
+    s.nextTakeoverIn -= dt
+    if (s.nextTakeoverIn <= 0) {
+      s.nextTakeoverIn = CONQUEST_GAP + Math.random() * CONQUEST_GAP
+      const who = wouldCome(s)
+      if (who) sendConqueror(s, who)
+    }
+  }
+
   // --- the clamps -----------------------------------------------------
   s.nextVisitorIn -= dt
   if (s.nextVisitorIn <= 0) {
     s.nextVisitorIn = 80 + Math.random() * 120
     if (s.visitors.length < visitorBerths(s)) {
-      const hail = makeVisitor()
+      const hail = makeVisitor(namesInPlay(s))
       s.visitors.push(hail)
       log(s, `${hail.name} is on approach.`, 'info')
     }
   }
 
   for (const v of [...s.visitors]) {
+    // A hull that came to take the station waits as long as it likes.
+    if (v.intent) continue
     v.timer -= dt
     if (v.status === 'inbound') {
       if (v.timer <= 0) {
@@ -1219,7 +1254,7 @@ const resolveMission = (s: GameState, m: Mission): void => {
       s.crew.push(survivor)
       m.find = { kind: 'survivor', detail: `${survivor.name} came back with them and stayed.` }
     } else if (roll < 0.65 && s.ships.length < fleetCapacity(s)) {
-      const hull = makeShip('shuttle')
+      const hull = makeShip('shuttle', undefined, namesInPlay(s))
       hull.hull = Math.round(hull.maxHull * 0.5)
       s.ships.push(hull)
       m.find = { kind: 'ship', detail: `They towed home a derelict — the ${hull.name}, half-dead.` }
@@ -1338,8 +1373,6 @@ export type Action =
   | { type: 'buyDeck' }
   | { type: 'resupply'; resource: ResourceKey }
   | { type: 'requestCrew' }
-  | { type: 'interview'; candidateId: string; tactic: Tactic; moduleId?: string }
-  | { type: 'offerContract'; candidateId: string }
   | { type: 'turnAway'; candidateId: string }
   | { type: 'launch'; missionId: string; shipId: string; crewIds: string[] }
   | { type: 'declineMission'; missionId: string }
@@ -1356,17 +1389,16 @@ export type Action =
   | { type: 'setAutoAccept'; moduleId: string; autoAccept: boolean }
   | { type: 'tradeVisitor'; visitorId: string; resource: ResourceKey; buy: boolean }
   | { type: 'answerGuest'; guestId: string; yes: boolean }
-  | { type: 'persuadeGuest'; guestId: string; tactic: Tactic; moduleId?: string }
-  | { type: 'signGuest'; guestId: string }
   | { type: 'recall'; missionId: string }
   | { type: 'answerCall'; missionId: string; choice: number }
   | { type: 'buyGear'; visitorId: string; item: ItemId }
   | { type: 'issueGear'; crewId: string; item: ItemId }
   | { type: 'stowGear'; crewId: string; slot: ItemSlot }
   | { type: 'research'; spec: SpecId | null }
+  | { type: 'talk'; script: ScriptId; with: SpeakerRef }
+  | { type: 'say'; reply: number }
+  | { type: 'endTalk' }
   | { type: 'fabricate'; item: ItemId | null }
-  | { type: 'declare'; faction: FactionId }
-  | { type: 'resign' }
   | { type: 'revive'; crewId: string }
   | { type: 'dismiss'; crewId: string }
   | { type: 'rename'; name: string }
@@ -1439,7 +1471,7 @@ export const fabRate = (s: GameState, crewById: Map<string, Crew>): number => {
 }
 
 /** Nudge one power's opinion of the station, inside the range it can move in. */
-const shift = (s: GameState, id: FactionId, amount: number): void => {
+export const shift = (s: GameState, id: FactionId, amount: number): void => {
   s.standing[id] = clamp(s.standing[id] + amount, STANDING_FLOOR, STANDING_CEILING)
 }
 
@@ -1622,7 +1654,6 @@ const makeCandidate = (s: GameState, luck: number): Candidate => {
     interest: Math.round(clamp(appeal(s) * 70 - reach * 25, 5, 60)),
     askingBonus: Math.round(60 + reach * 260),
     patience: PATIENCE_SECONDS,
-    used: [],
     promised: null,
     arrivesIn: 25 + Math.random() * 30,
   }
@@ -1639,34 +1670,8 @@ export const bonusOffer = (s: GameState, p: Prospect): number =>
  * strength. Which is to say: a captain comes down to whether the station is
  * genuinely worth moving to.
  */
-const holdOut = (p: Prospect): number => 1 - (p.grip ?? 0) * 0.55
+export const holdOut = (p: Prospect): number => 1 - (p.grip ?? 0) * 0.55
 
-/** What a tactic would do to this prospect's interest, right now. */
-export const tacticEffect = (
-  s: GameState,
-  p: Prospect,
-  tactic: Tactic,
-  moduleId?: string,
-): number => {
-  // Paying part of what they asked for is worth part of the goodwill. Being
-  // broke should make hiring harder, not impossible.
-  if (tactic === 'bonus') {
-    return Math.round(35 * (bonusOffer(s, p) / Math.max(1, p.askingBonus)) * holdOut(p))
-  }
-  if (tactic === 'pitch') {
-    const standards = 30 + p.tier * 45
-    return Math.round(
-      clamp(18 + (appeal(s) * 100 - standards) * 0.5 + recruiterSkill(s) * 4, 5, 45),
-    )
-  }
-  const m = s.modules.find((x) => x.id === moduleId)
-  if (!m) return 0
-  const stat = def(m.kind).stat
-  const ranked = STAT_KEYS.map((k) => ({ k, v: p.stats[k] })).sort((a, b) => b.v - a.v)
-  if (ranked[0].k === stat) return Math.round(40 * holdOut(p))
-  if (ranked[ranked.length - 1].k === stat) return -15
-  return Math.round(12 * holdOut(p))
-}
 
 /** The guest, and the hull they came in on. */
 export const guestAboard = (
@@ -1678,27 +1683,156 @@ export const guestAboard = (
   return ship && guest ? { guest, ship } : null
 }
 
-/** A power will not take a station on that has not been any use to it. */
-export const DECLARE_AT = 0.05
-
-/**
- * Whether the station could declare for a power right now, and if not, why
- * not. The panel says the reason rather than greying a button out.
- */
-export const declineReason = (s: GameState, id: FactionId): string | null => {
-  const def = factionDef(id)
-  if (!def.patronable) return `${def.short} is a filing status, not a flag.`
-  if (s.patron === id) return `Already flying ${def.short} paper.`
-  if (s.patron && !factionDef(s.patron).exit) {
-    return `Enrolment in ${factionDef(s.patron).short} has no exit clause.`
-  }
-  if (s.standing[id] < DECLARE_AT) {
-    return `${def.short} will not take a station that has been no use to them.`
-  }
-  return null
-}
 
 export const REVIVE_COST_PER_LEVEL = 90
+
+
+/**
+ * How long a station gets to be its own before somebody comes for it. There is
+ * no warning bar and no diplomacy that heads this off: a place worth taking
+ * eventually gets taken, and the only question is what you do when the hull is
+ * already alongside.
+ *
+ * It cannot happen to a station too small to be worth the fuel, and it will
+ * not happen twice in a row without a long quiet stretch in between.
+ */
+const CONQUEST_EARLIEST = 45 * 60
+const CONQUEST_GAP = 40 * 60
+
+/** Whether the station is worth somebody's trouble yet. */
+const worthTaking = (s: GameState): boolean => {
+  const d = derive(s)
+  return s.modules.length >= 10 && d.crewAlive.length >= 8
+}
+
+/**
+ * Who would come. The powers whose paper you do not fly, weighted towards
+ * whoever likes you least — being disliked is what makes a station a target.
+ */
+const wouldCome = (s: GameState): FactionId | null => {
+  const pool = PATRONS.filter((id) => id !== s.patron)
+  if (pool.length === 0) return null
+  const weights = pool.map((id) => Math.max(0.05, 0.25 - s.standing[id]))
+  const total = weights.reduce((a, b) => a + b, 0)
+  let roll = Math.random() * total
+  for (let i = 0; i < pool.length; i += 1) {
+    roll -= weights[i]
+    if (roll <= 0) return pool[i]
+  }
+  return pool[0]
+}
+
+/** A hull that is not asking. It is alongside by the time you read the hail. */
+const sendConqueror = (s: GameState, who: FactionId): void => {
+  const d = defence(s)
+  const hull = makeVisitor(namesInPlay(s))
+  hull.kind = 'patrol'
+  hull.claim = 'patrol'
+  hull.faction = who
+  hull.suspicion = 1
+  hull.cls = 'cutter'
+  hull.status = 'docked'
+  hull.aboard = []
+  hull.offer = null
+  hull.intent = 'conquest'
+  // What they brought scales with what they can see you have, so a well-armed
+  // station is threatened by something that can plausibly beat it.
+  hull.force = Math.round(14 + (d.guns + d.shield * 0.7) * (0.75 + Math.random() * 0.6))
+  hull.timer = 600
+  s.visitors.push(hull)
+  s.talk = beginTalk('conquest', { kind: 'visitor', id: hull.id }, hull.name)
+  log(
+    s,
+    `${hull.name} is alongside without asking. ${factionDef(who).name} colours.`,
+    'bad',
+  )
+}
+
+/**
+ * A master does not leave the hull behind. It comes with them if there is a
+ * berth for it, and is sold on the dock if there is not.
+ */
+const claimHull = (s: GameState, ship: Visitor): void => {
+  // She keeps her transponder name, unless something in the fleet already
+  // answers to it — one pool serves every hull in the game.
+  const clash = s.ships.some((h) => h.name === ship.name)
+  const hull = makeShip(ship.cls, clash ? undefined : ship.name, namesInPlay(s))
+  hull.hull = Math.round(hull.maxHull * (0.6 + Math.random() * 0.25))
+  s.visitors = s.visitors.filter((v) => v.id !== ship.id)
+  if (s.ships.length < fleetCapacity(s)) {
+    s.ships.push(hull)
+    log(s, `The ${hull.name} came with them. She is yours.`, 'good')
+  } else {
+    const paid = tradeInValue(hull)
+    s.credits += paid
+    log(s, `No berth for the ${hull.name}, so she went dockside. +${paid}c.`, 'info')
+  }
+}
+
+/**
+ * The end of a hiring conversation. Interest is a probability, so a
+ * half-convinced spacer is a coin toss — and either way the asking is over.
+ * Writes `signed` into the conversation so the closing line can read it back.
+ */
+const closeHire = (s: GameState, talk: Talk, c: TalkCtx): void => {
+  const p = c.prospect
+  if (!p) return
+  const d = derive(s)
+
+  // You cannot offer a berth you have not got, so the asking never happens and
+  // they stay where they are.
+  if (d.crewAlive.length >= d.crewCap) {
+    log(s, `${c.name} would come aboard, but there is no bunk free.`, 'warn')
+    return
+  }
+
+  // Otherwise take them off the list either way: nobody stands there being
+  // asked twice.
+  if (c.candidate) s.candidates = s.candidates.filter((x) => x.id !== c.candidate!.id)
+  if (c.guest && c.ship) c.ship.aboard = c.ship.aboard.filter((g) => g.id !== c.guest!.id)
+  if (Math.random() * SIGN_THRESHOLD >= p.interest) {
+    log(
+      s,
+      c.guest && c.ship
+        ? `${c.name} thought about it and stayed with the ${c.ship.name}.`
+        : `${c.name} turned the contract down and undocked.`,
+      'warn',
+    )
+    return
+  }
+
+  const hire = makeCrew({
+    name: c.name,
+    stats: p.stats,
+    seed: p.seed,
+    portrait: crewPortrait(c.candidate ?? c.guest ?? { seed: p.seed }),
+  })
+  s.crew.push(hire)
+  if (p.promised) assign(s, hire.id, p.promised)
+  talk.flags.push('signed')
+
+  if (c.guest && c.ship) {
+    log(s, `${c.name} signed off the ${c.ship.name} and onto the station.`, 'good')
+    // Taking someone under contract is noticed. Taking their master is noticed
+    // considerably more — and a captain brings the hull with them.
+    shift(s, c.ship.faction, c.guest.captain ? -0.05 : -0.015)
+    if (c.guest.captain) claimHull(s, c.ship)
+  } else {
+    log(s, `${c.name} signed on.`, 'good')
+  }
+}
+
+/**
+ * Whatever a node needs doing the moment it is reached, rather than when it is
+ * read. Two nodes in the game resolve something: the end of a hiring
+ * conversation, and the moment a station decides to shoot back.
+ */
+const onEnter = (s: GameState, talk: Talk): void => {
+  const c = speaker(s, talk.with)
+  if (!c) return
+  if (talk.script === 'hire' && talk.node === 'done') closeHire(s, talk, c)
+  if (talk.script === 'conquest' && talk.node === 'fight') resolveFight(c)
+}
 
 export const reducer = (state: GameState, action: Action): GameState => {
   switch (action.type) {
@@ -1736,7 +1870,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       const final = mergeNeighbours(s, placed)
       log(s, `${def(final.kind).name} online — deck ${action.deck + 1}.`, 'good')
       if (firstHangar) {
-        const shuttle = makeShip('shuttle')
+        const shuttle = makeShip('shuttle', undefined, namesInPlay(s))
         s.ships.push(shuttle)
         log(s, `HQ issued a shuttle with the bay — the ${shuttle.name}.`, 'good')
       }
@@ -1863,52 +1997,6 @@ export const reducer = (state: GameState, action: Action): GameState => {
       log(s, `HQ is sending ${cand.name} over for an interview.`, 'info')
       break
     }
-    case 'interview': {
-      const cand = s.candidates.find((x) => x.id === action.candidateId)
-      if (!cand || cand.arrivesIn > 0) return state
-      if (cand.used.includes(action.tactic)) return state
-      let paid = 0
-      if (action.tactic === 'bonus') {
-        paid = bonusOffer(s, cand)
-        if (paid <= 0) return state
-      }
-      const delta = tacticEffect(s, cand, action.tactic, action.moduleId)
-      s.credits -= paid
-      if (action.tactic === 'posting') {
-        const m = s.modules.find((x) => x.id === action.moduleId)
-        if (!m || m.staff.length >= staffSlots(m)) return state
-        cand.promised = m.id
-      }
-      cand.interest = Math.round(clamp(cand.interest + delta, 0, SIGN_THRESHOLD))
-      cand.used.push(action.tactic)
-      break
-    }
-    case 'offerContract': {
-      const cand = s.candidates.find((x) => x.id === action.candidateId)
-      if (!cand || cand.arrivesIn > 0) return state
-      s.candidates = s.candidates.filter((x) => x.id !== cand.id)
-      const d = derive(s)
-      if (d.crewAlive.length >= d.crewCap) {
-        log(s, `${cand.name} was offered a berth the station does not have.`, 'warn')
-        break
-      }
-      // Interest is a probability, so a half-convinced applicant is a coin toss.
-      if (Math.random() * SIGN_THRESHOLD >= cand.interest) {
-        log(s, `${cand.name} turned the contract down and undocked.`, 'warn')
-        break
-      }
-      // They keep the face you interviewed.
-      const hire = makeCrew({
-        name: cand.name,
-        stats: cand.stats,
-        seed: cand.seed,
-        portrait: crewPortrait(cand),
-      })
-      s.crew.push(hire)
-      if (cand.promised) assign(s, hire.id, cand.promised)
-      log(s, `${cand.name} signed on.`, 'good')
-      break
-    }
     case 'turnAway': {
       const cand = s.candidates.find((x) => x.id === action.candidateId)
       if (!cand) return state
@@ -1960,7 +2048,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       if (s.credits < price) return state
       if (s.ships.length >= fleetCapacity(s)) return state
       s.credits -= price
-      const bought = makeShip(action.cls)
+      const bought = makeShip(action.cls, undefined, namesInPlay(s))
       s.ships.push(bought)
       log(s, `HQ delivered the ${bought.name}, a ${shipDef(action.cls).name.toLowerCase()}.`, 'good')
       break
@@ -2110,7 +2198,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
             break
           }
           s.credits -= effect.price
-          const hull = makeShip(effect.cls)
+          const hull = makeShip(effect.cls, undefined, namesInPlay(s))
           hull.hull = Math.round(hull.maxHull * 0.7)
           s.ships.push(hull)
           log(s, `Bought the ${hull.name} off ${v.name}, no questions asked.`, 'good')
@@ -2134,75 +2222,6 @@ export const reducer = (state: GameState, action: Action): GameState => {
           s.missions.push(lead)
           log(s, `Bought a lead off ${v.name}. It had better be good.`, 'info')
           break
-        }
-      }
-      break
-    }
-    case 'persuadeGuest': {
-      const found = guestAboard(s, action.guestId)
-      if (!found || found.ship.status !== 'docked') return state
-      const { guest } = found
-      if (guest.used.includes(action.tactic)) return state
-      let paid = 0
-      if (action.tactic === 'bonus') {
-        paid = bonusOffer(s, guest)
-        if (paid <= 0) return state
-      }
-      const delta = tacticEffect(s, guest, action.tactic, action.moduleId)
-      s.credits -= paid
-      if (action.tactic === 'posting') {
-        const m = s.modules.find((x) => x.id === action.moduleId)
-        if (!m || m.staff.length >= staffSlots(m)) return state
-        guest.promised = m.id
-      }
-      guest.interest = Math.round(clamp(guest.interest + delta, 0, SIGN_THRESHOLD))
-      guest.used.push(action.tactic)
-      break
-    }
-    case 'signGuest': {
-      const found = guestAboard(s, action.guestId)
-      if (!found || found.ship.status !== 'docked') return state
-      const { guest, ship } = found
-      const d = derive(s)
-      if (d.crewAlive.length >= d.crewCap) {
-        log(s, `${guest.name} would come aboard, but there is no bunk free.`, 'warn')
-        break
-      }
-      // Interest is a probability, so a half-convinced spacer is a coin toss.
-      // Either way the asking is over: they go back up the gangway.
-      ship.aboard = ship.aboard.filter((g) => g.id !== guest.id)
-      if (Math.random() * SIGN_THRESHOLD >= guest.interest) {
-        log(s, `${guest.name} thought about it and stayed with the ${ship.name}.`, 'warn')
-        break
-      }
-
-      const hire = makeCrew({
-        name: guest.name,
-        stats: guest.stats,
-        seed: guest.seed,
-        portrait: crewPortrait(guest),
-      })
-      s.crew.push(hire)
-      if (guest.promised) assign(s, hire.id, guest.promised)
-      log(s, `${guest.name} signed off the ${ship.name} and onto the station.`, 'good')
-
-      // Taking someone under contract is noticed. Taking their master is
-      // noticed considerably more.
-      shift(s, ship.faction, guest.captain ? -0.05 : -0.015)
-
-      if (guest.captain) {
-        // A master does not leave the hull behind. It comes with them if there
-        // is a berth for it, and is sold on the dock if there is not.
-        const hull = makeShip(ship.cls, ship.name)
-        hull.hull = Math.round(hull.maxHull * (0.6 + Math.random() * 0.25))
-        s.visitors = s.visitors.filter((v) => v.id !== ship.id)
-        if (s.ships.length < fleetCapacity(s)) {
-          s.ships.push(hull)
-          log(s, `The ${hull.name} came with them. She is yours.`, 'good')
-        } else {
-          const paid = tradeInValue(hull)
-          s.credits += paid
-          log(s, `No berth for the ${hull.name}, so she went dockside. +${paid}c.`, 'info')
         }
       }
       break
@@ -2292,33 +2311,53 @@ export const reducer = (state: GameState, action: Action): GameState => {
       log(s, `The Fab Shop laid on a ${itemDef(action.item).name}. −${build.credits}c.`, 'info')
       break
     }
-    case 'declare': {
-      if (declineReason(s, action.faction)) return state
-      const taking = factionDef(action.faction)
-      const leaving = s.patron ? factionDef(s.patron) : null
-      if (leaving) {
-        // Nobody rewards a turncoat as much as they punish one.
-        shift(s, leaving.id, -DEFECTION_COST)
-        shift(s, action.faction, DEFECTION_CREDIT)
-        if (!s.resigned.includes(leaving.id)) s.resigned.push(leaving.id)
-        log(s, `${leaving.name} was informed. ${leaving.exit}`, 'warn')
-      }
-      s.patron = action.faction
-      log(s, `The station flies ${taking.name} paper.`, 'good')
-      if (!taking.exit) {
-        log(s, `Enrolment is permanent. There is no clause for undoing this.`, 'warn')
-      }
+    case 'talk': {
+      // One conversation at a time. Opening a new one abandons the old.
+      const ref = action.with
+      // Look them up before committing, so a stale id opens nothing.
+      const probe: GameState = { ...s, talk: beginTalk(action.script, ref, '') }
+      const found = speaker(probe, ref)
+      if (!found) return state
+      s.talk = beginTalk(action.script, ref, found.name)
       break
     }
-    case 'resign': {
-      if (!s.patron) return state
-      const leaving = factionDef(s.patron)
-      if (!leaving.exit) return state
-      shift(s, leaving.id, -DEFECTION_COST)
-      if (!s.resigned.includes(leaving.id)) s.resigned.push(leaving.id)
-      s.patron = null
-      log(s, `${leaving.name} was informed. ${leaving.exit}`, 'warn')
-      log(s, 'The station flies no flag. Nobody taxes you. Nobody comes either.', 'info')
+    case 'endTalk': {
+      // A conversation that cannot be walked away from stays open.
+      const node = s.talk ? nodeOf(s.talk) : null
+      if (node?.sticky) return state
+      s.talk = null
+      break
+    }
+    case 'say': {
+      const talk = s.talk
+      if (!talk) return state
+      const node = nodeOf(talk)
+      const c = speaker(s, talk.with)
+      if (!node || !c) {
+        s.talk = null
+        break
+      }
+      const picked = offered(c, node).find((o) => o.index === action.reply)
+      if (!picked || picked.barred) return state
+      const { reply } = picked
+
+      // What the commander said goes into the record before anything moves,
+      // so the transcript reads in the order it happened.
+      talk.said.push({ who: 'them', text: node.text(c) })
+      talk.said.push({ who: 'you', text: labelOf(reply, c) })
+
+      for (const flag of reply.sets ?? []) {
+        if (!talk.flags.includes(flag)) talk.flags.push(flag)
+      }
+      reply.effect?.(c)
+
+      const next = typeof reply.goto === 'function' ? reply.goto(c) : reply.goto
+      if (next === null) {
+        s.talk = null
+        break
+      }
+      talk.node = next
+      onEnter(s, talk)
       break
     }
     case 'renameCrew': {

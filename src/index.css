@@ -3215,3 +3215,124 @@ input.rename:focus {
 .report__find--spec {
   color: var(--amber);
 }
+
+.dossier__kit.is-empty {
+  color: var(--ink-faint);
+}
+
+/* --- conversations ----------------------------------------------------- */
+
+.talk {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.talk__face {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0a1119;
+}
+
+.talk__thread {
+  flex: 1;
+  min-width: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.talk__line {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+
+/* Everything already said is faded — it happened, it is not happening. */
+.talk__line--them,
+.talk__line--you {
+  opacity: 0.55;
+}
+
+.talk__line--you {
+  padding-left: 14px;
+  border-left: 2px solid var(--line-hot);
+  color: var(--ink-faint);
+}
+
+.talk__line--you i {
+  display: block;
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.talk__line--now {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.talk__beat {
+  margin: 0;
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--amber);
+}
+
+.talk__replies {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.talk__reply {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 9px 11px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--mint);
+  border-radius: 9px;
+  background: #0d1621;
+}
+
+.talk__reply:hover:not(:disabled) {
+  background: #12202e;
+  border-left-color: var(--ink);
+}
+
+.talk__reply:disabled {
+  opacity: 0.4;
+  border-left-color: var(--ink-faint);
+}
+
+.talk__reply b {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.talk__reply em {
+  font-size: 11px;
+  font-style: normal;
+  color: var(--ink-faint);
+}
+
+.talk__stuck {
+  color: var(--amber);
+}
+
+.topbar__flag i {
+  font-style: normal;
+  opacity: 0.7;
+}

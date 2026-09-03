@@ -1,5 +1,7 @@
 /** Core data model for Spaceport-99. */
 
+import type { Talk } from './talk.ts'
+
 export const STAT_KEYS = ['O', 'R', 'B', 'I', 'T', 'A', 'L'] as const
 export type StatKey = (typeof STAT_KEYS)[number]
 
@@ -164,9 +166,6 @@ export interface LogEntry {
   tone: 'info' | 'good' | 'warn' | 'bad'
 }
 
-/** A tactic the player can use once per interview. */
-export type Tactic = 'bonus' | 'pitch' | 'posting'
-
 /**
  * Someone HQ has sent over, waiting at the docking port. They are not crew yet
  * and cost nothing until they sign.
@@ -186,8 +185,6 @@ export interface Candidate {
   askingBonus: number
   /** Seconds left before they give up and undock. */
   patience: number
-  /** Tactics already spent on them. */
-  used: Tactic[]
   /** Module they were promised, honoured when they sign. */
   promised: string | null
   /** Seconds until they finish transit and appear at the dock. */
@@ -257,8 +254,6 @@ export interface Guest {
   interest: number
   /** Credits they want up front to walk away from their berth. */
   askingBonus: number
-  /** Tactics already spent on them. */
-  used: Tactic[]
   /** Module they were promised, honoured when they sign. */
   promised: string | null
   /** Portrait dealt from the same pool the crew draws on. */
@@ -277,9 +272,14 @@ export interface Prospect {
   tier: number
   interest: number
   askingBonus: number
-  used: Tactic[]
+  /** Seed, so what they want is fixed without being stored. */
+  seed: number
+  /** Room they were promised, honoured when they sign. */
+  promised: string | null
   /** Attachment to a ship they would have to leave. Absent for HQ applicants. */
   grip?: number
+  /** True for a ship's master. They want different things. */
+  captain?: boolean
 }
 
 export interface Visitor {
@@ -297,6 +297,13 @@ export interface Visitor {
   faction: FactionId
   /** On approach, hailing for a berth, or clamped on. */
   status: 'inbound' | 'requesting' | 'docked'
+  /**
+   * Why they are here, when it is not trade. A hull with an intent does not
+   * ask — it is alongside by the time you read the hail.
+   */
+  intent?: 'conquest'
+  /** What a hull with an intent brought with it, against the station's guns. */
+  force?: number
   /** Who came aboard off this hull. Empty until she is cleared to dock. */
   aboard: Guest[]
   /** Seconds until they stop waiting, or until they undock. */
@@ -501,6 +508,14 @@ export interface GameState {
   researching: SpecId | null
   /** What the Fab Shop is running off, and how far through it is. */
   fabricating: { item: ItemId; progress: number } | null
+  /**
+   * The conversation on screen, if any. Only the pointer is kept — which
+   * script, which line, and what has been established — because the scripts
+   * themselves live in code and would not survive a round trip through JSON.
+   */
+  talk: Talk | null
+  /** Seconds until somebody might come for the station. */
+  nextTakeoverIn: number
   /** Ids of crew that arrived but have not been greeted yet (for the toast). */
   seenIntro: boolean
   gameOver: boolean

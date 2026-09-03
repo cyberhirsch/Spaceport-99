@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Derived } from '../game/engine.ts'
 import { resupplyAmount, resupplyCost } from '../game/engine.ts'
+import { factionDef, standingWord } from '../game/factions.ts'
 import type { GameState, ResourceKey } from '../game/types.ts'
 import { RESOURCE_INFO } from '../game/types.ts'
 
@@ -63,6 +64,7 @@ const Gauge = ({
 export const TopBar = ({ state, derived, onRename, onResupply, onOpenMenu }: Props) => {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(state.name)
+  const flag = state.patron ? factionDef(state.patron) : null
 
   const commit = () => {
     setEditing(false)
@@ -108,6 +110,17 @@ export const TopBar = ({ state, derived, onRename, onResupply, onOpenMenu }: Pro
             ☺ {derived.crewAlive.length}/{derived.crewCap}
           </span>
           <span title="Decks">▤ {state.decks}</span>
+          {flag && (
+            <span
+              className="topbar__flag"
+              style={{ color: `hsl(${flag.hue} 70% 62%)` }}
+              title={`${flag.name} — they think of this station as ${standingWord(
+                state.standing[flag.id],
+              )}. Only a hull that comes to take it will change that.`}
+            >
+              {flag.glyph} {flag.short} <i>{standingWord(state.standing[flag.id])}</i>
+            </span>
+          )}
         </div>
       </div>
 

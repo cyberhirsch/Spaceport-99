@@ -31,20 +31,37 @@ test('the founding station can take visitors, and only so many at once', () => {
 })
 
 test('a ship that is waved off leaves, and an honest one leaves a mark', () => {
-  const [withTrader, trader] = hailing(newGame(), { kind: 'trader', claim: 'trader' })
+  // Not the station's own flag — turning that away has its own cost, below.
+  const [withTrader, trader] = hailing(newGame(), {
+    kind: 'trader',
+    claim: 'trader',
+    faction: 'concern',
+  })
   const waved = reducer(withTrader, { type: 'refuseVisitor', visitorId: trader.id })
   assert.equal(waved.visitors.length, 0)
   assert.deepEqual(waved.standing, withTrader.standing, 'waving off a trader costs nothing')
 
-  const [withDrifter, drifter] = hailing(newGame(), { kind: 'drifter', claim: 'drifter' })
+  const [withDrifter, drifter] = hailing(newGame(), {
+    kind: 'drifter',
+    claim: 'drifter',
+    faction: 'unlisted',
+  })
   const turned = reducer(withDrifter, { type: 'refuseVisitor', visitorId: drifter.id })
   const theirs = drifter.faction
   assert.ok(
     turned.standing[theirs] < withDrifter.standing[theirs],
     'turning away real trouble is remembered by their own people',
   )
-  // Unaligned, every power's opinion feeds the station's name.
-  assert.ok(appeal(turned) < appeal(withDrifter), 'and it shows in what the station is worth')
+  // A Confederation post is graded by the Confederation, so a drifter's
+  // opinion only reaches the station's name when it is Confederation paper
+  // being turned away.
+  const [withTerran, terran] = hailing(newGame(), {
+    kind: 'drifter',
+    claim: 'drifter',
+    faction: 'terran',
+  })
+  const snubbed = reducer(withTerran, { type: 'refuseVisitor', visitorId: terran.id })
+  assert.ok(appeal(snubbed) < appeal(withTerran), 'and it shows in what the station is worth')
 })
 
 test('turning away the flag you fly is noticed by the people who issued it', () => {

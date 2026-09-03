@@ -75,8 +75,11 @@ but not to publish.
 
 Three powers run the space the station's traffic comes from and goes back to. Spaceport-99 is
 not a prize any of them is circling: it is a small independent post, far enough out that all
-three find it convenient to leave alone. Whose paper you fly is still the most consequential
-decision the commander makes.
+three find it convenient to leave alone.
+
+**You start on the Confederation roll.** Nobody asked, and for most of the game nobody comes.
+There is no diplomacy tab, no declaring for a flag and no striking one — the only thing that
+ever changes whose paper you fly is a hull that turns up and takes the station.
 
 - **The Terran Confederation** claims by writ: Confederation charter still covers most of
   settled space and no member world has ever voted to give any of it back. It dispatches
@@ -84,15 +87,57 @@ decision the commander makes.
 - **The Meridian Concern** claims the lanes. Best prices at your clamps, credit when a reactor
   goes, and everything itemised.
 - **The Vantric Compact** claims by enrolment. It does not take stations; it invites them, once
-  a year, indefinitely. Protection that arrives when called, and no exit clause.
+  a year, indefinitely.
 - **The Unlisted** are not a power but a filing status — every hull whose registration lapsed.
   You can stand well or badly with them; you cannot fly their flag.
 
-Standing is kept separately for each, and moves on what you do at the clamps: who you berth, who
-you wave off, who you trade with, and who you poach off somebody else's bridge. Whose paper you
-fly decides which of those four opinions feeds `appeal()`, and so who HQ sends and how nasty the
-contracts get. Changing sides is expected out here and never free; the Compact is the one flag
-that cannot be struck.
+Standing is kept separately for each and moves on what you do at the clamps: who you berth, who
+you wave off, who you trade with, who you lean on, and who you poach off somebody else's bridge.
+Whose paper you fly decides which of those four opinions feeds `appeal()`, and so who HQ sends
+and how nasty the contracts get. The flag you currently fly, and what they make of you, is in
+the top bar.
+
+## Somebody comes for the station
+
+There is no warning. Once the place is big enough to be worth the fuel — ten rooms and eight
+hands — a hull eventually arrives that is not requesting a berth. It is alongside by the time
+you read the hail, and the conversation cannot be closed. Four ways out:
+
+| | What it costs |
+| --- | --- |
+| Strike the flag | Their paper from now on. Nobody dies. The power you left strikes you off its roll. |
+| Refuse | A fight decided by your batteries, shields and armed crew against what they brought. Win and every *other* power notices; lose and they take the flag, half the account and a note of who fired. Either way the station is marked. |
+| Pay them off | Steep, and steeper the less you could have fought. They go. They keep the address. |
+| Call your patron | Only works if you have been genuinely worth something to them. Otherwise you get a file number and are still standing there. |
+
+Whoever brought a force scaled it to what they could see you had, so arming the place makes the
+threat bigger and the odds better at the same time.
+
+## Talking to people
+
+Every person on the station or at its clamps can be talked to, and the conversation is the
+mechanism rather than a wrapper around one. Four scripts, in `src/game/talks/`:
+
+- **Your crew** tell you what is actually wrong with the place, worst thing first, in the order
+  a person would say it. They will ask for the posting they are built for, and being thanked for
+  saying something is worth something to them. There is nothing to win here.
+- **Hiring** replaced the three tactic buttons entirely. Everyone wants exactly one thing —
+  money, a job that suits them, a reason to believe in the station, or a way off the hull they
+  came in on — and you have to find out which before you spend anything. Ask them why they came
+  and they answer plainly; ask cold and they tell you to pick one. The right offer is worth 1.6×
+  its face value; the wrong one is worth half; **offering money to somebody who wanted to be
+  believed in is an insult**, and the more senior they are the worse it lands. Interest is still
+  the number underneath — you just cannot see it any more, only how they react.
+- **Ships' masters** will give you the news, tell you what they make of the place, and mention
+  it out there if it is worth mentioning. You can press one on what they are really carrying,
+  and let a dirty hull go or send it away. Leaning on a hull is cheap from behind a staffed
+  battery and expensive from behind nothing.
+- **A takeover**, above.
+
+Under the hood: `src/game/talk.ts` is the engine and holds no content. Only the pointer is saved
+— which script, which line, and what has been established — so a reply can carry a closure and
+still survive a reload. A node marked `sticky` cannot be walked away from; one marked `final`
+still renders after the person has left, which is how a signed contract gets its closing line.
 
 ## Three shapes of work
 
@@ -227,12 +272,11 @@ Crew who drop below a quarter health fall back to the spine and return to their
 post once they have healed up. Automated suppression handles an unattended
 emergency eventually, but far too slowly to rely on.
 
-**Hiring is a negotiation.** Nobody wanders in. A staffed Comms Array puts a
+**Hiring is a conversation.** Nobody wanders in. A staffed Comms Array puts a
 request to HQ, who dispatch someone; they fly out, dock at your Docking Port, and
-wait — not indefinitely. Then you interview them, with three tactics you can each
-use once: pay their signing bonus, pitch the station, or promise them a specific
-post. Offer them a contract and their interest is the odds they take it, so a
-half-convinced applicant is a coin toss and a wasted request.
+wait — not indefinitely. Then you talk to them, and what you can say is above,
+under *Talking to people*. Ask for their answer and their interest is the odds
+they take it, so a half-convinced applicant is a coin toss and a wasted request.
 
 Who turns up depends on **station standing** — size, whether you run a real
 surplus, how the crew are holding up, and what is in the account. HQ does not

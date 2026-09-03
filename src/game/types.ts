@@ -202,7 +202,18 @@ export type VisitorKind = 'trader' | 'courier' | 'patrol' | 'drifter' | 'smuggle
 /** Kit a crew member can be issued: one weapon, one layer of protection. */
 export type ItemSlot = 'sidearm' | 'armour'
 
-export type ItemId = 'cutter' | 'sidearm' | 'lance' | 'vest' | 'plate' | 'carapace'
+export type ItemId =
+  | 'cutter'
+  | 'sidearm'
+  | 'lance'
+  | 'torch'
+  | 'vest'
+  | 'plate'
+  | 'carapace'
+  | 'rig'
+
+/** Things that have to be found and worked out before they exist for you. */
+export type SpecId = 'shield' | 'vault' | 'torch' | 'rig'
 
 /** The powers whose space the traffic comes from, plus everyone off their books. */
 export type FactionId = 'terran' | 'concern' | 'compact' | 'unlisted'
@@ -336,7 +347,7 @@ export type MissionOutcome = 'triumph' | 'success' | 'setback' | 'disaster'
 
 /** Something brought home that is not simply credits or cargo. */
 export interface MissionFind {
-  kind: 'survivor' | 'ship' | 'cache'
+  kind: 'survivor' | 'ship' | 'cache' | 'spec'
   detail: string
 }
 
@@ -481,6 +492,15 @@ export interface GameState {
   resigned: FactionId[]
   /** Kit in the hold, not yet issued to anybody. */
   stores: Partial<Record<ItemId, number>>
+  /**
+   * Specs recovered so far, and how far the Research Lab has got with each. A key
+   * only exists once a fragment has been found; 1 means it is worked out.
+   */
+  specs: Partial<Record<SpecId, number>>
+  /** The spec the Research Lab is currently working on, if any. */
+  researching: SpecId | null
+  /** What the Fab Shop is running off, and how far through it is. */
+  fabricating: { item: ItemId; progress: number } | null
   /** Ids of crew that arrived but have not been greeted yet (for the toast). */
   seenIntro: boolean
   gameOver: boolean

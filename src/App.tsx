@@ -342,6 +342,8 @@ export default function App() {
           onClose={() => setModuleId(null)}
           onAssign={(cid, mid) => act({ type: 'assign', crewId: cid, moduleId: mid })}
           onUpgrade={() => act({ type: 'upgrade', moduleId })}
+          onResearch={(spec) => act({ type: 'research', spec })}
+          onFabricate={(item) => act({ type: 'fabricate', item })}
           canMove={(() => {
             const m = state.modules.find((x) => x.id === moduleId)
             return Boolean(m && canMove(state, m))

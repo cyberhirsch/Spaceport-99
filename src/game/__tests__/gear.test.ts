@@ -120,7 +120,7 @@ test('a battery and a shield are worth nothing unstaffed or switched off', () =>
 })
 
 test('a shield holds without anyone in it, badly', () => {
-  let s = build(newGame(), 'shield', WING - 3)
+  let s = build({ ...newGame(), specs: { shield: 1 } }, 'shield', WING - 3)
   const idle = defence(s).shield
   assert.ok(idle > 0, 'the field is up')
 

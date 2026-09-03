@@ -13,8 +13,16 @@ import {
 import { effectiveness } from '../game/crew.ts'
 import { cycleCredits, cycleYield, powerDraw } from '../game/modules.ts'
 import { incidentDef } from '../game/incidents.ts'
-import { RESOURCE_INFO, STAT_INFO, type Crew, type GameState } from '../game/types.ts'
+import {
+  RESOURCE_INFO,
+  STAT_INFO,
+  type Crew,
+  type GameState,
+  type ItemId,
+  type SpecId,
+} from '../game/types.ts'
 import type { DragState } from '../hooks/useDragAssign.ts'
+import { FabPanel, LabPanel } from './Workbench.tsx'
 import { CrewAvatar } from './CrewAvatar.tsx'
 import { Modal } from './Modal.tsx'
 
@@ -32,6 +40,8 @@ interface Props {
   onAutoAccept: (on: boolean) => void
   canMove: boolean
   onMove: () => void
+  onResearch: (spec: SpecId | null) => void
+  onFabricate: (item: ItemId | null) => void
 }
 
 export const ModuleModal = ({
@@ -48,6 +58,8 @@ export const ModuleModal = ({
   onAutoAccept,
   canMove,
   onMove,
+  onResearch,
+  onFabricate,
 }: Props) => {
   const m = state.modules.find((x) => x.id === moduleId)
   if (!m) return null
@@ -199,6 +211,9 @@ export const ModuleModal = ({
           </div>
         </>
       )}
+
+      {m.kind === 'library' && <LabPanel state={state} onResearch={onResearch} />}
+      {m.kind === 'fabricator' && <FabPanel state={state} onFabricate={onFabricate} />}
 
       {d.slotsPerSegment > 0 && (
         <p className="panel-note">

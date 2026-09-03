@@ -39,6 +39,7 @@ import {
 import { incidentDef } from './incidents.ts'
 import { SLOTS, itemDef, stock } from './gear.ts'
 import { rollCall, unattended } from './calls.ts'
+import { ITEM_SPEC, MODULE_SPEC, SPEC_IDS, specDef } from './specs.ts'
 import {
   DEFECTION_COST,
   DEFECTION_CREDIT,
@@ -73,6 +74,7 @@ import type {
   FactionId,
   ItemId,
   ItemSlot,
+  SpecId,
   Prospect,
   Mission,
   Ship,
@@ -90,7 +92,7 @@ import type {
   StationModule,
 } from './types.ts'
 
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
 export const BASE_CREW_CAP = 8
 export const BASE_STORAGE = 220
@@ -300,6 +302,9 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     patron: null,
     resigned: [],
     stores: {},
+    specs: {},
+    researching: null,
+    fabricating: null,
     seenIntro: false,
     gameOver: false,
   }
@@ -685,6 +690,54 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
       worst.condition = clamp(worst.condition + repairRate * dt, 0.2, 1)
       if (was < 1 && worst.condition >= 1) {
         log(s, `${def(worst.kind).name} repaired to sound.`, 'good')
+      }
+    }
+  }
+
+  // --- the research lab -------------------------------------------------
+  // A recovered spec is a stack of somebody else's paper. The lab turns it into
+  // something the station can actually build. Nothing else does, and it only
+  // works on one at a time.
+  if (s.researching) {
+    const id = s.researching
+    if ((s.specs[id] ?? 0) >= 1) {
+      s.researching = null
+    } else {
+      const rate = researchRate(s, crewById) * Math.max(0.6, grid)
+      if (rate > 0) {
+        const sd = specDef(id)
+        s.specs[id] = Math.min(1, (s.specs[id] ?? 0) + (rate / sd.effort) * dt)
+        if (s.specs[id]! >= 1) {
+          s.researching = null
+          const what =
+            sd.unlocks.kind === 'module'
+              ? `${def(sd.unlocks.module).name} can be built.`
+              : `${itemDef(sd.unlocks.item).name} can be run off in the Fab Shop.`
+          log(s, `${sd.name} worked out. ${what}`, 'good')
+          const next = openSpecs(s)[0]
+          if (next) {
+            s.researching = next
+            log(s, `The lab moved on to ${specDef(next).name}.`, 'info')
+          }
+        }
+      }
+    }
+  }
+
+  // --- the Fab Shop ------------------------------------------------------
+  if (s.fabricating) {
+    const spec = ITEM_SPEC[s.fabricating.item]
+    const build = spec ? specDef(spec).build : undefined
+    if (!build) {
+      s.fabricating = null
+    } else {
+      const rate = fabRate(s, crewById) * Math.max(0.6, grid)
+      s.fabricating.progress += (rate / build.seconds) * dt
+      if (s.fabricating.progress >= 1) {
+        const item = s.fabricating.item
+        s.stores[item] = (s.stores[item] ?? 0) + 1
+        s.fabricating = null
+        log(s, `The Fab Shop finished a ${itemDef(item).name}. It is in the hold.`, 'good')
       }
     }
   }
@@ -1141,8 +1194,25 @@ const resolveMission = (s: GameState, m: Mission): void => {
     }
   }
 
+  // Working drawings are the one find that is not a lottery. They come off
+  // dangerous jobs, because that is where nobody is left to keep their papers,
+  // and there are only ever four of them to bring home.
+  const fresh = SPEC_IDS.filter((id) => s.specs[id] === undefined)
+  if (
+    fresh.length > 0 &&
+    outcome !== 'disaster' &&
+    Math.random() < (outcome === 'triumph' ? 0.24 : 0.1) + m.danger * 0.22
+  ) {
+    const id = fresh[Math.floor(Math.random() * fresh.length)]
+    s.specs[id] = 0
+    if (!s.researching) s.researching = id
+    const sd = specDef(id)
+    m.find = { kind: 'spec', detail: `${sd.name}, off ${sd.found}.` }
+    log(s, `${m.name} came back with a spec: ${sd.name}.`, 'good')
+  }
+
   // Rare finds, and never on a run that went wrong.
-  if (outcome === 'triumph' || (outcome === 'success' && Math.random() < 0.15)) {
+  if (!m.find && (outcome === 'triumph' || (outcome === 'success' && Math.random() < 0.15))) {
     const roll = Math.random()
     if (roll < 0.4 && s.crew.filter((c) => !c.dead).length < derive(s).crewCap) {
       const survivor = makeCrew({ portrait: allocatePortrait(s) })
@@ -1290,10 +1360,11 @@ export type Action =
   | { type: 'signGuest'; guestId: string }
   | { type: 'recall'; missionId: string }
   | { type: 'answerCall'; missionId: string; choice: number }
-  | { type: 'declineMission'; missionId: string }
   | { type: 'buyGear'; visitorId: string; item: ItemId }
   | { type: 'issueGear'; crewId: string; item: ItemId }
   | { type: 'stowGear'; crewId: string; slot: ItemSlot }
+  | { type: 'research'; spec: SpecId | null }
+  | { type: 'fabricate'; item: ItemId | null }
   | { type: 'declare'; faction: FactionId }
   | { type: 'resign' }
   | { type: 'revive'; crewId: string }
@@ -1324,6 +1395,49 @@ export const SIGN_THRESHOLD = 100
  * dark, hungry outpost, which is why the strongest applicants only turn up once
  * the place is worth joining.
  */
+/** A spec is known once the Research Lab has finished working it out. */
+export const knows = (s: GameState, id: SpecId): boolean => (s.specs[id] ?? 0) >= 1
+
+/** Specs found but not yet finished, oldest first. */
+export const openSpecs = (s: GameState): SpecId[] =>
+  SPEC_IDS.filter((id) => s.specs[id] !== undefined && !knows(s, id))
+
+/**
+ * Whether a room can be built at all. Most are gated only on how many people
+ * are aboard; a couple need a drawing somebody else made first.
+ */
+export const moduleLocked = (s: GameState, kind: ModuleKind): SpecId | null => {
+  const spec = MODULE_SPEC[kind]
+  return spec && !knows(s, spec) ? spec : null
+}
+
+/** Kit the Fab Shop could run off right now. */
+export const fabricable = (s: GameState): ItemId[] =>
+  (Object.keys(ITEM_SPEC) as ItemId[]).filter((item) => {
+    const spec = ITEM_SPEC[item]
+    return spec !== undefined && knows(s, spec)
+  })
+
+/** How fast the Research Lab works: its crew's Intellect, its size and its grid. */
+export const researchRate = (s: GameState, crewById: Map<string, Crew>): number => {
+  let rate = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'library' || m.standby) continue
+    rate += workRate(m, crewById) * m.width * m.level * mergeBonus(m) * 1.6
+  }
+  return rate
+}
+
+/** How fast the Fab Shop turns a known pattern into a thing. */
+export const fabRate = (s: GameState, crewById: Map<string, Crew>): number => {
+  let rate = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'fabricator' || m.standby) continue
+    rate += workRate(m, crewById) * m.width * m.level * mergeBonus(m)
+  }
+  return rate
+}
+
 /** Nudge one power's opinion of the station, inside the range it can move in. */
 const shift = (s: GameState, id: FactionId, amount: number): void => {
   s.standing[id] = clamp(s.standing[id] + amount, STANDING_FLOOR, STANDING_CEILING)
@@ -1611,6 +1725,8 @@ export const reducer = (state: GameState, action: Action): GameState => {
   switch (action.type) {
     case 'build': {
       if (!canBuildAt(s, action.deck, action.col)) return state
+      // Some rooms cannot be built until somebody has worked out how.
+      if (moduleLocked(s, action.kind)) return state
       const cost = buildCost(action.kind, countOfKind(s, action.kind))
       if (s.credits < cost) return state
       s.credits -= cost
@@ -2141,6 +2257,39 @@ export const reducer = (state: GameState, action: Action): GameState => {
       const next = { ...c.gear }
       delete next[action.slot]
       c.gear = next
+      break
+    }
+    case 'research': {
+      // The lab works one drawing at a time. Switching does not lose the work
+      // already done on the other — paper keeps.
+      if (action.spec === null) {
+        s.researching = null
+        break
+      }
+      if (!openSpecs(s).includes(action.spec)) return state
+      if (s.researching === action.spec) return state
+      s.researching = action.spec
+      log(s, `The lab took up ${specDef(action.spec).name}.`, 'info')
+      break
+    }
+    case 'fabricate': {
+      if (action.item === null) {
+        // Cancelling refunds the materials. The shift is gone either way.
+        if (!s.fabricating) return state
+        const spec = ITEM_SPEC[s.fabricating.item]
+        const build = spec ? specDef(spec).build : undefined
+        if (build) s.credits += build.credits
+        s.fabricating = null
+        break
+      }
+      if (s.fabricating) return state
+      if (!fabricable(s).includes(action.item)) return state
+      const spec = ITEM_SPEC[action.item]
+      const build = spec ? specDef(spec).build : undefined
+      if (!build || s.credits < build.credits) return state
+      s.credits -= build.credits
+      s.fabricating = { item: action.item, progress: 0 }
+      log(s, `The Fab Shop laid on a ${itemDef(action.item).name}. −${build.credits}c.`, 'info')
       break
     }
     case 'declare': {

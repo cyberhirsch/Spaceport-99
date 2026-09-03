@@ -3123,3 +3123,95 @@ input.rename:focus {
 .mission__bar i.is-hot {
   background: var(--red);
 }
+
+/* --- specs: the research lab and the fab shop ------------------------- */
+
+.build-item.is-gated {
+  border-left-color: var(--ink-faint);
+}
+
+.specs {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.spec,
+.fab-run {
+  display: grid;
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink-faint);
+  border-radius: 9px;
+  background: #0d1621;
+}
+
+.spec--live,
+.fab-run {
+  border-left-color: var(--amber);
+}
+
+.spec--done {
+  border-left-color: var(--mint);
+}
+
+.spec__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.spec__head b {
+  flex: 1;
+  font-size: 13px;
+}
+
+.spec__head em {
+  font-size: 11px;
+  font-style: normal;
+  color: var(--ink-dim);
+}
+
+.spec__blurb {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.spec__bar {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: #0a1119;
+  overflow: hidden;
+}
+
+.spec__bar i {
+  display: block;
+  height: 100%;
+  background: var(--amber);
+}
+
+.spec--done .spec__bar i {
+  background: var(--mint);
+}
+
+.spec__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spec__foot em {
+  flex: 1;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--ink-faint);
+}
+
+.report__find--spec {
+  color: var(--amber);
+}

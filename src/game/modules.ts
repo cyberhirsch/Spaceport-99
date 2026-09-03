@@ -123,7 +123,8 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     kind: 'fabricator',
     name: 'Fabricator',
     short: 'Fab Shop',
-    blurb: 'Prints parts from feedstock and sells the surplus dockside.',
+    blurb:
+      'Prints parts from feedstock and sells the surplus dockside. Runs off kit the lab has worked out.',
     glyph: '⚒',
     hue: 25,
     cost: 480,
@@ -221,9 +222,10 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
   },
   library: {
     kind: 'library',
-    name: 'Archive',
-    short: 'Archive',
-    blurb: 'Every manual ever written, and a coffee machine. Trains Intellect.',
+    name: 'Research Lab',
+    short: 'Research',
+    blurb:
+      'Reference stacks, a drawing board and a coffee machine. Trains Intellect, and the only place a recovered spec gets worked out.',
     glyph: '❑',
     hue: 215,
     cost: 600,

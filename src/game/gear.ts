@@ -62,6 +62,18 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
     bonus: { R: 2, T: 1 },
     sellers: { compact: 1 },
   },
+  torch: {
+    id: 'torch',
+    name: 'Breaching Torch',
+    short: 'Torch',
+    slot: 'sidearm',
+    glyph: '⌁',
+    blurb: 'A cutting tool with the safety interlocks left out. Nobody sells these; you make them.',
+    price: 0,
+    guard: 5,
+    bonus: { R: 1, B: 1 },
+    sellers: {},
+  },
   vest: {
     id: 'vest',
     name: 'Work Vest',
@@ -97,6 +109,18 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
     guard: 8,
     bonus: { B: 2, O: 1 },
     sellers: { compact: 1 },
+  },
+  rig: {
+    id: 'rig',
+    name: 'Sealed Rig',
+    short: 'Rig',
+    slot: 'armour',
+    glyph: '◘',
+    blurb: 'Vacuum-rated and self-sealing. Heavy enough that nobody wears it for a whole shift.',
+    price: 0,
+    guard: 6,
+    bonus: { B: 2, O: 1 },
+    sellers: {},
   },
 }
 

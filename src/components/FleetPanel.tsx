@@ -223,7 +223,11 @@ export const FleetPanel = ({
           <strong>{OUTCOME_INFO[m.outcome!].label}</strong>
           <span>{m.name}</span>
           <span className="report__body">{m.report}</span>
-          {m.find && <span className="report__find">◈ {m.find.detail}</span>}
+          {m.find && (
+            <span className={`report__find${m.find.kind === 'spec' ? ' report__find--spec' : ''}`}>
+              {m.find.kind === 'spec' ? '❑' : '◈'} {m.find.detail}
+            </span>
+          )}
           <button className="btn btn--tiny" onClick={() => onFileReport(m.id)}>
             File it
           </button>

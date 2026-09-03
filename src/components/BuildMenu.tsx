@@ -1,4 +1,5 @@
-import { BUILDABLE, buildCost, countOfKind } from '../game/engine.ts'
+import { BUILDABLE, buildCost, countOfKind, moduleLocked } from '../game/engine.ts'
+import { specDef } from '../game/specs.ts'
 import type { Derived } from '../game/engine.ts'
 import type { GameState, ModuleKind } from '../game/types.ts'
 import { RESOURCE_INFO, STAT_INFO } from '../game/types.ts'
@@ -22,17 +23,28 @@ export const BuildMenu = ({ state, derived, placing, onPick }: Props) => {
       </p>
       <ul className="build-list">
         {BUILDABLE.map((d) => {
-          const locked = crewCount < d.unlockAtCrew
+          // Two different walls. Most rooms wait on people; a couple wait on a
+          // drawing nobody at this station has ever seen.
+          const gate = moduleLocked(state, d.kind)
+          const found = gate !== null && state.specs[gate] !== undefined
+          const locked = gate !== null || crewCount < d.unlockAtCrew
           const cost = buildCost(d.kind, countOfKind(state, d.kind))
           const poor = state.credits < cost
+          const why = gate
+            ? found
+              ? `${specDef(gate).name} — the lab is still working on it`
+              : `Needs a spec nobody here has: ${specDef(gate).name}`
+            : crewCount < d.unlockAtCrew
+              ? `Unlocks at ${d.unlockAtCrew} crew`
+              : d.blurb
           return (
             <li key={d.kind}>
               <button
-                className={`build-item${placing === d.kind ? ' is-active' : ''}`}
+                className={`build-item${placing === d.kind ? ' is-active' : ''}${gate ? ' is-gated' : ''}`}
                 style={{ ['--room-hue' as string]: String(d.hue) }}
                 disabled={locked || poor}
                 onClick={() => onPick(d.kind)}
-                title={locked ? `Unlocks at ${d.unlockAtCrew} crew` : d.blurb}
+                title={why}
               >
                 <span className="build-item__glyph">{d.glyph}</span>
                 <span className="build-item__text">
@@ -52,7 +64,7 @@ export const BuildMenu = ({ state, derived, placing, onPick }: Props) => {
                   </span>
                 </span>
                 <span className="build-item__cost">
-                  {locked ? `${d.unlockAtCrew} crew` : `${cost}c`}
+                  {gate ? (found ? 'in the lab' : 'spec needed') : locked ? `${d.unlockAtCrew} crew` : `${cost}c`}
                 </span>
               </button>
             </li>

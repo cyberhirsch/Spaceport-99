@@ -1,4 +1,4 @@
-import { PHASE_LABEL, autoAccepting, def, visitorPhase } from '../game/engine.ts'
+import { PHASE_LABEL, autoAccepting, def, dockOfficers, visitorPhase } from '../game/engine.ts'
 import { shipDef } from '../game/fleet.ts'
 import { SELL_MARGIN, TRADE_LOT, scanReading, visitorDef } from '../game/visitors.ts'
 import { factionDef } from '../game/factions.ts'
@@ -36,6 +36,7 @@ export const VisitorModal = ({
   const claimed = visitorDef(v.claim)
   const dock = state.modules.find((m) => m.kind === 'dock' && !m.standby)
   const auto = autoAccepting(state)
+  const officers = dockOfficers(state)
   const phase = visitorPhase(v)
 
   if (v.status === 'inbound') {
@@ -88,13 +89,25 @@ export const VisitorModal = ({
         </p>
 
         <div className="modal__actions">
-          <button className="btn btn--primary" onClick={onAccept}>
-            Open the clamps
+          <button
+            className="btn btn--primary"
+            disabled={officers === 0}
+            onClick={onAccept}
+            title={officers === 0 ? 'Nobody is working the docking desk' : undefined}
+          >
+            {officers === 0 ? 'Nobody on the desk' : 'Clear them to dock'}
           </button>
           <button className="btn btn--danger" onClick={onRefuse}>
             Wave them off
           </button>
         </div>
+
+        {officers === 0 && (
+          <p className="panel-note">
+            The clamps do not close themselves. Post somebody to the {def('dock').name} and they
+            can be brought alongside.
+          </p>
+        )}
 
         {dock && (
           <label className="toggle">
@@ -104,8 +117,8 @@ export const VisitorModal = ({
               onChange={(e) => onAutoAccept(e.target.checked)}
             />
             <span>
-              Clear all traffic automatically — no more asking, and no more scans read before the
-              clamps open.
+              Standing order to the desk: clear anything that hails. No more asking, and no more
+              scans read before a hull is alongside.
             </span>
           </label>
         )}

@@ -113,6 +113,14 @@ and the missions beyond your capacity go **out of contact**: still flying, still
 no longer reachable. You cannot recall them, and when they hail they stop waiting and decide for
 themselves — which they do cautiously, because they are the ones out there.
 
+## The docking desk
+
+Clamps do not close themselves. A Docking Port with nobody posted to it takes no traffic at all:
+hulls still arrive and hail, but they cannot be cleared, the port's share of the berthing fees
+stops, and auto-accept does nothing — it is a standing order to whoever is on the desk, not an
+unmanned system. The station is founded with six, not five, because it has seven posts and life
+support cannot be robbed to man the desk.
+
 ## Defending the place
 
 Four things decide whether a station can say no. A **Defence Battery** is two hardpoints and a

@@ -107,7 +107,11 @@ export const dockingFees = (s: GameState): number => {
   const alive = s.crew.filter((c) => !c.dead).length
   let fees = 0.1 + alive * 0.035 + s.modules.length * 0.02
   for (const m of s.modules) {
-    if (m.kind === 'dock') fees += 0.3 * m.width * m.level
+    // The port's own take needs somebody on the desk to collect it. An empty
+    // one is a row of clamps nothing is tied to.
+    if (m.kind === 'dock' && !m.standby && m.staff.length > 0) {
+      fees += 0.3 * m.width * m.level
+    }
   }
   return fees
 }
@@ -299,14 +303,30 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     seenIntro: false,
     gameOver: false,
   }
-  // The founders are hand-picked: one specialist per critical system, plus two
-  // generalists, so a new station is never dead on arrival through bad luck.
-  const founders: (StatKey | undefined)[] = ['T', 'O', 'B', undefined, undefined]
+  // The founders are hand-picked: one specialist per critical system, a port
+  // officer, and two generalists, so a new station is never dead on arrival
+  // through bad luck. Six, not five, because the station has seven posts and
+  // life support cannot be robbed to man the desk.
+  const founders: (StatKey | undefined)[] = ['T', 'O', 'B', 'A', undefined, undefined]
   for (const focus of founders) {
     state.crew.push(makeCrew({ stats: rollStats(6, focus), portrait: allocatePortrait(state) }))
   }
-  // Put the founding crew straight to work so the station is not dead on arrival.
+  // Put the founding crew straight to work so the station is not dead on
+  // arrival, then make sure somebody is on the docking desk: the founders
+  // arrived through it, and nothing comes alongside a port nobody is working.
   autoAssignInto(state)
+  const port = state.modules.find((m) => m.kind === 'dock')
+  if (port && port.staff.length === 0) {
+    const spare = [...state.crew]
+      .filter((c) => {
+        const post = state.modules.find((m) => m.id === c.assignment)
+        // Take from the fullest room, never from one running on a single pair
+        // of hands.
+        return !post || post.staff.length > 1
+      })
+      .sort((a, b) => effectiveness(b, 'A') - effectiveness(a, 'A'))[0]
+    if (spare) assign(state, spare.id, port.id)
+  }
   log(state, 'Station commissioned. Docking clamps released.', 'good')
   return state
 }
@@ -951,7 +971,7 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
   }
 }
 
-/** Opens the clamps and finds out what was actually aboard. */
+/** Brings a hull alongside and finds out what was actually aboard. */
 const admitVisitor = (s: GameState, v: Visitor): void => {
   const cap = derive(s).storageCap
   v.status = 'docked'
@@ -1022,7 +1042,7 @@ const admitVisitor = (s: GameState, v: Visitor): void => {
     }
     case 'raider': {
       if (dock) startIncident(s, 'pirates', dock)
-      log(s, `${v.name} opened fire the moment the clamps closed.`, 'bad')
+      log(s, `${v.name} opened fire the moment the clamps had her.`, 'bad')
       break
     }
   }
@@ -1358,9 +1378,23 @@ export const guestsAboard = (s: GameState): { guest: Guest; ship: Visitor }[] =>
 export const visitorBerths = (s: GameState): number =>
   s.modules.filter((m) => m.kind === 'dock' && !m.standby).length * 2
 
-/** True when any docking port is set to wave arrivals straight in. */
+/**
+ * Bodies on the docking desk. Clamps do not close themselves: somebody has to
+ * read the scan, talk the hull in and work the gangway, so an empty port takes
+ * no traffic however many berths it has.
+ */
+export const dockOfficers = (s: GameState): number =>
+  s.modules
+    .filter((m) => m.kind === 'dock' && !m.standby)
+    .reduce((n, m) => n + m.staff.length, 0)
+
+/**
+ * True when a docking port is set to wave arrivals straight in. It is still a
+ * standing order to the person on the desk, not an unmanned system — the
+ * setting decides whether the commander is asked, not whether anyone is there.
+ */
 export const autoAccepting = (s: GameState): boolean =>
-  s.modules.some((m) => m.kind === 'dock' && m.autoAccept && !m.standby)
+  dockOfficers(s) > 0 && s.modules.some((m) => m.kind === 'dock' && m.autoAccept && !m.standby)
 
 /** Hull berths across every hangar bay. */
 export const fleetCapacity = (s: GameState): number =>
@@ -1869,6 +1903,8 @@ export const reducer = (state: GameState, action: Action): GameState => {
     case 'acceptVisitor': {
       const v = s.visitors.find((x) => x.id === action.visitorId)
       if (!v || v.status !== 'requesting') return state
+      // Nobody on the desk, nothing comes alongside.
+      if (dockOfficers(s) === 0) return state
       admitVisitor(s, v)
       break
     }

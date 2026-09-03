@@ -276,7 +276,7 @@ export interface Visitor {
   /** Ship name on the transponder. */
   name: string
   cls: ShipClass
-  /** The truth, revealed only once the clamps are open. */
+  /** The truth, revealed only once they are alongside. */
   kind: VisitorKind
   /** What they say they are. Honest ships tell the truth. */
   claim: VisitorKind
@@ -286,7 +286,7 @@ export interface Visitor {
   faction: FactionId
   /** On approach, hailing for a berth, or clamped on. */
   status: 'inbound' | 'requesting' | 'docked'
-  /** Who came aboard off this hull. Empty until the clamps open. */
+  /** Who came aboard off this hull. Empty until she is cleared to dock. */
   aboard: Guest[]
   /** Seconds until they stop waiting, or until they undock. */
   timer: number

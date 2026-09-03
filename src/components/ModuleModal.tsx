@@ -228,8 +228,8 @@ export const ModuleModal = ({
             onChange={(e) => onAutoAccept(e.target.checked)}
           />
           <span>
-            Clear traffic automatically. Ships dock without asking — convenient, and nobody reads
-            the scan before the clamps open.
+            Standing order to the desk: clear anything that hails. Convenient, and nobody reads
+            the scan before a hull is alongside. The desk still has to be manned either way.
           </span>
         </label>
       )}

@@ -17,7 +17,14 @@ import { TitleScreen } from './components/TitleScreen.tsx'
 import { agoOf, spanOf } from './components/saveText.ts'
 import { slotInfo } from './game/save.ts'
 import { TopBar } from './components/TopBar.tsx'
-import { canMove, guestsAboard, isAway, relocateAnchor, staffSlots } from './game/engine.ts'
+import {
+  canMove,
+  dockOfficers,
+  guestsAboard,
+  isAway,
+  relocateAnchor,
+  staffSlots,
+} from './game/engine.ts'
 import { useDragAssign } from './hooks/useDragAssign.ts'
 import { useGame } from './hooks/useGame.ts'
 import { useMediaQuery } from './hooks/useMediaQuery.ts'
@@ -154,6 +161,9 @@ export default function App() {
     state.modules.some((m) => m.kind === 'command') &&
       !state.modules.some((m) => m.kind === 'command' && m.staff.length > 0) &&
       'Command Module unstaffed — no contracts are coming in',
+    state.modules.some((m) => m.kind === 'dock') &&
+      dockOfficers(state) === 0 &&
+      'Docking Port unstaffed — nothing can come alongside',
   ].filter(Boolean) as string[]
 
   if (parked) {

@@ -6,6 +6,7 @@ import {
   appeal,
   autoAccepting,
   derive,
+  dockOfficers,
   newGame,
   guestsAboard,
   reducer,
@@ -26,7 +27,7 @@ const hailing = (s: GameState, over: Partial<Visitor> = {}): [GameState, Visitor
 test('the founding station can take visitors, and only so many at once', () => {
   const s = newGame()
   assert.ok(visitorBerths(s) > 0, 'it starts with a docking port')
-  assert.equal(autoAccepting(s), false, 'and asks before opening the clamps')
+  assert.equal(autoAccepting(s), false, 'and asks before clearing anyone in')
 })
 
 test('a ship that is waved off leaves, and an honest one leaves a mark', () => {
@@ -73,7 +74,7 @@ test('a raider is trouble the moment the clamps close', () => {
   assert.equal(s.incidents[0].kind, 'pirates')
 })
 
-test('auto-accept opens the clamps without asking', () => {
+test('auto-accept clears traffic without asking', () => {
   let s = newGame()
   const dock = s.modules.find((m) => m.kind === 'dock')!
   s = reducer(s, { type: 'setAutoAccept', moduleId: dock.id, autoAccept: true })
@@ -280,4 +281,31 @@ test('a raider sends nobody friendly onto the decks', () => {
   const s = reducer(ready, { type: 'acceptVisitor', visitorId: raider.id })
   assert.equal(guestsAboard(s).length, 0, 'what came off that hull is an emergency, not a guest')
   assert.equal(s.incidents.length, 1)
+})
+
+test('nothing comes alongside a docking port nobody is working', () => {
+  const manned = newGame()
+  assert.ok(dockOfficers(manned) > 0, 'the founders arrived through it and one of them stayed')
+
+  // Stand the port officer down.
+  const port = manned.modules.find((m) => m.kind === 'dock')!
+  let s = manned
+  for (const id of [...port.staff]) s = reducer(s, { type: 'assign', crewId: id, moduleId: null })
+  assert.equal(dockOfficers(s), 0)
+
+  const [ready, v] = hailing(s, { kind: 'trader', claim: 'trader' })
+  assert.equal(reducer(ready, { type: 'acceptVisitor', visitorId: v.id }), ready, 'the clamps stay open')
+  assert.equal(autoAccepting(s), false, 'and a standing order needs somebody to stand there')
+
+  // Put anybody back on the desk and it works again.
+  const back = reducer(ready, { type: 'assign', crewId: ready.crew[0].id, moduleId: port.id })
+  const docked = reducer(back, { type: 'acceptVisitor', visitorId: v.id })
+  assert.equal(docked.visitors.find((x) => x.id === v.id)?.status, 'docked')
+})
+
+test('a powered-down docking port has nobody on the desk either', () => {
+  const s = newGame()
+  const port = s.modules.find((m) => m.kind === 'dock')!
+  const dark = reducer(s, { type: 'setStandby', moduleId: port.id, standby: true })
+  assert.equal(dockOfficers(dark), 0, 'standby stands the shift down')
 })

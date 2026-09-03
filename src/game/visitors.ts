@@ -12,7 +12,7 @@ interface VisitorDef {
   label: string
   /** What the hail says they want. */
   hail: string
-  /** True when opening the clamps for them is a mistake. */
+  /** True when clearing them to dock is a mistake. */
   trouble: boolean
   /** How often this shows up, relative to the others. */
   weight: number
@@ -137,7 +137,7 @@ const MISSION_HANDOFF: VisitorOffer = {
 }
 
 /**
- * Who you actually meet when the clamps open. `grip` is how tightly they are
+ * Who you actually meet when a hull comes alongside. `grip` is how tightly they are
  * bound to the hull they came in on: a passenger is already looking for a way
  * off, a ship's master has to be prised loose, and only a station worth moving
  * to will manage it. `points` is the stat budget they were built with, which is

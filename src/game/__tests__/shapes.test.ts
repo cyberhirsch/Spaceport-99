@@ -183,18 +183,22 @@ test('work paid in standing settles when the team gets home', () => {
 })
 
 test('the better the run, the more of the goodwill it earns', () => {
-  const settle = (outcome: 'triumph' | 'success' | 'setback' | 'disaster') => {
-    const [board, m] = offer(ready(), { seconds: 10, remaining: 10, standing: ['concern', 0.06] })
-    // Freeze the roll by handing the same job wildly different teams.
-    const stat = { triumph: 12, success: 8, setback: 3, disaster: 1 }[outcome]
-    const strong: GameState = {
-      ...board,
-      crew: board.crew.map((c) => ({ ...c, stats: { ...c.stats, [m.stat]: stat }, level: stat })),
+  // The roll carries ±10 of noise, so this is a claim about the average and
+  // has to be measured as one.
+  const settle = (stat: number) => {
+    let total = 0
+    for (let i = 0; i < 25; i += 1) {
+      const [board, m] = offer(ready(), { seconds: 10, remaining: 10, standing: ['concern', 0.06] })
+      const team: GameState = {
+        ...board,
+        crew: board.crew.map((c) => ({ ...c, stats: { ...c.stats, [m.stat]: stat }, level: stat })),
+      }
+      const after = advance(fly(team, m), 40)
+      total += after.standing.concern - board.standing.concern
     }
-    const after = advance(fly(strong, m), 40)
-    return after.standing.concern - board.standing.concern
+    return total / 25
   }
-  const good = settle('triumph')
-  const bad = settle('disaster')
-  assert.ok(good > bad, `a good run should beat a bad one: ${good} vs ${bad}`)
+  const good = settle(12)
+  const bad = settle(1)
+  assert.ok(good > bad, `a good crew should out-earn a hopeless one: ${good} vs ${bad}`)
 })

@@ -3216,10 +3216,6 @@ input.rename:focus {
   color: var(--amber);
 }
 
-.dossier__kit.is-empty {
-  color: var(--ink-faint);
-}
-
 /* --- conversations ----------------------------------------------------- */
 
 .talk {
@@ -3335,4 +3331,104 @@ input.rename:focus {
 .topbar__flag i {
   font-style: normal;
   opacity: 0.7;
+}
+
+/* --- issued kit, on the dossier ---------------------------------------- */
+
+/* Two across, on the same rhythm as the facts grid above it. */
+.dossier__kit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin-top: 14px;
+}
+
+@media (max-width: 560px) {
+  .dossier__kit {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kit {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  min-width: 0;
+}
+
+.kit__frame {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-hot);
+  border-radius: 9px;
+  background: #0a1119;
+  overflow: hidden;
+}
+
+/* An empty slot reads as a slot, not as a missing picture. */
+.kit--empty .kit__frame {
+  border-style: dashed;
+  border-color: var(--line);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 6px,
+      rgb(255 255 255 / 0.015) 6px 12px
+    ),
+    #0a1119;
+}
+
+.kit__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.kit__glyph {
+  font-size: 26px;
+  font-style: normal;
+  color: var(--ink-faint);
+}
+
+.kit--empty .kit__glyph {
+  font-size: 20px;
+  opacity: 0.5;
+}
+
+.kit__label {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.kit__label em {
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.kit__label b {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.kit--empty .kit__label b {
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+
+/* The name has the full column under the frame, so it wraps rather than
+   truncating — but it never widens the column. */
+.kit__label {
+  max-width: 100%;
+}
+
+.kit__label b {
+  overflow-wrap: anywhere;
 }

@@ -3,6 +3,7 @@ import { ITEM_IDS, SLOTS, SLOT_LABEL, itemDef } from '../game/gear.ts'
 import { effectiveness, portraitIndex, statTotal, xpForLevel } from '../game/crew.ts'
 import type { GameState, ItemId, ItemSlot } from '../game/types.ts'
 import { CrewAvatar } from './CrewAvatar.tsx'
+import { GearSlot } from './GearSlot.tsx'
 import { EditableName } from './EditableName.tsx'
 import { hpStyle } from './meters.ts'
 import { Modal } from './Modal.tsx'
@@ -77,18 +78,13 @@ export const CrewModal = ({
               <dt>Aptitude</dt>
               <dd>{statTotal(c)} pts</dd>
             </div>
-            {SLOTS.map((slot) => {
-              const worn = c.gear?.[slot]
-              return (
-                <div key={slot}>
-                  <dt>{SLOT_LABEL[slot]}</dt>
-                  <dd className={worn ? 'dossier__kit' : 'dossier__kit is-empty'}>
-                    {worn ? itemDef(worn).name : 'None issued'}
-                  </dd>
-                </div>
-              )
-            })}
           </dl>
+
+          <div className="dossier__kit">
+            {SLOTS.map((slot) => (
+              <GearSlot key={slot} slot={slot} item={c.gear?.[slot]} />
+            ))}
+          </div>
         </div>
       </div>
 

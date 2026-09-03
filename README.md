@@ -180,6 +180,16 @@ with a bad reputation, and the Compact will sell you a lance if it likes you and
 Kit counts twice — as stat points on the person wearing it, and as small arms when a boarding
 party comes down a corridor.
 
+### Kit art
+
+`public/gear/<itemId>.webp`, 256×256, alongside the portraits in `public/crew/`.
+Every file is optional: a slot with no art falls back to the item's glyph, and an
+empty slot draws a dashed frame instead. So a new piece of kit works the day it
+is added and gets its picture whenever one exists.
+
+Present: `sidearm`, `lance`, `torch`, `plate`. Still on glyphs: `cutter`, `vest`,
+`carapace`, `rig`.
+
 ## Things nobody will sell you
 
 Four things on this station cannot be bought, bribed for, or unlocked by getting big enough.

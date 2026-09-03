@@ -1,4 +1,12 @@
-import { fabRate, fabricable, knows, openSpecs, researchRate } from '../game/engine.ts'
+import {
+  derive,
+  fabRate,
+  fabricable,
+  heldItems,
+  knows,
+  openSpecs,
+  researchRate,
+} from '../game/engine.ts'
 import { itemDef } from '../game/gear.ts'
 import { ITEM_SPEC, SPEC_IDS, specDef } from '../game/specs.ts'
 import { def } from '../game/modules.ts'
@@ -144,6 +152,7 @@ export const FabPanel = ({ state, onFabricate }: FabProps) => {
             const build = spec ? specDef(spec).build : undefined
             if (!build) return null
             const poor = state.credits < build.credits
+            const noRoom = heldItems(state) >= derive(state).holdCap
             return (
               <li key={item} className="spec">
                 <span className="spec__head">
@@ -160,11 +169,17 @@ export const FabPanel = ({ state, onFabricate }: FabProps) => {
                   </em>
                   <button
                     className="btn btn--tiny"
-                    disabled={poor}
+                    disabled={poor || noRoom}
                     onClick={() => onFabricate(item)}
-                    title={poor ? 'Not enough credits for the materials' : undefined}
+                    title={
+                      noRoom
+                        ? 'Nowhere to put it — the hold is full'
+                        : poor
+                          ? 'Not enough credits for the materials'
+                          : undefined
+                    }
                   >
-                    Lay one on
+                    {noRoom ? 'Hold full' : 'Lay one on'}
                   </button>
                 </span>
               </li>

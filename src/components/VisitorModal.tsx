@@ -1,4 +1,12 @@
-import { PHASE_LABEL, autoAccepting, def, dockOfficers, visitorPhase } from '../game/engine.ts'
+import {
+  PHASE_LABEL,
+  autoAccepting,
+  def,
+  derive,
+  dockOfficers,
+  heldItems,
+  visitorPhase,
+} from '../game/engine.ts'
 import { shipDef } from '../game/fleet.ts'
 import { SELL_MARGIN, TRADE_LOT, scanReading, visitorDef } from '../game/visitors.ts'
 import { factionDef } from '../game/factions.ts'
@@ -33,6 +41,9 @@ export const VisitorModal = ({
   onTalk,
 }: Props) => {
   const v = state.visitors.find((x) => x.id === visitorId)
+  const derived = derive(state)
+  const held = heldItems(state)
+  const room = derived.holdCap - held
   if (!v) return null
   const hull = shipDef(v.cls)
   const claimed = visitorDef(v.claim)
@@ -214,18 +225,19 @@ export const VisitorModal = ({
                   </span>
                   <button
                     className="btn btn--tiny"
-                    disabled={state.credits < price}
+                    disabled={state.credits < price || room <= 0}
                     onClick={() => onBuyGear(id)}
+                    title={room <= 0 ? 'The hold is full — build a Cargo Hold' : undefined}
                   >
-                    Buy {price}c
+                    {room <= 0 ? 'Hold full' : `Buy ${price}c`}
                   </button>
                 </li>
               )
             })}
           </ul>
           <p className="panel-note">
-            Kit goes into the hold. Issue it from a crew member's file — one sidearm and one layer
-            of armour each.
+            Kit goes into the hold — <b>{held}</b> of <b>{derived.holdCap}</b> racked. Issue it
+            from a crew member's file: one sidearm and one layer of armour each.
           </p>
         </>
       )}

@@ -76,7 +76,14 @@ export interface ModuleDef {
   /** Extra crew capacity granted per segment per level. */
   crewCapacity?: number
   /** Extra storage cap granted per segment per level, applied to every resource. */
+  /**
+   * How much more of its own resource the station can bank because this room
+   * exists. A reactor buys capacitor space, an air plant buys tankage. Only
+   * meaningful on a room that produces something.
+   */
   storageBonus?: number
+  /** Racking for kit, in items. The Cargo Hold is the only room with any. */
+  holdBonus?: number
   /** Stat this module trains for assigned crew, if it is a training module. */
   trains?: StatKey
   /** Credits produced per cycle instead of a resource. */

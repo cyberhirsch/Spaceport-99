@@ -42,6 +42,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     stat: 'T',
     produces: 'power',
     baseYield: 42,
+    storageBonus: 120,
     cycleSeconds: 10,
     powerDraw: 0,
   },
@@ -58,6 +59,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     stat: 'O',
     produces: 'air',
     baseYield: 22,
+    storageBonus: 90,
     cycleSeconds: 14,
     powerDraw: 1.2,
   },
@@ -74,6 +76,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     stat: 'B',
     produces: 'food',
     baseYield: 22,
+    storageBonus: 90,
     cycleSeconds: 16,
     powerDraw: 1.2,
   },
@@ -95,14 +98,14 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     kind: 'storage',
     name: 'Cargo Hold',
     short: 'Cargo',
-    blurb: 'Pressurised racking. Raises the cap on every stored resource.',
+    blurb: 'Pressurised racking for kit — sidearms, armour, and whatever else comes off a hull.',
     glyph: '▦',
     hue: 35,
     cost: 300,
     unlockAtCrew: 5,
     slotsPerSegment: 2,
     stat: 'B',
-    storageBonus: 90,
+    holdBonus: 14,
     powerDraw: 1,
   },
   medbay: {
@@ -403,6 +406,10 @@ export const capacityBonus = (m: StationModule): number =>
 
 export const storageBonus = (m: StationModule): number =>
   Math.round((def(m.kind).storageBonus ?? 0) * m.width * m.level * mergeBonus(m))
+
+/** Racking for kit. Only the Cargo Hold has any. */
+export const holdBonus = (m: StationModule): number =>
+  Math.round((def(m.kind).holdBonus ?? 0) * m.width * m.level * mergeBonus(m))
 
 /** How many applicants the station can have waiting at once. */
 export const berths = (m: StationModule): number =>

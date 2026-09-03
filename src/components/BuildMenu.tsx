@@ -56,7 +56,10 @@ export const BuildMenu = ({ state, derived, placing, onPick }: Props) => {
                     {d.credits && <em>◈ credits</em>}
                     {d.trains && <em>trains {d.trains}</em>}
                     {d.crewCapacity && <em>+{d.crewCapacity} bunks</em>}
-                    {d.storageBonus && <em>+{d.storageBonus} storage</em>}
+                    {d.storageBonus && d.produces && (
+                      <em>+{d.storageBonus} {RESOURCE_INFO[d.produces].name} capacity</em>
+                    )}
+                    {d.holdBonus && <em>▦ racks {d.holdBonus} pieces of kit</em>}
                     {d.heals && <em>✚ heals crew</em>}
                     {d.repairs && <em>⚙ repairs rooms</em>}
                     {d.berths && <em>{d.berths} berths · ◈ docking fees</em>}

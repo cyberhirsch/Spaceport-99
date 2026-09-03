@@ -130,11 +130,11 @@ test('you can only trade with a ship that is actually berthed', () => {
 test('a purchase is trimmed to the room in the hold, and priced to match', () => {
   const [ready, v] = hailing(rich(newGame()), { kind: 'trader', claim: 'trader' })
   let s = reducer(ready, { type: 'acceptVisitor', visitorId: v.id })
-  const cap = derive(s).storageCap
+  const cap = derive(s).caps.food
   s = { ...s, resources: { ...s.resources, food: cap - 10 } }
   const purse = s.credits
   s = reducer(s, { type: 'tradeVisitor', visitorId: v.id, resource: 'food', buy: true })
-  assert.equal(s.resources.food, cap, 'the hold fills, no further')
+  assert.equal(s.resources.food, cap, 'the tanks fill, no further')
   assert.ok(purse - s.credits < Math.round(TRADE_LOT * v.prices.food), 'and you pay for ten, not fifty')
 })
 

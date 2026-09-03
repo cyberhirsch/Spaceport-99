@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { WING, crewGuard, defence, newGame, reducer } from '../engine.ts'
+import {
+  BASE_HOLD,
+  WING,
+  crewGuard,
+  defence,
+  derive,
+  heldItems,
+  newGame,
+  reducer,
+} from '../engine.ts'
 import { effectiveness } from '../crew.ts'
 import { ITEM_DEFS, itemDef, stock } from '../gear.ts'
 import { makeVisitor } from '../visitors.ts'
@@ -180,4 +189,70 @@ test('a dead crew member leaves their kit behind', () => {
   assert.equal(gone.dead, true)
   assert.deepEqual(gone.gear, {}, 'they are not buried with it')
   assert.equal(s.stores.sidearm, 1, 'somebody else will need it')
+})
+
+// ----------------------------------------------------- capacity and the hold --
+
+test('a room that makes something also banks it', () => {
+  const s = newGame()
+  const base = derive(s).caps
+  const more = derive(build(s, 'reactor', WING - 3)).caps
+  assert.ok(more.power > base.power, 'a second reactor buys capacitor space')
+  assert.equal(more.air, base.air, 'and nothing else')
+  assert.equal(more.food, base.food)
+
+  const airy = derive(build(s, 'atmospherics', WING - 3)).caps
+  assert.ok(airy.air > base.air, 'an air plant buys tankage')
+  assert.equal(airy.power, base.power)
+})
+
+test('a merged run of reactors banks more than two apart', () => {
+  const apart = build(build(newGame(), 'reactor', WING - 3), 'reactor', WING + 2)
+  const welded = build(build(newGame(), 'reactor', WING - 3), 'reactor', WING - 4)
+  assert.ok(
+    derive(welded).caps.power > derive(apart).caps.power,
+    'the run shares its tankage',
+  )
+})
+
+test('the Cargo Hold racks kit, and nothing else', () => {
+  const s = newGame()
+  const base = derive(s)
+  assert.equal(base.holdCap, BASE_HOLD, 'a station starts with a little racking')
+
+  const withHold = derive(build(s, 'storage', WING - 3))
+  assert.ok(withHold.holdCap > base.holdCap, 'and a Cargo Hold adds a lot')
+  assert.deepEqual(withHold.caps, base.caps, 'but it holds no power, air or food')
+})
+
+test('kit cannot be bought with nowhere to rack it', () => {
+  const [ready, v] = berthed(rich(newGame()), 'concern')
+  // Fill the racking to the brim.
+  const packed: GameState = {
+    ...ready,
+    stores: { sidearm: derive(ready).holdCap },
+  }
+  assert.equal(heldItems(packed), derive(packed).holdCap)
+
+  const tried = reducer(packed, { type: 'buyGear', visitorId: v.id, item: 'plate' })
+  assert.equal(tried.stores.plate, undefined, 'nothing was bought')
+  assert.equal(tried.credits, packed.credits, 'and nothing was paid')
+  assert.match(tried.log[0].text, /hold is full/)
+})
+
+test('a Cargo Hold makes room for the kit that would not fit', () => {
+  const [ready, v] = berthed(rich(newGame()), 'concern')
+  const packed: GameState = { ...ready, stores: { sidearm: derive(ready).holdCap } }
+  const roomy = build(packed, 'storage', WING - 3)
+  const bought = reducer(roomy, { type: 'buyGear', visitorId: v.id, item: 'plate' })
+  assert.equal(bought.stores.plate, 1, 'and now it fits')
+})
+
+test('issuing kit does not take racking, so a full hold can still be emptied', () => {
+  const s = newGame()
+  const packed: GameState = { ...s, stores: { plate: derive(s).holdCap } }
+  const who = packed.crew[0]
+  const issued = reducer(packed, { type: 'issueGear', crewId: who.id, item: 'plate' })
+  assert.equal(issued.crew.find((c) => c.id === who.id)!.gear.armour, 'plate')
+  assert.ok(heldItems(issued) < heldItems(packed), 'what is worn is not racked')
 })

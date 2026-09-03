@@ -232,9 +232,22 @@ You start with a reactor, an air plant, a hydroponics bay and five founders.
 Everything after that is yours to build.
 
 **Three resources, produced in cycles and consumed continuously.** Staffed rooms
-fill their progress bar and dump a batch into storage; your crew burn oxygen and
+fill their progress bar and dump a batch into the tanks; your crew burn oxygen and
 rations every second, and every powered room draws off the grid. The header shows
 the live net rate for each — that number going red is the only warning you get.
+
+**A room that makes something also banks it.** Each resource has its own ceiling,
+and the only thing that raises it is building more of what fills it: a second
+Fusion Reactor buys capacitor space as well as output, an Atmospherics Plant buys
+tankage, a Hydroponics Bay buys silo. A welded run banks more than the same rooms
+standing apart. The bare spine holds very little on its own, so early capacity is
+something you build rather than something you start with.
+
+The **Cargo Hold** is not part of that: it racks *kit* — sidearms and armour off a
+berthed hull, or whatever the Fab Shop runs off. A station starts with room for six
+pieces and a hold adds fourteen per segment. Fill it and there is nowhere to put
+what you buy; what a crew member is wearing takes no racking, so a full hold can
+always be emptied onto people.
 
 **Crew go where you drag them.** Pick a portrait up out of the tray at the bottom
 of the screen and drop it on a room to post someone there; drop it back on the

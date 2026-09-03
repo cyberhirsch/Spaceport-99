@@ -130,7 +130,7 @@ export const TopBar = ({ state, derived, onRename, onResupply, onOpenMenu }: Pro
             key={k}
             keyName={k}
             value={state.resources[k]}
-            cap={derived.storageCap}
+            cap={derived.caps[k]}
             rate={k === 'power' ? derived.powerRate : k === 'air' ? derived.airRate : derived.foodRate}
             credits={state.credits}
             onResupply={() => onResupply(k)}

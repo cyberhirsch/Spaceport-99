@@ -20,6 +20,7 @@ import {
   moduleShield,
   shipBerths,
   staffSlots,
+  holdBonus,
   storageBonus,
   touchesLift,
   upgradeCost,
@@ -99,7 +100,15 @@ import type {
 export const SAVE_VERSION = 7
 
 export const BASE_CREW_CAP = 8
-export const BASE_STORAGE = 220
+/**
+ * What the bare spine can hold before anything is built. Deliberately thin:
+ * capacity is meant to come from the rooms that make the stuff, so a founding
+ * station sits about where it always did and every reactor after that is felt.
+ */
+export const BASE_STORAGE = 120
+
+/** Kit a station can rack before it needs a Cargo Hold. */
+export const BASE_HOLD = 6
 export const AIR_PER_CREW = 0.06
 export const FOOD_PER_CREW = 0.05
 export const MAX_LOG = 60
@@ -129,7 +138,14 @@ export const MAX_CATCHUP_SECONDS = 4 * 60 * 60
 export interface Derived {
   crewAlive: Crew[]
   crewCap: number
-  storageCap: number
+  /**
+   * How much of each resource the station can bank. A room that makes
+   * something also buys the tankage to keep it, so a second reactor raises
+   * the power ceiling as well as the rate.
+   */
+  caps: Record<ResourceKey, number>
+  /** How many pieces of kit the hold can rack. */
+  holdCap: number
   /** Power drawn per second by every online module. */
   draw: number
   /** Power produced per second, averaged over module cycles. */
@@ -225,7 +241,12 @@ export const derive = (s: GameState): Derived => {
   const crewAlive = s.crew.filter((c) => !c.dead)
   const crewById = new Map(s.crew.map((c) => [c.id, c]))
   let crewCap = BASE_CREW_CAP
-  let storageCap = BASE_STORAGE
+  const caps: Record<ResourceKey, number> = {
+    power: BASE_STORAGE,
+    air: BASE_STORAGE,
+    food: BASE_STORAGE,
+  }
+  let holdCap = BASE_HOLD
   let draw = 0
   let powerRate = 0
   let airRate = 0
@@ -234,12 +255,14 @@ export const derive = (s: GameState): Derived => {
 
   for (const m of s.modules) {
     crewCap += capacityBonus(m)
-    storageCap += storageBonus(m)
+    holdCap += holdBonus(m)
     draw += powerDraw(m)
     powerRate += rateOf(m, crewById, 'power')
     airRate += rateOf(m, crewById, 'air')
     foodRate += rateOf(m, crewById, 'food')
     const d = def(m.kind)
+    // Tankage follows what the room makes: a reactor banks power and nothing else.
+    if (d.produces) caps[d.produces] += storageBonus(m)
     if (d.credits && d.cycleSeconds) {
       creditRate += (cycleCredits(m) * workRate(m, crewById)) / d.cycleSeconds
     }
@@ -252,7 +275,8 @@ export const derive = (s: GameState): Derived => {
   return {
     crewAlive,
     crewCap,
-    storageCap,
+    caps,
+    holdCap,
     draw,
     powerRate: powerRate - draw,
     airRate,
@@ -668,15 +692,14 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
     m.rushRisk = Math.max(0.15, m.rushRisk - dt * 0.004)
     while (m.progress >= 1) {
       m.progress -= 1
-      completeCycle(s, m, d.storageCap)
+      completeCycle(s, m, d.caps)
     }
   }
 
   // --- life support ---------------------------------------------------
-  const cap = d.storageCap
-  s.resources.power = clamp(s.resources.power, 0, cap)
-  s.resources.air = clamp(s.resources.air - alive.length * AIR_PER_CREW * dt, 0, cap)
-  s.resources.food = clamp(s.resources.food - alive.length * FOOD_PER_CREW * dt, 0, cap)
+  s.resources.power = clamp(s.resources.power, 0, d.caps.power)
+  s.resources.air = clamp(s.resources.air - alive.length * AIR_PER_CREW * dt, 0, d.caps.air)
+  s.resources.food = clamp(s.resources.food - alive.length * FOOD_PER_CREW * dt, 0, d.caps.food)
 
   const starving = s.resources.food <= 0
   const suffocating = s.resources.air <= 0
@@ -1061,7 +1084,7 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
 
 /** Brings a hull alongside and finds out what was actually aboard. */
 const admitVisitor = (s: GameState, v: Visitor): void => {
-  const cap = derive(s).storageCap
+  const caps = derive(s).caps
   v.status = 'docked'
   v.timer = 45 + Math.random() * 60
   // The hull stays at the clamps; the people walk onto your decks. Whatever
@@ -1084,7 +1107,7 @@ const admitVisitor = (s: GameState, v: Visitor): void => {
       const paid = Math.round(60 + Math.random() * 140)
       s.credits += paid
       for (const key of ['power', 'air', 'food'] as const) {
-        s.resources[key] = clamp(s.resources[key] + Math.round(20 + Math.random() * 50), 0, cap)
+        s.resources[key] = clamp(s.resources[key] + Math.round(20 + Math.random() * 50), 0, caps[key])
       }
       log(s, `${v.name} berthed and sold off a hold. +${paid}c and cargo.`, 'good')
       break
@@ -1179,14 +1202,14 @@ const resolveMission = (s: GameState, m: Mission): void => {
   const yieldOf =
     { triumph: 1.5, success: 1, setback: 0.35, disaster: 0 }[outcome] * Math.max(0, m.haul)
   const cargo = ship ? shipCargo(ship) : 1
-  const cap = derive(s).storageCap
+  const caps = derive(s).caps
   let credits = 0
   if (yieldOf > 0) {
     credits = Math.round(m.payout.credits * yieldOf * cargo)
     s.credits += credits
     for (const key of ['power', 'air', 'food'] as const) {
       const amount = Math.round(m.payout[key] * yieldOf * cargo)
-      s.resources[key] = clamp(s.resources[key] + amount, 0, cap)
+      s.resources[key] = clamp(s.resources[key] + amount, 0, caps[key])
     }
   }
 
@@ -1261,7 +1284,7 @@ const resolveMission = (s: GameState, m: Mission): void => {
     } else {
       const bump = Math.round(80 + m.danger * 200)
       for (const key of ['power', 'air', 'food'] as const) {
-        s.resources[key] = clamp(s.resources[key] + bump, 0, cap)
+        s.resources[key] = clamp(s.resources[key] + bump, 0, caps[key])
       }
       m.find = { kind: 'cache', detail: `A sealed cache — ${bump} of everything.` }
     }
@@ -1308,11 +1331,11 @@ const awardXp = (s: GameState, m: StationModule, amount: number): void => {
   }
 }
 
-const completeCycle = (s: GameState, m: StationModule, cap: number): void => {
+const completeCycle = (s: GameState, m: StationModule, caps: Record<ResourceKey, number>): void => {
   const md = def(m.kind)
   if (md.produces) {
     const amount = cycleYield(m)
-    s.resources[md.produces] = clamp(s.resources[md.produces] + amount, 0, cap)
+    s.resources[md.produces] = clamp(s.resources[md.produces] + amount, 0, caps[md.produces])
   }
   if (md.credits) s.credits += Math.round(cycleCredits(m))
   if (md.trains) {
@@ -1442,6 +1465,13 @@ export const moduleLocked = (s: GameState, kind: ModuleKind): SpecId | null => {
   const spec = MODULE_SPEC[kind]
   return spec && !knows(s, spec) ? spec : null
 }
+
+/** How many pieces of kit are racked in the hold right now. */
+export const heldItems = (s: GameState): number =>
+  Object.values(s.stores).reduce((n, count) => n + (count ?? 0), 0)
+
+/** Whether there is racking free for one more. Kit already issued does not count. */
+export const holdRoom = (s: GameState): number => derive(s).holdCap - heldItems(s)
 
 /** Kit the Fab Shop could run off right now. */
 export const fabricable = (s: GameState): ItemId[] =>
@@ -1950,7 +1980,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       } else {
         m.rushRisk = Math.min(0.75, m.rushRisk + 0.13)
         m.progress = 0
-        completeCycle(s, m, derive(s).storageCap)
+        completeCycle(s, m, derive(s).caps)
         log(s, `${md.name} rushed successfully.`, 'good')
       }
       break
@@ -1964,7 +1994,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       break
     }
     case 'resupply': {
-      const cap = derive(s).storageCap
+      const cap = derive(s).caps[action.resource]
       const cost = resupplyCost(cap)
       if (s.credits < cost) return state
       if (s.resources[action.resource] >= cap) return state
@@ -2142,7 +2172,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
     case 'tradeVisitor': {
       const v = s.visitors.find((x) => x.id === action.visitorId)
       if (!v || v.status !== 'docked') return state
-      const cap = derive(s).storageCap
+      const cap = derive(s).caps[action.resource]
       const unit = v.prices[action.resource]
       if (action.buy) {
         const room = cap - s.resources[action.resource]
@@ -2250,6 +2280,10 @@ export const reducer = (state: GameState, action: Action): GameState => {
       if (!v || v.status !== 'docked') return state
       const line = stock(v.faction).find((x) => x.id === action.item)
       if (!line || s.credits < line.price) return state
+      if (holdRoom(s) <= 0) {
+        log(s, `Nowhere to rack it. The hold is full.`, 'warn')
+        break
+      }
       s.credits -= line.price
       s.stores[action.item] = (s.stores[action.item] ?? 0) + 1
       shift(s, v.faction, 0.004)
@@ -2306,6 +2340,10 @@ export const reducer = (state: GameState, action: Action): GameState => {
       const spec = ITEM_SPEC[action.item]
       const build = spec ? specDef(spec).build : undefined
       if (!build || s.credits < build.credits) return state
+      if (holdRoom(s) <= 0) {
+        log(s, `The shop has nowhere to put it. The hold is full.`, 'warn')
+        break
+      }
       s.credits -= build.credits
       s.fabricating = { item: action.item, progress: 0 }
       log(s, `The Fab Shop laid on a ${itemDef(action.item).name}. −${build.credits}c.`, 'info')

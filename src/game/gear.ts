@@ -26,18 +26,6 @@ export interface ItemDef {
 }
 
 export const ITEM_DEFS: Record<ItemId, ItemDef> = {
-  cutter: {
-    id: 'cutter',
-    name: 'Rigging Cutter',
-    short: 'Cutter',
-    slot: 'sidearm',
-    glyph: '⌇',
-    blurb: 'A cargo tool with a bad reputation. Everyone has one; nobody calls it a weapon.',
-    price: 90,
-    guard: 1,
-    bonus: { B: 1 },
-    sellers: { unlisted: 0.85, concern: 1, terran: 1.1 },
-  },
   sidearm: {
     id: 'sidearm',
     name: 'Deck Sidearm',
@@ -74,18 +62,6 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
     bonus: { R: 1, B: 1 },
     sellers: {},
   },
-  vest: {
-    id: 'vest',
-    name: 'Work Vest',
-    short: 'Vest',
-    slot: 'armour',
-    glyph: '▤',
-    blurb: 'Padding, a beacon and a patch kit. Rated for falling crates, not for gunfire.',
-    price: 110,
-    guard: 1,
-    bonus: { B: 1 },
-    sellers: { terran: 0.9, concern: 1, unlisted: 0.95 },
-  },
   plate: {
     id: 'plate',
     name: 'Boarding Plate',
@@ -97,30 +73,6 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
     guard: 4,
     bonus: { B: 2 },
     sellers: { concern: 1, terran: 1.1, unlisted: 1.05 },
-  },
-  carapace: {
-    id: 'carapace',
-    name: 'Compact Carapace',
-    short: 'Carapace',
-    slot: 'armour',
-    glyph: '⬢',
-    blurb: 'Grown rather than made. Holds pressure, holds heat, and holds a grudge.',
-    price: 880,
-    guard: 8,
-    bonus: { B: 2, O: 1 },
-    sellers: { compact: 1 },
-  },
-  rig: {
-    id: 'rig',
-    name: 'Sealed Rig',
-    short: 'Rig',
-    slot: 'armour',
-    glyph: '◘',
-    blurb: 'Vacuum-rated and self-sealing. Heavy enough that nobody wears it for a whole shift.',
-    price: 0,
-    guard: 6,
-    bonus: { B: 2, O: 1 },
-    sellers: {},
   },
 }
 

@@ -102,8 +102,8 @@ export const statTotal = (c: Crew): number =>
  * should be slow and miserable, never mathematically doomed.
  */
 export const effectiveness = (c: Crew, stat: StatKey): number => {
-  // Kit counts. A vest is worth a point of Brawn to the person wearing it,
-  // whether they are fighting boarders or shifting cargo.
+  // Kit counts. Boarding plate is worth two points of Brawn to whoever is
+  // wearing it, whether they are fighting boarders or shifting cargo.
   let issued = 0
   for (const slot of ['sidearm', 'armour'] as const) {
     const id = c.gear?.[slot]

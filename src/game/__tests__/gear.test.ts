@@ -33,15 +33,14 @@ test('a fresh station carries nothing and nobody is issued anything', () => {
 
 test('who sells what is a matter of whose paper they fly', () => {
   const compact = stock('compact').map((x) => x.id)
-  assert.ok(compact.includes('lance') && compact.includes('carapace'))
-  assert.equal(compact.length, 2, 'the Compact sells its own kit and nothing else')
+  assert.deepEqual(compact, ['lance'], 'the Compact sells its own kit and nothing else')
 
   const unlisted = stock('unlisted').map((x) => x.id)
   assert.ok(!unlisted.includes('lance'), 'and sells it to nobody else')
   assert.ok(
-    stock('unlisted').find((x) => x.id === 'cutter')!.price <
-      stock('terran').find((x) => x.id === 'cutter')!.price,
-    'the Drift undercuts Earth on a cargo tool with a reputation',
+    stock('unlisted').find((x) => x.id === 'sidearm')!.price <
+      stock('terran').find((x) => x.id === 'sidearm')!.price,
+    'the Drift undercuts Earth on a deck sidearm',
   )
 })
 
@@ -83,10 +82,10 @@ test('issuing kit takes it out of the hold and puts it on somebody', () => {
   assert.ok(effectiveness(armed, 'R') > before, 'and it shows in what they can do')
 
   // A second sidearm swaps, it does not stack.
-  s = { ...s, stores: { ...s.stores, cutter: 1 } }
-  s = reducer(s, { type: 'issueGear', crewId: hand.id, item: 'cutter' })
+  s = { ...s, stores: { ...s.stores, lance: 1 } }
+  s = reducer(s, { type: 'issueGear', crewId: hand.id, item: 'lance' })
   const swapped = s.crew.find((c) => c.id === hand.id)!
-  assert.equal(swapped.gear.sidearm, 'cutter')
+  assert.equal(swapped.gear.sidearm, 'lance')
   assert.equal(s.stores.sidearm, 1, 'the old one goes back in the hold')
   assert.equal(itemDef('plate').slot, 'armour')
 })

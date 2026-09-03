@@ -199,18 +199,10 @@ export type VisitorKind = 'trader' | 'courier' | 'patrol' | 'drifter' | 'smuggle
 /** Kit a crew member can be issued: one weapon, one layer of protection. */
 export type ItemSlot = 'sidearm' | 'armour'
 
-export type ItemId =
-  | 'cutter'
-  | 'sidearm'
-  | 'lance'
-  | 'torch'
-  | 'vest'
-  | 'plate'
-  | 'carapace'
-  | 'rig'
+export type ItemId = 'sidearm' | 'lance' | 'torch' | 'plate'
 
 /** Things that have to be found and worked out before they exist for you. */
-export type SpecId = 'shield' | 'vault' | 'torch' | 'rig'
+export type SpecId = 'shield' | 'vault' | 'torch'
 
 /** The powers whose space the traffic comes from, plus everyone off their books. */
 export type FactionId = 'terran' | 'concern' | 'compact' | 'unlisted'

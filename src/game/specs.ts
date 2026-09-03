@@ -50,15 +50,6 @@ export const SPEC_DEFS: Record<SpecId, SpecDef> = {
     effort: 520,
     build: { credits: 380, seconds: 70 },
   },
-  rig: {
-    id: 'rig',
-    name: 'Sealed Rig Layup',
-    unlocks: { kind: 'item', item: 'rig' },
-    found: 'a wreck where exactly one body was still breathing, and this is why',
-    blurb: 'Vacuum-rated, self-sealing, and heavy enough that nobody wears it for a shift.',
-    effort: 640,
-    build: { credits: 520, seconds: 95 },
-  },
 }
 
 export const SPEC_IDS = Object.keys(SPEC_DEFS) as SpecId[]

@@ -11,7 +11,7 @@ import {
   researchRate,
 } from '../engine.ts'
 import { SPEC_IDS, specDef } from '../specs.ts'
-import type { GameState, ModuleKind, SpecId } from '../types.ts'
+import type { GameState, ModuleKind } from '../types.ts'
 
 const rich = (s: GameState): GameState => ({ ...s, credits: 80000 })
 
@@ -100,29 +100,29 @@ test('nothing is worked out without a lab, however long you wait', () => {
 })
 
 test('the lab moves on to the next drawing on its own', () => {
-  let s: GameState = { ...newGame(), specs: { torch: 0, rig: 0 }, researching: 'torch' }
+  let s: GameState = { ...newGame(), specs: { torch: 0, vault: 0 }, researching: 'torch' }
   s = build(s, 'library', 2)
   s = staff(s, 'library')
   // Stop the clock the moment the first one lands — the lab trains the very
   // stat it runs on, so left alone it would finish the second one too.
   while (!knows(s, 'torch')) s = run(s, 30)
-  assert.equal(s.researching, 'rig')
-  assert.equal(knows(s, 'rig'), false)
+  assert.equal(s.researching, 'vault')
+  assert.equal(knows(s, 'vault'), false)
 })
 
 test('setting a drawing aside keeps the work already done on it', () => {
-  let s: GameState = { ...newGame(), specs: { torch: 0, rig: 0 }, researching: 'torch' }
+  let s: GameState = { ...newGame(), specs: { torch: 0, vault: 0 }, researching: 'torch' }
   s = build(s, 'library', 2)
   s = staff(s, 'library')
   s = run(s, 60)
   const at = s.specs.torch ?? 0
   assert.ok(at > 0 && at < 1)
 
-  s = reducer(s, { type: 'research', spec: 'rig' })
-  assert.equal(s.researching, 'rig')
+  s = reducer(s, { type: 'research', spec: 'vault' })
+  assert.equal(s.researching, 'vault')
   s = run(s, 60)
   assert.equal(s.specs.torch, at, 'the shelved drawing did not move')
-  assert.ok((s.specs.rig ?? 0) > 0)
+  assert.ok((s.specs.vault ?? 0) > 0)
 })
 
 test('the lab will not take up a drawing nobody has found', () => {
@@ -186,10 +186,8 @@ test('a shop with nobody in it makes nothing', () => {
 
 test('the fabricate-only kit cannot be bought anywhere', async () => {
   const { ITEM_DEFS } = await import('../gear.ts')
-  for (const id of ['torch', 'rig'] as const) {
-    assert.equal(ITEM_DEFS[id].price, 0)
-    assert.deepEqual(ITEM_DEFS[id].sellers, {})
-  }
+  assert.equal(ITEM_DEFS.torch.price, 0)
+  assert.deepEqual(ITEM_DEFS.torch.sellers, {})
 })
 
 test('every spec unlocks something real, and nothing twice', () => {
@@ -203,5 +201,5 @@ test('every spec unlocks something real, and nothing twice', () => {
     if (u.kind === 'item') assert.ok(specDef(id).build, `${id} has no build`)
     else assert.equal(specDef(id).build, undefined)
   }
-  assert.equal(SPEC_IDS.length, (Object.keys({}) as SpecId[]).length + 4)
+  assert.equal(SPEC_IDS.length, 3)
 })

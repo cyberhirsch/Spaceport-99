@@ -96,7 +96,7 @@ import type {
   StationModule,
 } from './types.ts'
 
-export const SAVE_VERSION = 6
+export const SAVE_VERSION = 7
 
 export const BASE_CREW_CAP = 8
 export const BASE_STORAGE = 220

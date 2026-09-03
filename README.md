@@ -175,8 +175,16 @@ its berth is a gun platform; one out on a contract is not. And the crew carry wh
 them — one sidearm, one layer of armour, bought off berthed hulls and kept in the hold until
 somebody needs it.
 
-Who sells what depends on whose paper they fly: the Drift undercuts everyone on a cargo tool
-with a bad reputation, and the Compact will sell you a lance if it likes you and to nobody else.
+Four pieces of kit exist, and the list is deliberately short — anything without art was cut
+rather than shipped as a placeholder:
+
+| | Slot | Guard | Where from |
+| --- | --- | --- | --- |
+| Deck Sidearm | sidearm | 3 | Earth, the Concern, the Drift — cheapest off a Drift hull |
+| Vantric Lance | sidearm | 7 | The Compact, and nobody else |
+| Breaching Torch | sidearm | 5 | Fabricated. Sold by no one at any price. |
+| Boarding Plate | armour | 4 | Earth, the Concern, the Drift |
+
 Kit counts twice — as stat points on the person wearing it, and as small arms when a boarding
 party comes down a corridor.
 
@@ -187,17 +195,17 @@ Every file is optional: a slot with no art falls back to the item's glyph, and a
 empty slot draws a dashed frame instead. So a new piece of kit works the day it
 is added and gets its picture whenever one exists.
 
-Present: `sidearm`, `lance`, `torch`, `plate`. Still on glyphs: `cutter`, `vest`,
-`carapace`, `rig`.
+Every piece of kit in the game has art. Anything without a render was cut rather
+than shipped as a glyph, so the four that remain are the four you can see.
 
 ## Things nobody will sell you
 
-Four things on this station cannot be bought, bribed for, or unlocked by getting big enough.
+Three things on this station cannot be bought, bribed for, or unlocked by getting big enough.
 They have to be **found**, then **worked out**, and for two of them **made**.
 
 A working drawing turns up on a job — a survey hull that never filed its own design, a Drift
 salvor who wrote down what everything is worth, a boarding party that no longer needs its kit.
-The chance rises with how dangerous the contract was, and there are only four in the game.
+The chance rises with how dangerous the contract was, and there are only three in the game.
 
 A drawing on its own is a stack of somebody else's paper. The **Research Lab** works one out at
 a time, at a rate set by its crew's Intellect, its size and its level — and because the lab
@@ -209,12 +217,11 @@ another; paper keeps, and the shelved one holds the progress it already had.
 | Field Projector Geometry | Shield Projector | build it |
 | Reclamation Sorting Tables | Reclamation Bay | build it |
 | Breaching Torch Pattern | Breaching Torch | run it off, 380c a unit |
-| Sealed Rig Layup | Sealed Rig | run it off, 520c a unit |
 
 Rooms stop there: building one *is* the manufacture. Kit does not — a worked-out pattern goes to
 the **Fab Shop**, which charges the materials up front and runs one item at a time into the hold.
-Cancel a run and the materials come back; the shift does not. Neither the torch nor the rig is
-carried by any hull that will ever dock here, at any price and by any faction.
+Cancel a run and the materials come back; the shift does not. The torch is carried by no hull
+that will ever dock here, at any price and by any faction.
 
 Until the drawing exists, the build menu says so: `spec needed` for one nobody has found,
 `in the lab` for one being worked out.

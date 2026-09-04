@@ -7,6 +7,7 @@ import { ITEM_SPEC, specDef } from './specs.ts'
 import { factionDef } from './factions.ts'
 import { makeMission, type MissionOpts, OPEN_HAUL_PER_MINUTE, OPEN_STRAIN_PER_MINUTE } from './fleet.ts'
 import { makeVisitor } from './visitors.ts'
+import { makeWalkIn } from './recruit.ts'
 import type { Crew, ModuleDef, GameState, ResourceKey, StationModule } from './types.ts'
 import {
   AIR_PER_CREW,
@@ -22,11 +23,20 @@ import {
   roll,
   roller,
 } from './core.ts'
-import { crewGuard, workRate, unassign, assign, trainingSeconds, awardXp } from './staffing.ts'
+import {
+  autoAssignInto,
+  crewGuard,
+  workRate,
+  unassign,
+  assign,
+  trainingSeconds,
+  awardXp,
+} from './staffing.ts'
 import {
   dockingFees,
   cellsAboard,
   commerce,
+  dockBerths,
   recycled,
   openSpecs,
   researchRate,
@@ -240,6 +250,9 @@ const stepFabShop = (s: GameState, dt: number, ctx: TickCtx): void => {
 
 /** Incidents: fire, vermin, breach and pirates burn down, spread, and get fought. */
 const stepIncidents = (s: GameState, dt: number, ctx: TickCtx): void => {
+  // Whether anything got contained this tick — and so whether it is worth
+  // checking that the room it happened in got its operator back.
+  let cleared = false
   for (const inc of [...s.incidents]) {
     const idef = incidentDef(inc.kind)
     const m = s.modules.find((x) => x.id === inc.moduleId)
@@ -276,6 +289,7 @@ const stepIncidents = (s: GameState, dt: number, ctx: TickCtx): void => {
     if (inc.kind === 'pirates') s.credits = Math.max(0, s.credits - 1.5 * dt)
 
     if (inc.hp <= 0) {
+      cleared = true
       s.incidents = s.incidents.filter((x) => x.id !== inc.id)
       const reward = Math.round(idef.bounty * (1 + s.modules.length * 0.05))
       s.credits += reward
@@ -316,6 +330,13 @@ const stepIncidents = (s: GameState, dt: number, ctx: TickCtx): void => {
       }
     }
   }
+
+  // A room that was on fire is a room the greedy pass skipped over while it
+  // burned. The operator who fell back from it may since have been posted
+  // somewhere else entirely — nobody was going to send them back to a fire —
+  // so the moment it is out, give the roster one more pass rather than
+  // leaving an essential post to sit empty until a player happens to notice.
+  if (cleared) autoAssignInto(s)
 }
 
 /**
@@ -488,6 +509,20 @@ const stepTraffic = (s: GameState, dt: number): void => {
       const hail = makeVisitor(roller(s), namesInPlay(s))
       s.visitors.push(hail)
       log(s, `${hail.name} is on approach.`, 'info')
+    }
+    // A busy Trading Hub occasionally lands somebody nobody called for — off a
+    // hull already at the clamps, deciding to stay rather than fly on.
+    const hub = commerce(s)
+    const d = derive(s)
+    if (
+      hub > 0 &&
+      roll(s) < Math.min(0.35, hub * 0.12) &&
+      s.candidates.length < dockBerths(s) &&
+      d.crewAlive.length < d.crewCap
+    ) {
+      const walker = makeWalkIn(s)
+      s.candidates.push(walker)
+      log(s, `${walker.name} came off a hull at the Trading Hub, asking about a berth.`, 'good')
     }
   }
 

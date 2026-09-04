@@ -208,6 +208,41 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
 
 ---
 
+
+- **Something other than bunks moves the roster.** Four levers, each
+  measurably different from before:
+  - **How many** — a wider, better-run Comms Array calls in more than one
+    candidate per request (`commsReach`/`requestCandidates` in
+    `src/game/rooms.ts`, capped by however many berths the dock actually has
+    free) and shortens the cooldown before HQ will take another call
+    (`requestCooldown`, floored at 20s). A bare one-segment array is
+    unchanged: exactly one candidate, the old 70s cooldown.
+  - **Who answers** — `candidateFaction` in `src/game/recruit.ts` weights
+    towards the patron you fly for, warmer standing sending more of their own;
+    a cold patron or none leaves the mix close to even. The candidate carries
+    a `faction` field now, same as a guest or a prisoner.
+  - **How good they are** — `stationRecord` reads deaths, live incidents,
+    tank levels, and a staffed Lounge or Gym, centred on 0.5 so an ordinary
+    station is untouched. It nudges the same `reach` roll `appeal` already
+    drove, so a station with a bad week gets worse applicants without
+    appeal's broader meaning (contract danger, morale) changing at all.
+  - **Who turns up unasked** — a busy, staffed Trading Hub occasionally lands
+    a walk-in (`makeWalkIn`) straight onto the roster with no transit delay,
+    rolled alongside the existing traffic clock in `stepTraffic`. No hub, no
+    walk-ins, ever.
+
+  Quarters is still the only way past the crew cap itself — none of the four
+  levers touch it, and a full roster refuses every one of them the same way.
+  Fixed a real bug found while testing this: a crew member who fell back from
+  an incident and got reassigned elsewhere while it burned had no way back to
+  an essential post once nobody was left idle to trigger another
+  auto-assign pass. `stepIncidents` now runs one more assignment pass
+  whenever an incident clears. 15 new tests; verified live in the browser —
+  built a wide array, watched HQ send two candidates in one request, capped
+  correctly at the dock's two berths.
+
+---
+
 ## Opus
 
 Nothing outstanding. The five that were here are in **Done** above; what is
@@ -218,33 +253,7 @@ can be handed.
 
 ## Sonnet
 
-### 1. Something other than bunks moves the roster
-
-**Why.** Reaching 60 crew is a matter of building Crew Quarters and waiting.
-The Comms Array, the Docking Port, standing with your patron and the station's
-own record all exist and none of them change who arrives, how many, or how
-good they are. Four levers, four different effects:
-
-- **How many** — the Comms Array. A wider array calls more people at once and
-  shortens the cooldown between requests.
-- **Who answers** — patron standing. A warm flag sends its own people; a cold
-  one leaves you with whoever is passing. This decides the faction mix of
-  candidates, which starts to matter a great deal once covert ops exists.
-- **How good they are** — the station's record. Deaths, unattended incidents
-  and a thin larder make the station a hard sell and bring desperate, low-stat
-  people. A Lounge, a Gym, a clean log and full stores bring better ones.
-- **Who turns up unasked** — the Trading Hub. Traffic occasionally lands a
-  candidate nobody called for, and shifts the mix of hulls that dock.
-
-**Where.** `src/game/recruit.ts` (`makeCandidate`, candidate count and stat
-roll), `src/game/reducer.ts` (`requestCrew`), `src/game/core.ts`
-(`REQUEST_COOLDOWN`), `src/game/traffic.ts` for the walk-ins.
-
-**Done when.** All four levers measurably change the harness figures they are
-supposed to — count, faction mix, mean stat, unasked arrivals — and quarters
-remain the ceiling rather than the only lever.
-
-### 2. Break up the two long modals
+### 1. Break up the two long modals
 
 **Why.** `src/components/VisitorModal.tsx` is resource trade, the bonded cage,
 kit, the boarding party, the auto-accept toggle and a talk button.
@@ -259,7 +268,7 @@ adds a file, not a branch.
 **Done when.** Neither modal file is over 200 lines, and adding a room-specific
 panel touches one new file plus one line in the lookup.
 
-### 3. Luck does something
+### 2. Luck does something
 
 **Why.** Three rooms run on Luck — the Comms Array, the Trading Hub and the
 Reclamation Bay — and two are at the far end of the curve. Every other stat has
@@ -277,7 +286,7 @@ suffers incidents measurably less, and a seeded test says so.
 
 ## Haiku
 
-### 4. A `CLAUDE.md`
+### 3. A `CLAUDE.md`
 
 **Why.** There is none. Every session re-learns the reducer discipline, the
 `.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
@@ -292,7 +301,7 @@ extension.
 **Done when.** The file exists and a new session can find the layer order and
 the test commands without reading `engine.ts`.
 
-### 5. Re-deal portraits on load
+### 4. Re-deal portraits on load
 
 **Why.** A save from before portraits were dealt has crew with no `portrait`
 field, so they draw from the seed and can share a face.
@@ -303,7 +312,7 @@ field, so they draw from the seed and can share a face.
 **Done when.** Loading such a save gives every crew member a distinct portrait
 where the pool allows, and a test loads a fixture without portraits and checks.
 
-### 6. Tests for the parts of the split that changed visibility
+### 5. Tests for the parts of the split that changed visibility
 
 **Why.** The refactor exported about two dozen previously private helpers
 (`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
@@ -318,7 +327,7 @@ use it as the pattern.
 **Done when.** Each newly exported helper with a branch in it has at least one
 test that exercises the branch.
 
-### 7. PWA manifest and service worker
+### 6. PWA manifest and service worker
 
 **Why.** The web build is not installable and does not run offline, though
 nothing in it needs a network. An idle station you check on through the day
@@ -332,7 +341,7 @@ app icon can come from an existing asset until there is a proper one.
 **Done when.** The deployed page passes the browser's install check and loads
 with the network off after one visit.
 
-### 8. Rename the branch to `main`
+### 7. Rename the branch to `main`
 
 **Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
 and the deployment is tied to it.
@@ -350,7 +359,7 @@ is gone.
 Both of these are specified and neither ships with placeholder art. They move
 into the tiers the day the renders arrive.
 
-### 9. New kit for the Research Lab
+### 8. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -368,7 +377,7 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 10. Art for the rooms and the ships
+### 9. Art for the rooms and the ships
 
 **Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.

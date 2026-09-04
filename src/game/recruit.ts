@@ -1,9 +1,10 @@
 import { crewPortrait, effectiveness, makeCrew, rollStats, uid } from './crew.ts'
 import { makeShip, tradeInValue } from './fleet.ts'
+import { FACTION_IDS, STANDING_CEILING, STANDING_FLOOR } from './factions.ts'
 import type { Talk, TalkCtx } from './talk.ts'
-import type { Candidate, Prospect, GameState, Visitor } from './types.ts'
-import { clamp, log, namesInPlay, PATIENCE_SECONDS, roll, roller, SIGN_THRESHOLD } from './core.ts'
-import { assign, allocatePortrait } from './staffing.ts'
+import type { Candidate, FactionId, Prospect, GameState, Rng, Visitor } from './types.ts'
+import { clamp, log, namesInPlay, PATIENCE_SECONDS, pickOne, roll, roller, SIGN_THRESHOLD } from './core.ts'
+import { assign, allocatePortrait, workRate } from './staffing.ts'
 import { fleetCapacity } from './rooms.ts'
 import { derive } from './state.ts'
 import { shift, appeal } from './standing.ts'
@@ -22,11 +23,64 @@ export const recruiterSkill = (s: GameState): number => {
   return best
 }
 
+/**
+ * What the station looks like to somebody thinking about signing on — not the
+ * pitch (that is `appeal`), but the state of the place. A death nobody
+ * mentions, an emergency still burning and empty tanks read the same to a
+ * recruit as to anybody sizing up a new posting; a clean log, a Lounge and a
+ * Gym running, and full stores read the other way. Centred on 0.5 so a
+ * perfectly ordinary station leaves the usual numbers alone.
+ */
+export const stationRecord = (s: GameState): number => {
+  const crewById = new Map(s.crew.map((c) => [c.id, c]))
+  const deathToll = Math.min(0.35, s.crew.filter((c) => c.dead).length * 0.05)
+  const trouble = Math.min(0.3, s.incidents.length * 0.12)
+  const d = derive(s)
+  const larder =
+    (d.caps.food > 0 ? clamp(s.resources.food / d.caps.food, 0, 1) : 0) * 0.5 +
+    (d.caps.air > 0 ? clamp(s.resources.air / d.caps.air, 0, 1) : 0) * 0.5
+  let comfort = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'lounge' && m.kind !== 'gym') continue
+    if (!m.standby && workRate(m, crewById) > 0) comfort += 0.1
+  }
+  return clamp(0.5 - deathToll - trouble + larder * 0.2 + Math.min(0.2, comfort), 0, 1)
+}
+
+/**
+ * Who HQ is likely to send. A patron in good standing sends its own; a cold
+ * one, or none, leaves you with whoever is passing.
+ */
+export const candidateFaction = (s: GameState, rng: Rng): FactionId => {
+  const patron = s.patron
+  if (!patron) return pickOne(rng, FACTION_IDS)
+  const warmth = (s.standing[patron] - STANDING_FLOOR) / (STANDING_CEILING - STANDING_FLOOR)
+  const sendsOwn = clamp(0.15 + warmth * 0.7, 0.15, 0.85)
+  return rng() < sendsOwn ? patron : pickOne(rng, FACTION_IDS)
+}
+
+/** The stats and standing an applicant is built from — shared by a request and a walk-in. */
+const rolledApplicant = (
+  s: GameState,
+  rng: Rng,
+  luck: number,
+): { stats: ReturnType<typeof rollStats>; reach: number; faction: FactionId } => {
+  const record = stationRecord(s)
+  const reach = clamp(
+    appeal(s) + (record - 0.5) * 0.3 + luck * 0.02 + (rng() * 0.3 - 0.15),
+    0,
+    1,
+  )
+  const stats = rollStats(rng, 6 + Math.round(reach * 8))
+  const faction = candidateFaction(s, rng)
+  return { stats, reach, faction }
+}
+
 /** Someone HQ has picked out, as good as the station deserves. */
 export const makeCandidate = (s: GameState, luck: number): Candidate => {
-  const reach = clamp(appeal(s) + luck * 0.02 + (roll(s) * 0.3 - 0.15), 0, 1)
-  const stats = rollStats(roller(s), 6 + Math.round(reach * 8))
-  const crew = makeCrew(roller(s), { stats })
+  const rng = roller(s)
+  const { stats, reach, faction } = rolledApplicant(s, rng, luck)
+  const crew = makeCrew(rng, { stats })
   return {
     id: uid('a'),
     name: crew.name,
@@ -34,12 +88,39 @@ export const makeCandidate = (s: GameState, luck: number): Candidate => {
     portrait: allocatePortrait(s),
     stats,
     tier: reach,
+    faction,
     // Someone HQ rates highly knows it, and starts colder on a modest station.
     interest: Math.round(clamp(appeal(s) * 70 - reach * 25, 5, 60)),
     askingBonus: Math.round(60 + reach * 260),
     patience: PATIENCE_SECONDS,
     promised: null,
-    arrivesIn: 25 + roll(s) * 30,
+    arrivesIn: 25 + rng() * 30,
+  }
+}
+
+/**
+ * Somebody off a hull at the Trading Hub who decided to stay rather than fly
+ * on. Already aboard, so there is no transit to wait through.
+ */
+export const makeWalkIn = (s: GameState): Candidate => {
+  const rng = roller(s)
+  const { stats, reach, faction } = rolledApplicant(s, rng, 0)
+  const crew = makeCrew(rng, { stats })
+  return {
+    id: uid('a'),
+    name: crew.name,
+    seed: crew.seed,
+    portrait: allocatePortrait(s),
+    stats,
+    tier: reach,
+    faction,
+    // Already standing on your deck rather than weighing an offer from afar —
+    // a walk-in has made most of the decision before you ever meet them.
+    interest: Math.round(clamp(appeal(s) * 90 - reach * 15, 20, 85)),
+    askingBonus: Math.round(50 + reach * 220),
+    patience: PATIENCE_SECONDS,
+    promised: null,
+    arrivesIn: 0,
   }
 }
 

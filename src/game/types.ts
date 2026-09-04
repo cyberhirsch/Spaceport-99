@@ -127,6 +127,8 @@ export interface ModuleDef {
    * level. Covert Ops only. It never reaches certainty.
    */
   discretion?: number
+  /** How many extra HQ looks harder for, per segment per level. Comms only. */
+  calls?: number
 }
 
 /** A built (possibly merged) room occupying contiguous slots on one deck. */
@@ -221,6 +223,8 @@ export interface Candidate {
   promised: string | null
   /** Seconds until they finish transit and appear at the dock. */
   arrivesIn: number
+  /** Who sent them, or who they last flew for. Shifts with patron standing. */
+  faction: FactionId
 }
 
 // --------------------------------------------------------------- visitors --

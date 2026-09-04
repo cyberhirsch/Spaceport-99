@@ -152,6 +152,7 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     credits: 12,
     cycleSeconds: 24,
     powerDraw: 3,
+    calls: 1,
   },
   dock: {
     kind: 'dock',

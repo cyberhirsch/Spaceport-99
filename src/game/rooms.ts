@@ -22,7 +22,7 @@ import type {
   Visitor,
   StationModule,
 } from './types.ts'
-import { clamp } from './core.ts'
+import { clamp, REQUEST_COOLDOWN } from './core.ts'
 import { crewGuard, workRate, awayCrewIds } from './staffing.ts'
 
 // What the rooms add up to: defence, tankage, cells, commerce, reach.
@@ -130,6 +130,31 @@ export const commerce = (s: GameState): number => {
   }
   return n
 }
+
+/**
+ * How hard the Comms Array is looking on your behalf. A staffed array of one
+ * segment at level one is worth exactly one — the floor a founding station
+ * already had — and a wider, better-run array pulls in more.
+ */
+export const commsReach = (s: GameState): number => {
+  const crewById = new Map(s.crew.map((c) => [c.id, c]))
+  let n = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'comms' || m.standby) continue
+    n += (def(m.kind).calls ?? 0) * m.width * m.level * mergeBonus(m) * workRate(m, crewById)
+  }
+  return n
+}
+
+/** How many people one request to HQ turns up, given the array behind it. */
+export const requestCandidates = (s: GameState): number => Math.max(1, Math.round(commsReach(s)))
+
+/**
+ * How long HQ takes to answer the next request. A bigger array shortens it;
+ * a bare one-segment array leaves it exactly where it always was.
+ */
+export const requestCooldown = (s: GameState): number =>
+  Math.max(20, REQUEST_COOLDOWN / (1 + Math.max(0, commsReach(s) - 1) * 0.25))
 
 /** How much of what the crew burn is recovered, capped short of free. */
 export const recycled = (s: GameState): number => {

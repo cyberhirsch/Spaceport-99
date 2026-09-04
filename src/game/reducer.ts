@@ -31,7 +31,6 @@ import {
   log,
   MAX_CATCHUP_SECONDS,
   namesInPlay,
-  REQUEST_COOLDOWN,
   REQUEST_COST,
   resupplyAmount,
   resupplyCost,
@@ -49,6 +48,8 @@ import {
   dockOfficers,
   fleetCapacity,
   dockBerths,
+  requestCandidates,
+  requestCooldown,
 } from './rooms.ts'
 import { derive, makeModule, newGame, holdRoom } from './state.ts'
 import { startIncident } from './hazards.ts'
@@ -280,7 +281,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       const d = derive(s)
       if (d.crewAlive.length >= d.crewCap) return state
       s.credits -= REQUEST_COST
-      s.broadcastCooldown = REQUEST_COOLDOWN
+      s.broadcastCooldown = requestCooldown(s)
       // A sharp operator on the comms desk gets HQ to look a little harder.
       let luck = 0
       for (const m of s.modules.filter((x) => x.kind === 'comms')) {
@@ -289,9 +290,23 @@ export const reducer = (state: GameState, action: Action): GameState => {
           if (c) luck = Math.max(luck, c.stats.L)
         }
       }
-      const cand = makeCandidate(s, luck)
-      s.candidates.push(cand)
-      log(s, `HQ is sending ${cand.name} over for an interview.`, 'info')
+      // A wider, better-run array gets HQ to send more than one name over —
+      // never more than the dock has room to actually receive.
+      const room = dockBerths(s) - waiting
+      const sent = Math.min(requestCandidates(s), Math.max(1, room))
+      const names: string[] = []
+      for (let i = 0; i < sent; i += 1) {
+        const cand = makeCandidate(s, luck)
+        s.candidates.push(cand)
+        names.push(cand.name)
+      }
+      log(
+        s,
+        sent > 1
+          ? `HQ is sending ${sent} people over for interviews: ${names.join(', ')}.`
+          : `HQ is sending ${names[0]} over for an interview.`,
+        'info',
+      )
       break
     }
     case 'turnAway': {

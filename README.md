@@ -456,17 +456,36 @@ Crew who drop below a quarter health fall back to the spine and return to their
 post once they have healed up. Automated suppression handles an unattended
 emergency eventually, but far too slowly to rely on.
 
-**Hiring is a conversation.** Nobody wanders in. A staffed Comms Array puts a
-request to HQ, who dispatch someone; they fly out, dock at your Docking Port, and
-wait — not indefinitely. Then you talk to them, and what you can say is above,
-under *Talking to people*. Ask for their answer and their interest is the odds
-they take it, so a half-convinced applicant is a coin toss and a wasted request.
+**Hiring is a conversation.** A staffed Comms Array puts a request to HQ, who
+dispatch someone; they fly out, dock at your Docking Port, and wait — not
+indefinitely. Then you talk to them, and what you can say is above, under
+*Talking to people*. Ask for their answer and their interest is the odds they
+take it, so a half-convinced applicant is a coin toss and a wasted request.
 
-Who turns up depends on **station standing** — size, whether you run a real
-surplus, how the crew are holding up, and what is in the account. HQ does not
-send its best people to a dark, hungry outpost, which is why the strongest
-applicants only appear once the place is worth joining. The ones who do come
-early know they are settling, and their standards are lower to match.
+Four things move the roster, and Crew Quarters is only the ceiling on it:
+
+- **How many** a single request turns up. A bare, one-segment array calls in
+  exactly one, same as ever; build it wider and level it up and HQ starts
+  sending more at once, capped by whatever berths the Docking Port has free.
+  A bigger array also answers your next call sooner.
+- **Who answers.** A patron in good standing sends its own people more often
+  than not; a cold one, or none, leaves the mix close to even across every
+  power in the Drift.
+- **How good they are.** Deaths on the log, an emergency still burning, and
+  empty tanks read the same to an applicant as to anybody else sizing up a
+  new posting — a Lounge and a Gym running, and full stores, read the other
+  way.
+- **Who turns up unasked.** A busy, staffed Trading Hub occasionally lands
+  somebody straight onto the roster who never went through a request at
+  all — already on the deck, no transit to wait through. No hub, no
+  walk-ins.
+
+Who turns up otherwise still depends on **station standing** — size, whether
+you run a real surplus, how the crew are holding up, and what is in the
+account. HQ does not send its best people to a dark, hungry outpost, which is
+why the strongest applicants only appear once the place is worth joining. The
+ones who do come early know they are settling, and their standards are lower
+to match.
 
 Crew Quarters raise your bunk cap. Training rooms raise a single stat, one point
 per cycle, each point slower than the last. The Engineering Bay trains Tech and,

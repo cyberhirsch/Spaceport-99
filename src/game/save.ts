@@ -30,6 +30,9 @@ const STEPS: { from: number; up: (raw: Record<string, unknown>) => void }[] = [
       raw.burned = 0
     },
   },
+  // 9 → 10: hulls started turning up and not asking for anything. An older
+  // station gets the same grace period a new one does.
+  { from: 9, up: (raw) => { raw.nextLoiterIn = 16 * 60 } },
 ]
 
 export const migrate = (raw: GameState): GameState | null => {

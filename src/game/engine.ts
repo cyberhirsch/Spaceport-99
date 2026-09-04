@@ -18,6 +18,8 @@ import './talks/captain.ts'
 import './talks/prisoner.ts'
 import './talks/conquest.ts'
 import './talks/covert.ts'
+import './talks/loiter.ts'
+import './talks/demand.ts'
 
 export * from './core.ts'
 export * from './staffing.ts'

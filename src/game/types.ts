@@ -378,15 +378,28 @@ export interface Visitor {
   suspicion: number
   /** Whose paper the hull is flying. Raiders are always Unlisted. */
   faction: FactionId
-  /** On approach, hailing for a berth, or clamped on. */
-  status: 'inbound' | 'requesting' | 'docked'
   /**
-   * Why they are here, when it is not trade. A hull with an intent does not
-   * ask — it is alongside by the time you read the hail.
+   * On approach, hailing for a berth, clamped on — or standing off, which is a
+   * hull that has arrived, not asked for anything, and not left either.
    */
-  intent?: 'conquest'
+  status: 'inbound' | 'requesting' | 'holding' | 'docked'
+  /**
+   * Why they are here, when it is not trade.
+   *
+   * `conquest` is alongside by the time you read the hail. The other three are
+   * one escalation: a hull `loiter`s two kilometres out, and if nothing is done
+   * about it, it `demand`s, and if that is refused it comes in as a `raid`.
+   * Every raid is therefore something you watched arrive.
+   */
+  intent?: 'conquest' | 'loiter' | 'demand' | 'raid'
   /** What a hull with an intent brought with it, against the station's guns. */
   force?: number
+  /**
+   * What they will take to be somewhere else, fixed when they arrive. Quoted
+   * rather than recomputed: a price that drifts while you read it is not a
+   * price, and this one is quoted twice on the same screen.
+   */
+  asking?: number
   /**
    * A quiet word somebody asked them to have with you. The hull carrying it is
    * rarely flying the paper of the power that sent it — that is the point.
@@ -635,6 +648,8 @@ export interface GameState {
   covert: Record<FactionId, number>
   /** Seconds until somebody tries a quiet word. */
   nextApproachIn: number
+  /** Seconds until a hull turns up and does not ask for anything. */
+  nextLoiterIn: number
   /** How many arrangements have come out. Nobody forgets the second one. */
   burned: number
   seenIntro: boolean

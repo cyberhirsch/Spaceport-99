@@ -407,7 +407,9 @@ export const StationView = ({
                         ? `on approach, hailing in ${Math.ceil(v.timer)}s`
                         : phase === 'hailing'
                           ? `requesting permission to dock, holding ${Math.ceil(v.timer)}s`
-                          : `berthed, leaving in ${Math.ceil(v.timer)}s`
+                          : phase === 'holding'
+                            ? `standing off and not asking for anything — open a channel`
+                            : `berthed, leaving in ${Math.ceil(v.timer)}s`
                     }`}
                   >
                     <span className="visitor-chip__flag">{factionDef(v.faction).glyph}</span>
@@ -417,6 +419,7 @@ export const StationView = ({
                       <em>{PHASE_LABEL[phase]}</em>
                     </span>
                     {phase === 'hailing' && <span className="visitor-chip__bang">?</span>}
+                    {phase === 'holding' && <span className="visitor-chip__bang">!</span>}
                   </button>
                 )
               })}

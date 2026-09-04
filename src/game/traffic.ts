@@ -5,7 +5,7 @@ import { makeMission } from './fleet.ts'
 import { makeGuests, makeVisitor } from './visitors.ts'
 import type { CovertAsk, FactionId, Prisoner, GameState, Guest, Visitor } from './types.ts'
 import { clamp, log, namesInPlay, pickOne, roll, roller, spread } from './core.ts'
-import { allocatePortrait } from './staffing.ts'
+import { allocatePortrait, isAway, unassign } from './staffing.ts'
 import { defence, cellsAboard } from './rooms.ts'
 import { derive } from './state.ts'
 import { startIncident } from './hazards.ts'
@@ -127,18 +127,23 @@ export const admitVisitor = (s: GameState, v: Visitor): void => {
 
 /** How many ships can be at the clamps at once, waiting or berthed. */
 /** Where a hull is in its visit, for the traffic board. */
-export const visitorPhase = (v: Visitor): 'inbound' | 'hailing' | 'docked' | 'departing' =>
+export const visitorPhase = (
+  v: Visitor,
+): 'inbound' | 'hailing' | 'holding' | 'docked' | 'departing' =>
   v.status === 'inbound'
     ? 'inbound'
-    : v.status === 'requesting'
-      ? 'hailing'
-      : v.timer <= 15
-        ? 'departing'
-        : 'docked'
+    : v.status === 'holding'
+      ? 'holding'
+      : v.status === 'requesting'
+        ? 'hailing'
+        : v.timer <= 15
+          ? 'departing'
+          : 'docked'
 
 export const PHASE_LABEL: Record<ReturnType<typeof visitorPhase>, string> = {
   inbound: 'inbound',
   hailing: 'asking',
+  holding: 'standing off',
   docked: 'docked',
   departing: 'leaving',
 }
@@ -172,10 +177,6 @@ export const guestAboard = (
  * Nobody sounds out a station with nothing on it. Once there is, somebody
  * always does, and it is never the power whose flag is over the door.
  */
-export const APPROACH_EARLIEST = 11 * 60
-
-export const APPROACH_GAP = 8 * 60
-
 export const worthSounding = (s: GameState): boolean =>
   s.modules.length >= 6 && derive(s).crewAlive.length >= 5
 
@@ -308,6 +309,150 @@ export const wouldCome = (s: GameState): FactionId | null => {
     if (r <= 0) return pool[i]
   }
   return pool[0]
+}
+
+// -------------------------------------------------------- hulls that wait --
+
+/**
+ * Not every ship comes to trade.
+ *
+ * Some arrive, do not ask for a berth, and do not leave. A hull standing off is
+ * the opening move of the only sequence in the game that can hurt the station
+ * from outside: it loiters, then it demands, then it comes in. Each step is
+ * visible on the board before the next one happens, which is the point — a raid
+ * here is always something you watched arrive and chose how to answer.
+ */
+/** How much they brought, measured against what they can see you have. */
+const forceFor = (s: GameState): number => {
+  const d = defence(s)
+  return Math.round(10 + (d.guns + d.shield * 0.6) * spread(roller(s), 0.7, 1.25))
+}
+
+/**
+ * What they will take to be somewhere else.
+ *
+ * It scales with what the station is plainly worth, because they can see the
+ * same thing you can — and it is quoted once, when they arrive, and never
+ * recomputed. A figure that drifts while you are reading it is not a price, and
+ * this one appears twice on the same screen. The loiterer takes 55% of it; by
+ * the time they are demanding, it is the whole number.
+ */
+export const tribute = (s: GameState, v: Visitor): number =>
+  v.asking ??
+  Math.round((260 + s.modules.length * 55 + (v.force ?? 10) * 14) * (1 + appeal(s) * 0.5))
+
+/** Whether there is anything here worth standing off for. */
+export const worthLeaningOn = (s: GameState): boolean =>
+  s.modules.length >= 8 && derive(s).crewAlive.length >= 6
+
+/**
+ * A hull arrives and does not ask for anything.
+ *
+ * Mostly the Drift — nobody with paper to lose leans on a station in daylight —
+ * but a power that dislikes you will do it too, deniably, and a power you have
+ * an arrangement with will quietly tell you it is coming.
+ */
+export const sendLoiter = (s: GameState): void => {
+  const hull = makeVisitor(roller(s), namesInPlay(s))
+  const grudge = PATRONS.filter((id) => id !== s.patron && s.standing[id] < -0.05)
+  hull.faction = grudge.length > 0 && roll(s) < 0.35 ? pickOne(roller(s), grudge) : 'unlisted'
+  hull.kind = 'raider'
+  hull.claim = 'trader'
+  hull.suspicion = 0.85
+  hull.status = 'holding'
+  hull.aboard = []
+  hull.offer = null
+  hull.intent = 'loiter'
+  hull.force = forceFor(s)
+  // Quoted on arrival and not recomputed afterwards.
+  hull.asking = tribute(s, hull)
+  // Long enough to notice it, decide, and act. Ignoring it is also a decision.
+  hull.timer = 200 + roll(s) * 160
+  s.visitors.push(hull)
+  log(s, `${hull.name} is holding station two kilometres out and not answering.`, 'warn')
+  // Somebody you deal with off the record hears things first.
+  const friend = PATRONS.find((id) => s.covert[id] > 0.06)
+  if (friend) {
+    log(
+      s,
+      `A channel that does not exist says ${factionDef(friend).short} know who that is. It is not them.`,
+      'info',
+    )
+  }
+}
+
+/** They stop waiting and start asking. */
+export const raiseDemand = (s: GameState, v: Visitor): void => {
+  v.intent = 'demand'
+  v.timer = 150 + roll(s) * 120
+  log(s, `${v.name} has opened a channel, and it is not a request for a berth.`, 'bad')
+  s.talk = beginTalk('demand', { kind: 'visitor', id: v.id }, v.name)
+}
+
+/**
+ * They come in.
+ *
+ * A raid costs rooms, cargo and blood, and it is survivable: crew are hurt
+ * rather than killed unless the station had nothing to fight with and ignored
+ * every step that led here. Nobody dies to a hull they were warned about twice
+ * and could have paid, fought or reported.
+ */
+export const resolveRaid = (s: GameState, v: Visitor): void => {
+  const d = defence(s)
+  const force = v.force ?? 12
+  const held = d.guns + d.shield * 0.7 + d.smallArms * 0.35
+  // How much of what they brought gets through.
+  const through = clamp(1 - held / (held + force), 0.12, 1)
+  const beaten = held > force * 1.35
+
+  for (const m of s.modules) {
+    if (m.kind === 'spine') continue
+    if (roll(s) >= through * 0.55) continue
+    m.condition = clamp(m.condition - spread(roller(s), 0.12, 0.34) * through, 0.15, 1)
+  }
+  const taken = Math.round(Math.min(s.credits, (140 + force * 26) * through))
+  s.credits -= taken
+
+  let hurt = 0
+  let killed = 0
+  const alive = s.crew.filter((c) => !c.dead && !isAway(s, c.id))
+  for (const c of alive) {
+    if (roll(s) >= through * 0.4) continue
+    const damage = Math.round(c.maxHp * spread(roller(s), 0.25, 0.6) * through)
+    // Defenceless and forewarned is the only way this kills anybody.
+    if (held < 1 && damage >= c.hp && alive.length > 1) {
+      c.dead = true
+      c.hp = 0
+      unassign(s, c.id)
+      killed += 1
+    } else {
+      c.hp = Math.max(1, c.hp - damage)
+      hurt += 1
+    }
+  }
+
+  shift(s, v.faction, -0.06)
+  v.intent = undefined
+  v.status = 'requesting'
+  v.timer = 0
+  log(
+    s,
+    beaten
+      ? `The ${v.name} came in and did not get far. −${taken}c, ${hurt} hurt.`
+      : `The ${v.name} came in. −${taken}c, ${hurt} hurt${killed ? `, ${killed} dead` : ''}.`,
+    killed ? 'bad' : 'warn',
+  )
+  if (killed === 0 && hurt === 0 && taken === 0) {
+    log(s, `They looked at what the station had and thought better of it.`, 'good')
+  }
+}
+
+/** They decide it is not worth it after all. */
+export const standDown = (s: GameState, v: Visitor, why: string): void => {
+  v.intent = undefined
+  v.status = 'requesting'
+  v.timer = 0
+  log(s, `${v.name} broke off. ${why}`, 'good')
 }
 
 /** A hull that is not asking. It is alongside by the time you read the hail. */

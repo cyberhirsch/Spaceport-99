@@ -3,7 +3,7 @@ import type { GameState, LogEntry, Rng } from './types.ts'
 
 // Constants and the two helpers everything else leans on.
 
-export const SAVE_VERSION = 9
+export const SAVE_VERSION = 10
 
 /**
  * The station's luck.
@@ -101,5 +101,19 @@ export const PATIENCE_SECONDS = 110
 
 /** Interest needed for a certainty; below it, an offer is a gamble. */
 export const SIGN_THRESHOLD = 100
+
+/**
+ * Timings for the two things that happen *to* a station rather than at it.
+ *
+ * They live here rather than with the code that uses them because founding a
+ * station has to set both clocks, and `state.ts` sits below `traffic.ts`.
+ */
+export const APPROACH_EARLIEST = 11 * 60
+
+export const APPROACH_GAP = 8 * 60
+
+export const LOITER_EARLIEST = 16 * 60
+
+export const LOITER_GAP = 13 * 60
 
 export const REVIVE_COST_PER_LEVEL = 90

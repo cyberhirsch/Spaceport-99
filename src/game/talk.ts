@@ -20,7 +20,15 @@ export type SpeakerRef =
   | { kind: 'visitor'; id: string }
   | { kind: 'prisoner'; id: string }
 
-export type ScriptId = 'crew' | 'hire' | 'captain' | 'conquest' | 'prisoner' | 'covert'
+export type ScriptId =
+  | 'crew'
+  | 'hire'
+  | 'captain'
+  | 'conquest'
+  | 'prisoner'
+  | 'covert'
+  | 'loiter'
+  | 'demand'
 
 /** One exchanged line, kept so the conversation reads as a conversation. */
 export interface TalkLine {

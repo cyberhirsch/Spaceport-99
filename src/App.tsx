@@ -415,7 +415,12 @@ export default function App() {
             setVisitorId(null)
           }}
           onTalkQuiet={() => {
-            act({ type: 'talk', script: 'covert', with: { kind: 'visitor', id: visitorId } })
+            // The same button covers every conversation nobody is meant to
+            // overhear: a hull standing off, its demand, and a quiet word.
+            const v = state.visitors.find((x) => x.id === visitorId)
+            const script =
+              v?.intent === 'loiter' ? 'loiter' : v?.intent === 'demand' ? 'demand' : 'covert'
+            act({ type: 'talk', script, with: { kind: 'visitor', id: visitorId } })
             setVisitorId(null)
           }}
         />

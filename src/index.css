@@ -1674,6 +1674,14 @@ h3 {
   animation: pulse 1.6s ease-in-out infinite;
 }
 
+/* A hull that arrived, asked for nothing, and did not leave. */
+.visitor-chip--holding {
+  border-color: #a8324a;
+  background: #2a0e16;
+  color: #ffb3bf;
+  animation: pulse 2.6s ease-in-out infinite;
+}
+
 .visitor-chip--inbound {
   border-style: dashed;
   opacity: 0.72;

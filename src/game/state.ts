@@ -12,11 +12,15 @@ import { blankStanding } from './factions.ts'
 import type { Crew, GameState, ModuleKind, ResourceKey, StatKey, StationModule } from './types.ts'
 import {
   AIR_PER_CREW,
+  APPROACH_EARLIEST,
+  APPROACH_GAP,
   BASE_CREW_CAP,
   BASE_HOLD,
   BASE_STORAGE,
   FOOD_PER_CREW,
   log,
+  LOITER_EARLIEST,
+  LOITER_GAP,
   newSeed,
   roll,
   roller,
@@ -160,6 +164,7 @@ export const newGame = (name = 'Spaceport-99', seed = newSeed()): GameState => {
     nextTakeoverIn: 0,
     covert: blankStanding(),
     nextApproachIn: 0,
+    nextLoiterIn: 0,
     burned: 0,
     seenIntro: false,
     gameOver: false,
@@ -169,7 +174,9 @@ export const newGame = (name = 'Spaceport-99', seed = newSeed()): GameState => {
   state.nextTakeoverIn = 20 * 60 + roll(state) * 20 * 60
   // Nobody has any reason to sound the station out yet, so the first quiet word
   // is a long way off. It comes sooner once there is something here worth one.
-  state.nextApproachIn = 14 * 60 + roll(state) * 10 * 60
+  state.nextApproachIn = APPROACH_EARLIEST + roll(state) * APPROACH_GAP
+  // And nothing worth leaning on, so nobody leans. Yet.
+  state.nextLoiterIn = LOITER_EARLIEST + roll(state) * LOITER_GAP
   // The founders are hand-picked: one specialist per critical system, a port
   // officer, and two generalists, so a new station is never dead on arrival
   // through bad luck. Six, not five, because the station has seven posts and

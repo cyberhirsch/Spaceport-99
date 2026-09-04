@@ -45,6 +45,23 @@ about to happen rather than rerolling it: a death stands, and so does a
 contract that went badly. Saves are brought forward across versions from
 version 8 on, one migration step per bump, rather than being thrown away.
 
+## Ships that are not here to trade
+
+Most hulls hail for a berth. Some arrive, ask for nothing, and do not leave.
+
+A hull standing off is the first of three steps, and each one is on the board
+before the next happens. Left alone it **demands** — a figure, a deadline, and
+an honest readout of how the fight would go. Refuse that and it comes in. So
+every raid in the game is something you watched arrive and chose how to answer:
+you can pay it off cheaply at the first step, expensively at the second, warn it
+away if your batteries can back the words, call the flag you fly and find out
+whether they answer, or spend an arrangement nobody filed.
+
+A raid costs rooms, cargo and blood, and it is survivable. Crew are hurt rather
+than killed unless the station had nothing to fight with and ignored every step
+that led there — and even then somebody is always left to shut the door. Meeting
+it on your own timing, rather than theirs, measurably reduces what they bring.
+
 ## Two standings
 
 Every power keeps two opinions of the station: the one on the record, and the

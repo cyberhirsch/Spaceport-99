@@ -10,9 +10,11 @@ import { makeVisitor } from './visitors.ts'
 import type { ModuleDef, GameState, ResourceKey, StationModule } from './types.ts'
 import {
   AIR_PER_CREW,
+  APPROACH_GAP,
   clamp,
   FOOD_PER_CREW,
   log,
+  LOITER_GAP,
   MAX_CATCHUP_SECONDS,
   namesInPlay,
   pickOne,
@@ -37,11 +39,14 @@ import { shift, appeal } from './standing.ts'
 import { rollFar, answerCall, resolveMission, inContact } from './missions.ts'
 import {
   admitVisitor,
-  APPROACH_GAP,
   CONQUEST_EARLIEST,
   CONQUEST_GAP,
+  raiseDemand,
+  resolveRaid,
   sendApproach,
   sendConqueror,
+  sendLoiter,
+  worthLeaningOn,
   worthSounding,
   worthTaking,
   wouldCome,
@@ -354,6 +359,16 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
     }
   }
 
+  // --- hulls that wait ------------------------------------------------
+  // One at a time. This is a sequence with three visible steps, not a swarm.
+  if (worthLeaningOn(s)) {
+    s.nextLoiterIn -= dt
+    if (s.nextLoiterIn <= 0) {
+      s.nextLoiterIn = LOITER_GAP + roll(s) * LOITER_GAP
+      if (!s.visitors.some((v) => v.intent && v.intent !== 'conquest')) sendLoiter(s)
+    }
+  }
+
   // --- the quiet word -------------------------------------------------
   // Somebody sounds the station out from time to time. It rides in on ordinary
   // traffic, so if nothing suitable is alongside it simply waits for a hull.
@@ -379,7 +394,25 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
 
   for (const v of [...s.visitors]) {
     // A hull that came to take the station waits as long as it likes.
-    if (v.intent) continue
+    if (v.intent === 'conquest') continue
+    // The three-step sequence runs on its own clock, and every step of it has
+    // already been on the board long enough to answer.
+    if (v.intent) {
+      v.timer -= dt
+      if (v.timer > 0) continue
+      if (v.intent === 'loiter') {
+        raiseDemand(s, v)
+      } else if (v.intent === 'demand') {
+        // Ignoring a demand is an answer, and they heard it.
+        v.intent = 'raid'
+        v.timer = 8
+      } else {
+        resolveRaid(s, v)
+        // Whatever was on screen about it is finished now.
+        if (s.talk && s.talk.with.kind === 'visitor' && s.talk.with.id === v.id) s.talk = null
+      }
+      continue
+    }
     v.timer -= dt
     if (v.status === 'inbound') {
       if (v.timer <= 0) {

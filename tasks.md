@@ -145,29 +145,50 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
   conversation with no option to pay, report or reason with it. The file lives
   in the Comms Array panel.
 
+- **Ran a scripted playthrough, and fixed the dead end it found.** Five hours of
+  game time, three seeds, a policy that builds, staffs, hires, berths hulls,
+  takes contracts and answers every conversation. It found one genuine blocker
+  and it was a bad one: **a founding station could never grow.** It has exactly
+  enough people to man the four rooms it comes with, so the Comms Array — the
+  first thing anybody builds — was a post nobody would ever take; asking HQ for
+  crew needs somebody sitting at it; and auto-assign only ever filled empty
+  slots from the idle pool, of which there was none. Five hours in, the harness
+  had sixteen rooms, thirty thousand credits and the same six people it
+  started with, and then they starved.
+
+  Fixed in `src/game/staffing.ts`: `jobPriority` now ranks the comms desk just
+  after life support while the station is below its own crew cap, and
+  `autoAssignInto` has a second pass that will move the *second* person out of
+  a room that has two in order to man an empty essential post. Nothing is ever
+  stripped to nobody, and only the posts that decide whether the station has a
+  future can pull somebody off another job. Same harness now reaches sixteen
+  crew by eighty minutes. Six tests in `src/game/__tests__/staffing.test.ts`
+  hold it shut.
+
+  **Still yours to play.** The harness is good at wipes, rates and dead ends and
+  blind to boredom. What it cannot tell you, and what a hand-played session
+  would: whether the first twenty minutes are interesting or just admin;
+  whether the letter arriving at nine minutes is too early to care about;
+  whether the gap between the Research Lab at 30 crew and the Trading Hub at 52
+  has anything in it; and whether losing the station reads as a twist or as a
+  punishment. One other thing it did surface for a human to judge: power and
+  food can sit negative for forty minutes before anybody dies, which is either
+  a generous warning or an invisible death sentence, depending on how legible
+  the readout is when you are actually looking at it.
+
 ---
 
 ## Opus
 
-### 1. Play it, then fix what drags
-
-**Why.** Nobody has. Every balance claim — "4½ hours to 60 crew", "one spec
-every five runs", "9 wipes in 40 idle runs" — is from a headless harness, not
-from a hand on the controls. The harness is good at wipes and rates and blind
-to boredom. The boss plays this one.
-
-**Where.** Everything. Keep a log: where you waited with nothing to do, where a
-number was wrong, where the interface made you guess.
-
-**Done when.** One full session from a fresh station to the Trading Hub, and a
-list of at least five things that dragged, each with a proposed fix. The fixes
-are separate tasks; this one is the list.
+Nothing outstanding. The five that were here are in **Done** above; what is
+left of the playtest is a session played by hand, which is not a task anybody
+can be handed.
 
 ---
 
 ## Sonnet
 
-### 2. Save migrations instead of save wipes
+### 1. Save migrations instead of save wipes
 
 **Why.** `SAVE_VERSION` is 7 and has been bumped every session. Each bump makes
 every existing save unloadable. Fine while nobody is playing; the day someone
@@ -180,7 +201,7 @@ newer than this one). The 7 → 8 step is written and tested, and the chain does
 not back-port 5 or 6.
 
 **What is left.** Every bump from here adds a step — that is the whole
-discipline, and it is worth a line in `CLAUDE.md` (task 7) so it is not
+discipline, and it is worth a line in `CLAUDE.md` (task 6) so it is not
 forgotten. The remaining gap is coverage: `migrate` is tested through
 `luck.test.ts`, not through `loadGame`/`readSlot`, which are the functions that
 actually touch `localStorage`.
@@ -189,7 +210,7 @@ actually touch `localStorage`.
 fixture through `loadGame` with a stubbed `localStorage`, and the next feature
 to change the save shape adds its step rather than bumping and wiping.
 
-### 3. Split the tick
+### 2. Split the tick
 
 **Why.** `src/game/tick.ts` is 516 lines and `step()` is most of it: the power
 grid, production, life support, the med bay, the engineering bay, the lab, the
@@ -204,7 +225,7 @@ already commented as a section. They should be functions.
 **Done when.** `step()` is under 40 lines, every section is a named function
 with its doc comment, and the tests are untouched and green.
 
-### 4. Something other than bunks moves the roster
+### 3. Something other than bunks moves the roster
 
 **Why.** Reaching 60 crew is a matter of building Crew Quarters and waiting.
 The Comms Array, the Docking Port, standing with your patron and the station's
@@ -230,7 +251,7 @@ roll), `src/game/reducer.ts` (`requestCrew`), `src/game/core.ts`
 supposed to — count, faction mix, mean stat, unasked arrivals — and quarters
 remain the ceiling rather than the only lever.
 
-### 5. Break up the two long modals
+### 4. Break up the two long modals
 
 **Why.** `src/components/VisitorModal.tsx` is resource trade, the bonded cage,
 kit, the boarding party, the auto-accept toggle and a talk button.
@@ -245,7 +266,7 @@ adds a file, not a branch.
 **Done when.** Neither modal file is over 200 lines, and adding a room-specific
 panel touches one new file plus one line in the lookup.
 
-### 6. Luck does something
+### 5. Luck does something
 
 **Why.** Three rooms run on Luck — the Comms Array, the Trading Hub and the
 Reclamation Bay — and two are at the far end of the curve. Every other stat has
@@ -263,7 +284,7 @@ suffers incidents measurably less, and a seeded test says so.
 
 ## Haiku
 
-### 7. A `CLAUDE.md`
+### 6. A `CLAUDE.md`
 
 **Why.** There is none. Every session re-learns the reducer discipline, the
 `.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
@@ -278,7 +299,7 @@ extension.
 **Done when.** The file exists and a new session can find the layer order and
 the test commands without reading `engine.ts`.
 
-### 8. Re-deal portraits on load
+### 7. Re-deal portraits on load
 
 **Why.** A save from before portraits were dealt has crew with no `portrait`
 field, so they draw from the seed and can share a face.
@@ -289,7 +310,7 @@ field, so they draw from the seed and can share a face.
 **Done when.** Loading such a save gives every crew member a distinct portrait
 where the pool allows, and a test loads a fixture without portraits and checks.
 
-### 9. Tests for the parts of the split that changed visibility
+### 8. Tests for the parts of the split that changed visibility
 
 **Why.** The refactor exported about two dozen previously private helpers
 (`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
@@ -304,7 +325,7 @@ use it as the pattern.
 **Done when.** Each newly exported helper with a branch in it has at least one
 test that exercises the branch.
 
-### 10. PWA manifest and service worker
+### 9. PWA manifest and service worker
 
 **Why.** The web build is not installable and does not run offline, though
 nothing in it needs a network. An idle station you check on through the day
@@ -318,7 +339,7 @@ app icon can come from an existing asset until there is a proper one.
 **Done when.** The deployed page passes the browser's install check and loads
 with the network off after one visit.
 
-### 11. Rename the branch to `main`
+### 10. Rename the branch to `main`
 
 **Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
 and the deployment is tied to it.
@@ -336,7 +357,7 @@ is gone.
 Both of these are specified and neither ships with placeholder art. They move
 into the tiers the day the renders arrive.
 
-### 12. New kit for the Research Lab
+### 11. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -354,7 +375,7 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 13. Art for the rooms and the ships
+### 12. Art for the rooms and the ships
 
 **Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.

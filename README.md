@@ -512,6 +512,19 @@ The station keeps running while the tab is closed, catching up on as much as fou
 hours when you return. Nobody dies during that catch-up: you come back to a
 station in crisis rather than to a tomb.
 
+## Crew and posts
+
+A founding station arrives with exactly enough people to man the four rooms it
+comes with, which means the first room you build is a post nobody is free to
+take. **Auto-assign** will move the second person out of a room that has two in
+order to man an empty essential post — the three life-support rooms, and the
+Comms Array while the station is still short of its own bunks. It will never
+strip a room to nobody, and it will not rob life support to staff an
+Observation Deck.
+
+That matters more than it sounds: asking HQ for crew needs somebody sitting at
+the comms desk, so a station that cannot man it cannot grow at all.
+
 ## Layout
 
 ```

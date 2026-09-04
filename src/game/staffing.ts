@@ -2,7 +2,7 @@ import { def, mergeBonus, staffSlots } from './modules.ts'
 import { PORTRAIT_COUNT, crewPortrait, effectiveness, grantXp } from './crew.ts'
 import { SLOTS, itemDef } from './gear.ts'
 import type { Crew, GameState, StatKey, StationModule } from './types.ts'
-import { log, pickOne, roller } from './core.ts'
+import { BASE_CREW_CAP, log, pickOne, roller } from './core.ts'
 
 // Who is standing in which room, who is free, and how well they work.
 
@@ -81,7 +81,7 @@ export const autoAssignInto = (s: GameState): number => {
     .filter(
       (m) => staffSlots(m) > 0 && !m.standby && !s.incidents.some((i) => i.moduleId === m.id),
     )
-    .sort((a, b) => jobPriority(a) - jobPriority(b))
+    .sort((a, b) => jobPriority(s, a) - jobPriority(s, b))
   const free = new Set(idleCrew(s).map((c) => c.id))
   for (const m of jobs) {
     const stat = def(m.kind).stat
@@ -97,20 +97,77 @@ export const autoAssignInto = (s: GameState): number => {
       if (assign(s, best.id, m.id)) moved += 1
     }
   }
+
+  // Second pass: a room nobody is standing in is not a room.
+  //
+  // A founding station has exactly enough people to fill the four rooms it
+  // comes with, so the first thing built after that — the Comms Array, usually
+  // — is a post nobody will ever take. Left alone that is a dead end: asking
+  // HQ for crew needs somebody on that desk, and there is never anybody spare
+  // to put there. So an empty room may take the *second* person out of a room
+  // that has two. Nothing is ever stripped to nobody, and a donor keeps working
+  // at the reduced rate, which is a trade a player would make and could not
+  // otherwise ask for.
+  for (const m of jobs) {
+    if (m.staff.length > 0) continue
+    const mine = jobPriority(s, m)
+    // Only the posts that decide whether the station has a future are worth
+    // taking somebody off another job for. A Lounge can wait for a volunteer.
+    if (mine > ESSENTIAL) continue
+    const donor = [...jobs]
+      .filter((x) => x.id !== m.id && x.staff.length > 1)
+      .sort((a, b) => jobPriority(s, b) - jobPriority(s, a))[0]
+    if (!donor) continue
+    const spare = donor.staff[donor.staff.length - 1]
+    if (!spare) continue
+    unassign(s, spare)
+    if (assign(s, spare, m.id)) moved += 1
+  }
   return moved
 }
 
-/** Life support first, then money, then training. */
-export const jobPriority = (m: StationModule): number => {
+/**
+ * Priorities at or below this are worth taking somebody off another job for:
+ * the three life-support rooms, and the comms desk while the station is short
+ * of its own bunks. Everything else waits for somebody to be free.
+ */
+export const ESSENTIAL = 3
+
+/**
+ * Life support first, then the road out, then money, then training.
+ *
+ * The Comms Array is the exception that has to be spelled out. It looks like an
+ * ordinary earner, so a greedy sort leaves it empty whenever there are more
+ * rooms than people — and an empty comms desk is the one thing that cannot be
+ * recovered from by waiting, because asking HQ for crew is the only way a
+ * station grows and it needs somebody sitting there to do it. A station short
+ * of its own bunks staffs that desk before it staffs anything but air.
+ */
+export const jobPriority = (s: GameState, m: StationModule): number => {
   const d = def(m.kind)
   if (d.produces === 'power') return 0
   if (d.produces === 'air') return 1
   if (d.produces === 'food') return 2
-  if (d.heals) return 3
-  if (d.credits) return 4
-  if (d.berths) return 5
+  if (m.kind === 'comms') {
+    const alive = s.crew.filter((c) => !c.dead).length
+    return alive < crewCapOf(s) ? 3 : 8
+  }
+  if (d.heals) return 4
+  if (d.credits) return 5
+  if (d.berths) return 6
   return 9
 }
+
+/**
+ * Bunks aboard, without going through `derive` — this runs inside the
+ * assignment sort, and `derive` is a layer above it.
+ */
+const crewCapOf = (s: GameState): number =>
+  BASE_CREW_CAP +
+  s.modules.reduce(
+    (n, m) => n + (def(m.kind).crewCapacity ?? 0) * m.width * m.level * mergeBonus(m),
+    0,
+  )
 
 /** Grants xp to one crew member by id. */
 export const awardXpTo = (s: GameState, id: string, amount: number): void => {

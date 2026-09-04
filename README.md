@@ -45,6 +45,26 @@ about to happen rather than rerolling it: a death stands, and so does a
 contract that went badly. Saves are brought forward across versions from
 version 8 on, one migration step per bump, rather than being thrown away.
 
+## Two standings
+
+Every power keeps two opinions of the station: the one on the record, and the
+one it would admit to if nobody were listening. Sooner or later each of them
+sends somebody to find out which kind of commander you are — the word never
+arrives on a hull flying their own paper, because neither of you has to admit
+the conversation happened.
+
+There are three answers and all of them mean something. Refusing is free, which
+is what makes taking it a choice rather than a trap. Reporting it to your flag
+is picking a side out loud. Taking it pays, opens a channel, and leaves you one
+bad roll from your own flag finding out — and a power that already has an
+arrangement with you has far less reason to come and take the place.
+
+The **Covert Ops** room does not create any of this; it only makes it
+survivable. Without one you are conducting private business on the open channel
+and hoping. With one, the odds of an arrangement coming out drop a long way and
+never reach zero. Two that come out and somebody starts making the case that
+this post needs new management.
+
 ## Standalone builds
 
 The same bundle, wrapped twice. **Electron** serves it to a desktop window;

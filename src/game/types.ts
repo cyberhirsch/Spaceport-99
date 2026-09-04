@@ -27,6 +27,7 @@ export const RESOURCE_INFO: Record<ResourceKey, { name: string; short: string; i
 
 export type ModuleKind =
   | 'spine'
+  | 'covertops'
   | 'reactor'
   | 'atmospherics'
   | 'hydroponics'
@@ -121,6 +122,11 @@ export interface ModuleDef {
   commerce?: number
   /** Reach for far contracts, per segment per level. Deep Space Operations only. */
   reach?: number
+  /**
+   * How much of a quiet arrangement this room can keep quiet, per segment per
+   * level. Covert Ops only. It never reaches certainty.
+   */
+  discretion?: number
 }
 
 /** A built (possibly merged) room occupying contiguous slots on one deck. */
@@ -232,6 +238,30 @@ export type SpecId = 'shield' | 'vault' | 'torch' | 'astro' | 'filter'
 
 /** The powers whose space the traffic comes from, plus everyone off their books. */
 export type FactionId = 'terran' | 'concern' | 'compact' | 'unlisted'
+
+/**
+ * What a power asks for when it would rather deal with you than take you.
+ *
+ * Every one of them is something you could refuse without consequence and
+ * accept without anybody finding out — which is the whole trouble with them.
+ */
+export type CovertAsk =
+  /** Move something through the station without it appearing on a manifest. */
+  | 'cargo'
+  /** Say who has been alongside lately, and what they were carrying. */
+  | 'names'
+  /** Have nobody watching the clamps for an hour. */
+  | 'window'
+  /** Go on talking to the power whose flag you no longer fly. */
+  | 'turn'
+
+/** One power's quiet approach, carried by a hull that is not obviously theirs. */
+export interface CovertOffer {
+  from: FactionId
+  ask: CovertAsk
+  /** Credits on the table. */
+  pays: number
+}
 
 /** Something a docked ship wants to talk about. Marked with an exclamation. */
 export interface VisitorOffer {
@@ -357,6 +387,11 @@ export interface Visitor {
   intent?: 'conquest'
   /** What a hull with an intent brought with it, against the station's guns. */
   force?: number
+  /**
+   * A quiet word somebody asked them to have with you. The hull carrying it is
+   * rarely flying the paper of the power that sent it — that is the point.
+   */
+  covert?: CovertOffer
   /** Who came aboard off this hull. Empty until she is cleared to dock. */
   aboard: Guest[]
   /** Seconds until they stop waiting, or until they undock. */
@@ -591,6 +626,17 @@ export interface GameState {
   /** Seconds until somebody might come for the station. */
   nextTakeoverIn: number
   /** Ids of crew that arrived but have not been greeted yet (for the toast). */
+  /**
+   * What each power thinks of the station off the record — the arrangements
+   * nobody has filed. Kept apart from `standing` on purpose: a station can be
+   * a model Confederation post on paper and be answering three other people's
+   * questions at night.
+   */
+  covert: Record<FactionId, number>
+  /** Seconds until somebody tries a quiet word. */
+  nextApproachIn: number
+  /** How many arrangements have come out. Nobody forgets the second one. */
+  burned: number
   seenIntro: boolean
   gameOver: boolean
 }

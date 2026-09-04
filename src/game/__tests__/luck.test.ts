@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { advance, newGame, reducer, roll, seeded } from '../engine.ts'
+import { SAVE_VERSION, advance, newGame, reducer, roll, seeded } from '../engine.ts'
 import { migrate } from '../save.ts'
 import type { GameState } from '../types.ts'
 
@@ -81,10 +81,12 @@ test('reloading a save cannot reroll what was about to happen', () => {
 test('a save from the version before the luck existed is brought forward', () => {
   const old = { ...newGame('Spaceport-99', 5), version: 7 } as unknown as Record<string, unknown>
   delete old.rng
+  delete old.covert
   const brought = migrate(old as unknown as GameState)
   assert.ok(brought, 'it loads rather than being thrown away')
-  assert.equal(brought.version, 8)
+  assert.equal(brought.version, SAVE_VERSION, 'walked all the way to the present')
   assert.equal(typeof brought.rng, 'number', 'and it is dealt luck of its own')
+  assert.ok(brought.covert, 'and a ledger for what it has not filed')
 })
 
 test('a save with no path forward is refused rather than guessed at', () => {

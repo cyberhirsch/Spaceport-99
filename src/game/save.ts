@@ -1,4 +1,5 @@
 import { SAVE_VERSION, newGame, newSeed } from './engine.ts'
+import { blankStanding } from './factions.ts'
 import type { GameState } from './types.ts'
 
 const KEY = 'spaceport99.save'
@@ -19,6 +20,16 @@ const STEPS: { from: number; up: (raw: Record<string, unknown>) => void }[] = [
   // 7 → 8: rolls moved into the state. A save from before this has no luck of
   // its own, so deal it some. What it would have rolled was never written down.
   { from: 7, up: (raw) => { raw.rng = newSeed() } },
+  // 8 → 9: the powers started dealing off the record. A station from before
+  // this has no arrangements with anybody, which is the honest answer.
+  {
+    from: 8,
+    up: (raw) => {
+      raw.covert = blankStanding()
+      raw.nextApproachIn = 11 * 60
+      raw.burned = 0
+    },
+  },
 ]
 
 export const migrate = (raw: GameState): GameState | null => {

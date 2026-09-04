@@ -370,6 +370,21 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     lots: 2,
     powerDraw: 2.5,
   },
+  covertops: {
+    kind: 'covertops',
+    name: 'Covert Ops',
+    short: 'Covert',
+    blurb:
+      'A room with no window on the deck plan and a channel that is not in the register. Every power would rather deal with a station than take one; this is where you find out what they are offering.',
+    glyph: '◑',
+    hue: 285,
+    cost: 1040,
+    unlockAtCrew: 50,
+    slotsPerSegment: 2,
+    stat: 'A',
+    discretion: 0.3,
+    powerDraw: 3.5,
+  },
   dso: {
     kind: 'dso',
     name: 'Deep Space Operations',

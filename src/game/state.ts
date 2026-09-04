@@ -158,12 +158,18 @@ export const newGame = (name = 'Spaceport-99', seed = newSeed()): GameState => {
     prisoners: [],
     bonded: [],
     nextTakeoverIn: 0,
+    covert: blankStanding(),
+    nextApproachIn: 0,
+    burned: 0,
     seenIntro: false,
     gameOver: false,
   }
   // Nothing has been rolled yet, so this is the station's first draw: how long
   // it gets before anybody comes for it.
   state.nextTakeoverIn = 20 * 60 + roll(state) * 20 * 60
+  // Nobody has any reason to sound the station out yet, so the first quiet word
+  // is a long way off. It comes sooner once there is something here worth one.
+  state.nextApproachIn = 14 * 60 + roll(state) * 10 * 60
   // The founders are hand-picked: one specialist per critical system, a port
   // officer, and two generalists, so a new station is never dead on arrival
   // through bad luck. Six, not five, because the station has seven posts and

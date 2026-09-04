@@ -1,4 +1,4 @@
-import { clamp, defence, log, pickOne, roll, roller, shift } from '../engine.ts'
+import { clamp, covertShift, defence, log, pickOne, roll, roller, shift } from '../engine.ts'
 import { STANDING_CEILING, factionDef } from '../factions.ts'
 import { registerScript, type TalkCtx, type TalkScript } from '../talk.ts'
 
@@ -128,6 +128,12 @@ const script: TalkScript = {
         goto: 'bought',
       },
       {
+        label: 'Remind them what you have been doing for them.',
+        note: () => 'The arrangement was never written down. That works both ways.',
+        when: (c) => Boolean(c.ship) && c.s.covert[c.ship!.faction] > 0.06,
+        goto: 'arrangement',
+      },
+      {
         label: (c) => `Call ${factionDef(c.s.patron ?? 'terran').short} and hold them to it.`,
         note: () => 'You fly their paper. This is what that was supposed to buy.',
         when: (c) => Boolean(c.s.patron) && c.s.patron !== c.ship?.faction,
@@ -151,6 +157,50 @@ const script: TalkScript = {
         },
       },
     ],
+  },
+
+  /**
+   * The one door that only exists because of what you did off the record. They
+   * do not withdraw out of gratitude — they withdraw because a station that is
+   * already answering their questions is worth more standing than taken.
+   */
+  arrangement: {
+    sticky: true,
+    text: (c) => {
+      const v = c.ship
+      if (!v) return ''
+      return `The channel goes quiet for eleven seconds. When they come back it is a different voice, and a much more careful one. "That was not supposed to be on this frequency, commander." A pause. "No. It would be untidy to take a station we are already talking to."`
+    },
+    beat: () => 'Nobody says the word arrangement. Nobody has to.',
+    replies: [
+      {
+        label: 'Then take the clamps off.',
+        effect: (c) => {
+          const v = c.ship
+          if (!v) return
+          v.status = 'requesting'
+          v.timer = 0
+          v.intent = undefined
+          // The arrangement is spent: it was worth exactly one of these.
+          covertShift(c.s, v.faction, -0.09)
+          shift(c.s, v.faction, 0.02)
+          log(c.s, `The ${v.name} stood down. Nobody filed a reason.`, 'good')
+        },
+        goto: 'withdrew',
+      },
+      {
+        label: 'No. I would rather owe you nothing.',
+        note: () => 'The arrangement stays intact. So does the hull on your clamps.',
+        goto: 'start',
+      },
+    ],
+  },
+
+  withdrew: {
+    final: true,
+    text: (c) =>
+      `The ${c.talk.who} came off the clamps without a word and was gone inside the hour. The flag over the door did not change, and the account of why it did not change does not exist anywhere.`,
+    replies: [{ label: 'Close', goto: null }],
   },
 
   authority: {

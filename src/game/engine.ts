@@ -17,6 +17,7 @@ import './talks/hire.ts'
 import './talks/captain.ts'
 import './talks/prisoner.ts'
 import './talks/conquest.ts'
+import './talks/covert.ts'
 
 export * from './core.ts'
 export * from './staffing.ts'

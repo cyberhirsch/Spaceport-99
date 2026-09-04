@@ -11,6 +11,21 @@ export const shift = (s: GameState, id: FactionId, amount: number): void => {
 }
 
 /**
+ * Nudge what one power thinks of the station off the record.
+ *
+ * Covert standing runs on the same scale as the public kind and is kept in a
+ * separate ledger, because the two move independently and frequently in
+ * opposite directions. That is the whole point of it.
+ */
+export const covertShift = (s: GameState, id: FactionId, amount: number): void => {
+  s.covert[id] = clamp(s.covert[id] + amount, STANDING_FLOOR, STANDING_CEILING)
+}
+
+/** Powers who would take your call whatever your paperwork says. */
+export const channels = (s: GameState): FactionId[] =>
+  FACTION_IDS.filter((id) => s.covert[id] > 0.02)
+
+/**
  * The standing that actually counts. Flying a flag means that power's opinion
  * is the one deciding who HQ sends you and how nasty the contracts are; with
  * no flag you trade on your general name instead, for better and worse.

@@ -153,6 +153,27 @@ export const sensorEdge = (s: GameState): number => {
   return Math.min(0.9, n)
 }
 
+/**
+ * How well the station can keep an arrangement off the record.
+ *
+ * Without a Covert Ops room you are conducting your private business on the
+ * open channel and hoping, which is roughly as safe as it sounds. With one, it
+ * is a manageable risk — never a safe one. Nothing here reaches certainty.
+ */
+export const discretion = (s: GameState): number => {
+  const crewById = new Map(s.crew.map((c) => [c.id, c]))
+  let n = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'covertops' || m.standby) continue
+    n += (def(m.kind).discretion ?? 0) * m.width * m.level * mergeBonus(m) * workRate(m, crewById)
+  }
+  return Math.min(0.75, n)
+}
+
+/** The odds a quiet arrangement comes out, if you take one right now. */
+export const exposureRisk = (s: GameState): number =>
+  Math.max(0.06, 0.6 - discretion(s) - Math.min(0.1, s.modules.length * 0.004))
+
 /** Whether the station can send teams past the comms envelope, and how far. */
 export const reach = (s: GameState): number => {
   const crewById = new Map(s.crew.map((c) => [c.id, c]))

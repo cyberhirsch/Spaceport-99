@@ -414,6 +414,10 @@ export default function App() {
             act({ type: 'talk', script: 'captain', with: { kind: 'visitor', id: visitorId } })
             setVisitorId(null)
           }}
+          onTalkQuiet={() => {
+            act({ type: 'talk', script: 'covert', with: { kind: 'visitor', id: visitorId } })
+            setVisitorId(null)
+          }}
         />
       )}
 

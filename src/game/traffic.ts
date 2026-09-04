@@ -3,13 +3,13 @@ import { beginTalk } from './talk.ts'
 import { PATRONS, factionDef } from './factions.ts'
 import { makeMission } from './fleet.ts'
 import { makeGuests, makeVisitor } from './visitors.ts'
-import type { FactionId, Prisoner, GameState, Guest, Visitor } from './types.ts'
-import { clamp, log, namesInPlay, roll, roller } from './core.ts'
+import type { CovertAsk, FactionId, Prisoner, GameState, Guest, Visitor } from './types.ts'
+import { clamp, log, namesInPlay, pickOne, roll, roller, spread } from './core.ts'
 import { allocatePortrait } from './staffing.ts'
 import { defence, cellsAboard } from './rooms.ts'
 import { derive } from './state.ts'
 import { startIncident } from './hazards.ts'
-import { shift, appeal } from './standing.ts'
+import { shift, appeal, covertShift } from './standing.ts'
 import { rollFar } from './missions.ts'
 
 // Hulls at the clamps: admitting them, arresting off them, and the one that is not asking.
@@ -166,6 +166,121 @@ export const guestAboard = (
  * It cannot happen to a station too small to be worth the fuel, and it will
  * not happen twice in a row without a long quiet stretch in between.
  */
+// -------------------------------------------------------------- quiet words --
+
+/**
+ * Nobody sounds out a station with nothing on it. Once there is, somebody
+ * always does, and it is never the power whose flag is over the door.
+ */
+export const APPROACH_EARLIEST = 11 * 60
+
+export const APPROACH_GAP = 8 * 60
+
+export const worthSounding = (s: GameState): boolean =>
+  s.modules.length >= 6 && derive(s).crewAlive.length >= 5
+
+/**
+ * Who tries you.
+ *
+ * Everybody, eventually. Soonest the powers whose paper you do not fly, and
+ * soonest of those the ones you have already said yes to once — an arrangement
+ * that worked is an arrangement worth extending.
+ */
+export const wouldSound = (s: GameState): FactionId | null => {
+  const pool = PATRONS.filter((id) => id !== s.patron)
+  if (pool.length === 0) return null
+  const weights = pool.map((id) => Math.max(0.05, 0.2 + s.covert[id] * 2 - s.standing[id] * 0.5))
+  const total = weights.reduce((a, b) => a + b, 0)
+  let r = roll(s) * total
+  for (let i = 0; i < pool.length; i += 1) {
+    r -= weights[i]
+    if (r <= 0) return pool[i]
+  }
+  return pool[0]
+}
+
+/** What each ask is worth, before the station's size is taken into account. */
+const ASK_PAYS: Record<CovertAsk, [number, number]> = {
+  cargo: [240, 420],
+  names: [150, 290],
+  window: [430, 700],
+  turn: [520, 900],
+}
+
+/**
+ * How much harder each ask is to keep off the record. Naming who docked is
+ * barely anything; standing your watch down for an hour is the sort of thing
+ * people notice afterwards and work backwards from.
+ */
+export const ASK_RISK: Record<CovertAsk, number> = {
+  cargo: 1,
+  names: 0.7,
+  window: 1.3,
+  turn: 1.45,
+}
+
+/** What they would ask this station for, given who they are to it. */
+const askFor = (s: GameState, from: FactionId): CovertAsk => {
+  // A power that used to hold this station wants one thing above all others.
+  if (s.resigned.includes(from) && s.patron !== null && s.patron !== from) return 'turn'
+  const r = roll(s)
+  if (r < 0.4) return 'cargo'
+  if (r < 0.75) return 'names'
+  return 'window'
+}
+
+/**
+ * A quiet word, carried by whoever happens to be alongside.
+ *
+ * It never arrives on a hull flying the sender's own paper — the whole value of
+ * the arrangement is that neither of you has to admit it exists. If nothing
+ * suitable is at the clamps, nobody says anything today.
+ */
+export const sendApproach = (s: GameState): boolean => {
+  const from = wouldSound(s)
+  if (!from) return false
+  const carriers = s.visitors.filter(
+    (v) => v.status === 'docked' && !v.covert && !v.intent && v.faction !== from,
+  )
+  if (carriers.length === 0) return false
+  const hull = pickOne(roller(s), carriers)
+  const ask = askFor(s, from)
+  const [lo, hi] = ASK_PAYS[ask]
+  const size = 1 + Math.min(0.8, s.modules.length * 0.035)
+  hull.covert = { from, ask, pays: Math.round(spread(roller(s), lo, hi) * size) }
+  log(s, `Somebody aboard the ${hull.name} would like a word off the log.`, 'warn')
+  return true
+}
+
+/**
+ * An arrangement comes out.
+ *
+ * Whoever holds the station takes it personally, and takes it worse each time.
+ * Two of these and somebody starts making the case that this post needs new
+ * management.
+ */
+export const expose = (s: GameState, from: FactionId, ask: CovertAsk): void => {
+  s.burned += 1
+  const patron = s.patron
+  const bite = 0.06 + s.burned * 0.02 + (ask === 'turn' ? 0.06 : 0)
+  if (patron) {
+    shift(s, patron, -bite)
+    log(
+      s,
+      `It came out. ${factionDef(patron).short} know you have been talking to ${factionDef(from).short}.`,
+      'bad',
+    )
+  } else {
+    log(s, `It came out. Everybody knows who you have been talking to.`, 'bad')
+  }
+  // The power you dealt with is not embarrassed. It is inconvenienced.
+  covertShift(s, from, -0.03)
+  if (s.burned >= 2 && patron) {
+    // Twice is a pattern, and a pattern is an argument for replacing you.
+    s.nextTakeoverIn = Math.min(s.nextTakeoverIn, 300 + roll(s) * 300)
+  }
+}
+
 export const CONQUEST_EARLIEST = 45 * 60
 
 export const CONQUEST_GAP = 40 * 60
@@ -183,7 +298,9 @@ export const worthTaking = (s: GameState): boolean => {
 export const wouldCome = (s: GameState): FactionId | null => {
   const pool = PATRONS.filter((id) => id !== s.patron)
   if (pool.length === 0) return null
-  const weights = pool.map((id) => Math.max(0.05, 0.25 - s.standing[id]))
+  // An arrangement is worth more to them than a station is: they already have
+  // what taking it would get them, and none of the trouble.
+  const weights = pool.map((id) => Math.max(0.05, 0.25 - s.standing[id] - s.covert[id] * 1.2))
   const total = weights.reduce((a, b) => a + b, 0)
   let r = roll(s) * total
   for (let i = 0; i < pool.length; i += 1) {

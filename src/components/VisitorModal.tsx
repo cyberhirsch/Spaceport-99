@@ -31,6 +31,8 @@ interface Props {
   onSelectGuest: (guestId: string) => void
   onAutoAccept: (on: boolean) => void
   onTalk: () => void
+  /** Opens the approach a passenger is carrying, when there is one. */
+  onTalkQuiet: () => void
 }
 
 export const VisitorModal = ({
@@ -46,6 +48,7 @@ export const VisitorModal = ({
   onSelectGuest,
   onAutoAccept,
   onTalk,
+  onTalkQuiet,
 }: Props) => {
   const v = state.visitors.find((x) => x.id === visitorId)
   const derived = derive(state)
@@ -308,6 +311,11 @@ export const VisitorModal = ({
         <button className="btn btn--primary" onClick={onTalk}>
           Talk to the master
         </button>
+        {v.covert && (
+          <button className="btn btn--quiet" onClick={onTalkQuiet}>
+            Somebody wants a word
+          </button>
+        )}
       </div>
 
       {dock && (

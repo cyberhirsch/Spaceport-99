@@ -97,6 +97,18 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
   a `GameState` rolls from it. `SAVE_VERSION` went to 8 — see the note on
   task 6 below.
 
+- **Built the Covert Ops room, and the second standing behind it.** Every power
+  now keeps two opinions of the station: `standing` on the record and `covert`
+  off it. Approaches ride in on ordinary traffic, never on a hull flying the
+  sender's own paper, and ask for one of four things — cargo that skips the
+  manifest, the docking log, an hour with nobody on the clamps, or that you keep
+  talking to the flag you no longer fly. Refusing is free; reporting it swings
+  your patron; taking it pays, opens a channel, and rolls against
+  `exposureRisk`. The room does not create any of it, it only makes it
+  survivable. Payoffs: an arrangement makes a power far less likely to come and
+  take the station, and it buys one door out of a takeover that closes behind
+  you.
+
 ---
 
 ## Opus
@@ -164,7 +176,7 @@ comes for a prisoner held past a threshold, and a faction can file a claim for
 one. `src/game/talks/conquest.ts` — the new owner's first demand inside the
 hour, the old owner's first visit after that, and the option to keep working
 for the flag you lost. That last one is the double agent: it pays, it raises
-your covert standing with the old owner (task 4), and exposure costs you far
+your covert standing with the old owner (the Covert Ops room, now built), and exposure costs you far
 more than refusing ever would. `src/game/missions.ts` and `src/game/calls.ts` —
 far work gets its own hails, and a far team that goes silent is a beat rather
 than a timer.
@@ -174,35 +186,7 @@ the station triggers a conversation within the hour and leaves a standing
 choice open rather than closed; and there is at least one hail only a far team
 ever sends.
 
-### 4. The Covert Ops room
-
-**Why.** Standing is one number per faction and it only ever moves in public.
-Every power in the Drift would sooner deal with a station quietly than take it,
-and there is currently no way for them to try. This is also what makes losing
-the station interesting rather than final: whoever holds your clamps does not
-hold who you talk to at night.
-
-**Where.** A new `covertops` room in `src/game/modules.ts`, late on the curve
-(around 50 crew), staffed on Wits. A second standing map on `GameState` —
-`covert: Record<FactionId, number>` in `src/game/types.ts`, moved by a `shift`
-sibling in `src/game/standing.ts`. Approaches are scripts in `src/game/talks/`
-attached to visitors and crew: carry this and do not log it, tell us who docked
-last week, look the other way for an hour, keep talking to us now that you fly
-their flag. Answering raises covert standing with them and rolls for exposure;
-a staffed, powered Covert Ops room makes that roll a formality, and no room at
-all makes it likely. Exposure crashes the official standing with whoever holds
-you and, past a threshold, brings a conquest or a reprisal.
-
-**Where it pays off.** Covert standing is what decides who backs you when the
-flag changes, who warns you before a raid, and who is willing to hear the
-letter's contents in task 1.
-
-**Done when.** Every faction can approach you covertly regardless of the flag
-you fly, both standings are visible in the flag panel, the room measurably
-changes exposure risk, and getting caught has consequences a player can see
-coming and choose to accept.
-
-### 5. Play it, then fix what drags
+### 4. Play it, then fix what drags
 
 **Why.** Nobody has. Every balance claim — "4½ hours to 60 crew", "one spec
 every five runs", "9 wipes in 40 idle runs" — is from a headless harness, not
@@ -220,7 +204,7 @@ are separate tasks; this one is the list.
 
 ## Sonnet
 
-### 6. Save migrations instead of save wipes
+### 5. Save migrations instead of save wipes
 
 **Why.** `SAVE_VERSION` is 7 and has been bumped every session. Each bump makes
 every existing save unloadable. Fine while nobody is playing; the day someone
@@ -233,7 +217,7 @@ newer than this one). The 7 → 8 step is written and tested, and the chain does
 not back-port 5 or 6.
 
 **What is left.** Every bump from here adds a step — that is the whole
-discipline, and it is worth a line in `CLAUDE.md` (task 11) so it is not
+discipline, and it is worth a line in `CLAUDE.md` (task 10) so it is not
 forgotten. The remaining gap is coverage: `migrate` is tested through
 `luck.test.ts`, not through `loadGame`/`readSlot`, which are the functions that
 actually touch `localStorage`.
@@ -242,7 +226,7 @@ actually touch `localStorage`.
 fixture through `loadGame` with a stubbed `localStorage`, and the next feature
 to change the save shape adds its step rather than bumping and wiping.
 
-### 7. Split the tick
+### 6. Split the tick
 
 **Why.** `src/game/tick.ts` is 516 lines and `step()` is most of it: the power
 grid, production, life support, the med bay, the engineering bay, the lab, the
@@ -257,7 +241,7 @@ already commented as a section. They should be functions.
 **Done when.** `step()` is under 40 lines, every section is a named function
 with its doc comment, and the tests are untouched and green.
 
-### 8. Something other than bunks moves the roster
+### 7. Something other than bunks moves the roster
 
 **Why.** Reaching 60 crew is a matter of building Crew Quarters and waiting.
 The Comms Array, the Docking Port, standing with your patron and the station's
@@ -283,7 +267,7 @@ roll), `src/game/reducer.ts` (`requestCrew`), `src/game/core.ts`
 supposed to — count, faction mix, mean stat, unasked arrivals — and quarters
 remain the ceiling rather than the only lever.
 
-### 9. Break up the two long modals
+### 8. Break up the two long modals
 
 **Why.** `src/components/VisitorModal.tsx` is resource trade, the bonded cage,
 kit, the boarding party, the auto-accept toggle and a talk button.
@@ -298,7 +282,7 @@ adds a file, not a branch.
 **Done when.** Neither modal file is over 200 lines, and adding a room-specific
 panel touches one new file plus one line in the lookup.
 
-### 10. Luck does something
+### 9. Luck does something
 
 **Why.** Three rooms run on Luck — the Comms Array, the Trading Hub and the
 Reclamation Bay — and two are at the far end of the curve. Every other stat has
@@ -307,7 +291,7 @@ a job by 15 crew.
 **Where.** `src/game/missions.ts` and `rollOutcome` in `src/game/fleet.ts`
 (Luck shades the find roll), `src/game/hazards.ts` (`rollIncident` picks a
 target; the luckiest person in the room should shade it), and the exposure roll
-in task 4 once it exists. Small numbers.
+in the Covert Ops room. Small numbers.
 
 **Done when.** A crew with high Luck finds caches measurably more often and
 suffers incidents measurably less, and a seeded test says so.
@@ -316,7 +300,7 @@ suffers incidents measurably less, and a seeded test says so.
 
 ## Haiku
 
-### 11. A `CLAUDE.md`
+### 10. A `CLAUDE.md`
 
 **Why.** There is none. Every session re-learns the reducer discipline, the
 `.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
@@ -331,7 +315,7 @@ extension.
 **Done when.** The file exists and a new session can find the layer order and
 the test commands without reading `engine.ts`.
 
-### 12. Re-deal portraits on load
+### 11. Re-deal portraits on load
 
 **Why.** A save from before portraits were dealt has crew with no `portrait`
 field, so they draw from the seed and can share a face.
@@ -342,7 +326,7 @@ field, so they draw from the seed and can share a face.
 **Done when.** Loading such a save gives every crew member a distinct portrait
 where the pool allows, and a test loads a fixture without portraits and checks.
 
-### 13. Tests for the parts of the split that changed visibility
+### 12. Tests for the parts of the split that changed visibility
 
 **Why.** The refactor exported about two dozen previously private helpers
 (`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
@@ -357,7 +341,7 @@ use it as the pattern.
 **Done when.** Each newly exported helper with a branch in it has at least one
 test that exercises the branch.
 
-### 14. PWA manifest and service worker
+### 13. PWA manifest and service worker
 
 **Why.** The web build is not installable and does not run offline, though
 nothing in it needs a network. An idle station you check on through the day
@@ -371,7 +355,7 @@ app icon can come from an existing asset until there is a proper one.
 **Done when.** The deployed page passes the browser's install check and loads
 with the network off after one visit.
 
-### 15. Rename the branch to `main`
+### 14. Rename the branch to `main`
 
 **Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
 and the deployment is tied to it.
@@ -389,7 +373,7 @@ is gone.
 Both of these are specified and neither ships with placeholder art. They move
 into the tiers the day the renders arrive.
 
-### 16. New kit for the Research Lab
+### 15. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -407,7 +391,7 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 17. Art for the rooms and the ships
+### 16. Art for the rooms and the ships
 
 **Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.

@@ -37,11 +37,14 @@ import { shift, appeal } from './standing.ts'
 import { rollFar, answerCall, resolveMission, inContact } from './missions.ts'
 import {
   admitVisitor,
+  APPROACH_GAP,
   CONQUEST_EARLIEST,
   CONQUEST_GAP,
+  sendApproach,
+  sendConqueror,
+  worthSounding,
   worthTaking,
   wouldCome,
-  sendConqueror,
 } from './traffic.ts'
 
 // One second of the station, and the loop that runs many of them.
@@ -348,6 +351,16 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       s.nextTakeoverIn = CONQUEST_GAP + roll(s) * CONQUEST_GAP
       const who = wouldCome(s)
       if (who) sendConqueror(s, who)
+    }
+  }
+
+  // --- the quiet word -------------------------------------------------
+  // Somebody sounds the station out from time to time. It rides in on ordinary
+  // traffic, so if nothing suitable is alongside it simply waits for a hull.
+  if (worthSounding(s)) {
+    s.nextApproachIn -= dt
+    if (s.nextApproachIn <= 0) {
+      s.nextApproachIn = sendApproach(s) ? APPROACH_GAP + roll(s) * APPROACH_GAP : 45
     }
   }
 

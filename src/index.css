@@ -1417,6 +1417,13 @@ h3 {
   color: #ff9aab;
 }
 
+/* An approach nobody is supposed to have made. It should not look official. */
+.btn--quiet {
+  border-color: #4a3a6b;
+  background: #1a1526;
+  color: #c4aef2;
+}
+
 /* ------------------------------------------------------------- modals -- */
 
 /* Modals are bottom sheets on a phone and centred dialogs on a desktop. */

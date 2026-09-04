@@ -11,6 +11,7 @@ import type { ModuleDef, GameState, ResourceKey, StationModule } from './types.t
 import {
   AIR_PER_CREW,
   APPROACH_GAP,
+  CLAIM_AFTER,
   clamp,
   FOOD_PER_CREW,
   log,
@@ -36,7 +37,7 @@ import {
 import { derive } from './state.ts'
 import { adjacentModules, incidentCap, startIncident, rollIncident } from './hazards.ts'
 import { shift, appeal } from './standing.ts'
-import { rollFar, answerCall, resolveMission, inContact } from './missions.ts'
+import { answerCall, inContact, resolveMission, rollFar } from './missions.ts'
 import {
   admitVisitor,
   CONQUEST_EARLIEST,
@@ -44,7 +45,9 @@ import {
   raiseDemand,
   resolveRaid,
   sendApproach,
+  sendClaimant,
   sendConqueror,
+  sendLevy,
   sendLoiter,
   worthLeaningOn,
   worthSounding,
@@ -345,6 +348,18 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       log(s, `${gone.name} is out of the cells and off the station.`, 'bad')
       shift(s, gone.faction, 0.02)
     }
+    // Hold somebody long enough and you find out who their people are. One
+    // hull at a time, and never while one is already alongside asking.
+    s.nextClaimIn -= dt
+    if (s.nextClaimIn <= 0) {
+      const ripe = s.prisoners.find((p) => p.held >= CLAIM_AFTER)
+      if (ripe && !s.visitors.some((v) => v.claiming) && !s.talk) {
+        sendClaimant(s, ripe.id)
+        s.nextClaimIn = 6 * 60
+      } else {
+        s.nextClaimIn = 30
+      }
+    }
   }
 
   // --- somebody coming for the station --------------------------------
@@ -356,6 +371,15 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       s.nextTakeoverIn = CONQUEST_GAP + roll(s) * CONQUEST_GAP
       const who = wouldCome(s)
       if (who) sendConqueror(s, who)
+    }
+  }
+
+  // --- what follows a takeover ----------------------------------------
+  if (s.nextLevyIn > 0) {
+    s.nextLevyIn -= dt
+    if (s.nextLevyIn <= 0) {
+      s.nextLevyIn = 0
+      sendLevy(s)
     }
   }
 
@@ -513,6 +537,19 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       if (m.nextCall <= 0) {
         const call = rollCall(roller(s), m)
         if (call) {
+          // Past the envelope nobody is waiting on you. What arrives is a
+          // report of a decision already taken, hours after the fact — which
+          // is what makes far work a different kind of job rather than the
+          // same one with a bigger number on it.
+          if (m.far && !inContact(s).has(m.id)) {
+            const chose = call.options[unattended(call)]
+            m.odds += chose.odds ?? 0
+            m.haul *= chose.haul ?? 1
+            m.strain += chose.strain ?? 0
+            m.nextCall = m.remaining > 90 ? Math.round(m.remaining * (0.4 + roll(s) * 0.3)) : 0
+            log(s, `${m.name}, relayed and late: ${chose.note ?? chose.detail}`, 'info')
+            continue
+          }
           m.call = call
           m.status = 'calling'
           log(s, `${m.name} is hailing. They want an answer.`, 'warn')

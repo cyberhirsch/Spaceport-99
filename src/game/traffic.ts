@@ -311,6 +311,60 @@ export const wouldCome = (s: GameState): FactionId | null => {
   return pool[0]
 }
 
+// --------------------------------------------------------- second acts --
+
+/**
+ * Somebody comes for the person in your cells.
+ *
+ * Holding somebody used to be the end of the story: one conversation, three
+ * doors, done. It is not, because people have people. A hull turns up flying
+ * their paper and asks for them back, and now what you did in the Brig is a
+ * thing other powers have an opinion about.
+ */
+export const sendClaimant = (s: GameState, prisonerId: string): void => {
+  const held = s.prisoners.find((p) => p.id === prisonerId)
+  if (!held) return
+  const hull = makeVisitor(roller(s), namesInPlay(s))
+  hull.faction = held.faction
+  hull.kind = held.faction === 'unlisted' ? 'drifter' : 'patrol'
+  hull.claim = hull.kind
+  hull.suspicion = 0.2
+  hull.status = 'docked'
+  hull.aboard = []
+  hull.offer = null
+  hull.claiming = prisonerId
+  hull.timer = 300
+  hull.asking = Math.round(280 + held.stats.B * 40 + s.modules.length * 30)
+  s.visitors.push(hull)
+  log(s, `${hull.name} is alongside asking after ${held.name}, by name.`, 'warn')
+  s.talk = beginTalk('claim', { kind: 'visitor', id: hull.id }, hull.name)
+}
+
+/**
+ * The first bill from whoever took the station.
+ *
+ * A takeover used to be an ending: the flag changed and nothing followed. This
+ * is what follows. They do not want the station destroyed, they want it useful,
+ * and being useful turns out to have a price list.
+ */
+export const sendLevy = (s: GameState): void => {
+  const patron = s.patron
+  if (!patron) return
+  const hull = makeVisitor(roller(s), namesInPlay(s))
+  hull.faction = patron
+  hull.kind = 'patrol'
+  hull.claim = 'patrol'
+  hull.suspicion = 0
+  hull.status = 'docked'
+  hull.aboard = []
+  hull.offer = null
+  hull.timer = 400
+  hull.asking = Math.round((320 + s.modules.length * 60) * (1 + appeal(s) * 0.4))
+  s.visitors.push(hull)
+  log(s, `${factionDef(patron).name} have sent somebody to inspect their new station.`, 'warn')
+  s.talk = beginTalk('levy', { kind: 'visitor', id: hull.id }, hull.name)
+}
+
 // -------------------------------------------------------- hulls that wait --
 
 /**

@@ -20,6 +20,8 @@ import './talks/conquest.ts'
 import './talks/covert.ts'
 import './talks/loiter.ts'
 import './talks/demand.ts'
+import './talks/claim.ts'
+import './talks/levy.ts'
 
 export * from './core.ts'
 export * from './staffing.ts'

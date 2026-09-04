@@ -418,8 +418,13 @@ export default function App() {
             // The same button covers every conversation nobody is meant to
             // overhear: a hull standing off, its demand, and a quiet word.
             const v = state.visitors.find((x) => x.id === visitorId)
-            const script =
-              v?.intent === 'loiter' ? 'loiter' : v?.intent === 'demand' ? 'demand' : 'covert'
+            const script = v?.intent === 'loiter'
+              ? 'loiter'
+              : v?.intent === 'demand'
+                ? 'demand'
+                : v?.claiming
+                  ? 'claim'
+                  : 'covert'
             act({ type: 'talk', script, with: { kind: 'visitor', id: visitorId } })
             setVisitorId(null)
           }}

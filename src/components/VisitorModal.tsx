@@ -346,6 +346,11 @@ export const VisitorModal = ({
             Somebody wants a word
           </button>
         )}
+        {v.claiming && (
+          <button className="btn btn--quiet" onClick={onTalkQuiet}>
+            They are asking after your prisoner
+          </button>
+        )}
       </div>
 
       {dock && (

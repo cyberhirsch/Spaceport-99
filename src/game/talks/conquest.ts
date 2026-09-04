@@ -43,6 +43,9 @@ const cede = (c: TalkCtx): void => {
   c.s.patron = taker
   shift(c.s, taker, 0.06)
   log(c.s, `Spaceport-99 now flies ${factionDef(taker).name} paper. Nobody voted.`, 'bad')
+  // A takeover is not an ending. Their first assessment is already on its way,
+  // and so, before long, is a quiet word from whoever you used to fly for.
+  c.s.nextLevyIn = 6 * 60 + roll(c.s) * 10 * 60
 }
 
 /** They fought. Whether it went well or not, it cost. */

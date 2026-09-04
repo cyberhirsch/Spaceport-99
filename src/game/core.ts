@@ -3,7 +3,7 @@ import type { GameState, LogEntry, Rng } from './types.ts'
 
 // Constants and the two helpers everything else leans on.
 
-export const SAVE_VERSION = 10
+export const SAVE_VERSION = 11
 
 /**
  * The station's luck.
@@ -115,5 +115,8 @@ export const APPROACH_GAP = 8 * 60
 export const LOITER_EARLIEST = 16 * 60
 
 export const LOITER_GAP = 13 * 60
+
+/** How long somebody sits in the cells before their people come asking. */
+export const CLAIM_AFTER = 7 * 60
 
 export const REVIVE_COST_PER_LEVEL = 90

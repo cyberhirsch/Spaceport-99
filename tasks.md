@@ -120,6 +120,18 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
   with nothing to fight with that ignored every step, and never everybody.
   Meeting it ready cuts what they bring by a fifth to two fifths.
 
+- **Gave three systems a second act.** The Brig: hold somebody past a threshold
+  and a hull turns up flying their paper asking for them back — sell them,
+  release them for nothing and open a channel, refuse and keep a prisoner whose
+  people now have opinions, or take the single better offer they will make. A
+  takeover: the new owner's first assessment arrives within the hour and wants
+  credits, crew, or a refusal that every power you used to fly for hears about
+  and acts on. Far work: out of contact, a hail arrives as a report of a
+  decision already taken rather than a question, and far contracts draw on
+  troubles no near job has. The double agent arrives through the covert channel
+  that already exists — the `turn` ask is only offered by a power that used to
+  hold the station.
+
 ---
 
 ## Opus
@@ -151,29 +163,7 @@ through defence, and the endings are conversations.
 least three of the seven bearings through existing contract machinery, and
 reach one of four endings. Nothing in the questline is a new mechanic.
 
-### 2. Second acts, and the double agent
-
-**Why.** Breadth over depth. The Brig ends every story in one conversation:
-nobody comes looking for the person you are holding. Conquest happens once and
-is over — the flag changes and nothing follows. Far work is a multiplier on pay
-and time, not a different kind of job.
-
-**Where.** `src/game/talks/prisoner.ts` and `src/game/traffic.ts` — somebody
-comes for a prisoner held past a threshold, and a faction can file a claim for
-one. `src/game/talks/conquest.ts` — the new owner's first demand inside the
-hour, the old owner's first visit after that, and the option to keep working
-for the flag you lost. That last one is the double agent: it pays, it raises
-your covert standing with the old owner (the Covert Ops room, now built), and exposure costs you far
-more than refusing ever would. `src/game/missions.ts` and `src/game/calls.ts` —
-far work gets its own hails, and a far team that goes silent is a beat rather
-than a timer.
-
-**Done when.** Holding a prisoner past a threshold triggers an arrival; ceding
-the station triggers a conversation within the hour and leaves a standing
-choice open rather than closed; and there is at least one hail only a far team
-ever sends.
-
-### 3. Play it, then fix what drags
+### 2. Play it, then fix what drags
 
 **Why.** Nobody has. Every balance claim — "4½ hours to 60 crew", "one spec
 every five runs", "9 wipes in 40 idle runs" — is from a headless harness, not
@@ -191,7 +181,7 @@ are separate tasks; this one is the list.
 
 ## Sonnet
 
-### 4. Save migrations instead of save wipes
+### 3. Save migrations instead of save wipes
 
 **Why.** `SAVE_VERSION` is 7 and has been bumped every session. Each bump makes
 every existing save unloadable. Fine while nobody is playing; the day someone
@@ -204,7 +194,7 @@ newer than this one). The 7 → 8 step is written and tested, and the chain does
 not back-port 5 or 6.
 
 **What is left.** Every bump from here adds a step — that is the whole
-discipline, and it is worth a line in `CLAUDE.md` (task 9) so it is not
+discipline, and it is worth a line in `CLAUDE.md` (task 8) so it is not
 forgotten. The remaining gap is coverage: `migrate` is tested through
 `luck.test.ts`, not through `loadGame`/`readSlot`, which are the functions that
 actually touch `localStorage`.
@@ -213,7 +203,7 @@ actually touch `localStorage`.
 fixture through `loadGame` with a stubbed `localStorage`, and the next feature
 to change the save shape adds its step rather than bumping and wiping.
 
-### 5. Split the tick
+### 4. Split the tick
 
 **Why.** `src/game/tick.ts` is 516 lines and `step()` is most of it: the power
 grid, production, life support, the med bay, the engineering bay, the lab, the
@@ -228,7 +218,7 @@ already commented as a section. They should be functions.
 **Done when.** `step()` is under 40 lines, every section is a named function
 with its doc comment, and the tests are untouched and green.
 
-### 6. Something other than bunks moves the roster
+### 5. Something other than bunks moves the roster
 
 **Why.** Reaching 60 crew is a matter of building Crew Quarters and waiting.
 The Comms Array, the Docking Port, standing with your patron and the station's
@@ -254,7 +244,7 @@ roll), `src/game/reducer.ts` (`requestCrew`), `src/game/core.ts`
 supposed to — count, faction mix, mean stat, unasked arrivals — and quarters
 remain the ceiling rather than the only lever.
 
-### 7. Break up the two long modals
+### 6. Break up the two long modals
 
 **Why.** `src/components/VisitorModal.tsx` is resource trade, the bonded cage,
 kit, the boarding party, the auto-accept toggle and a talk button.
@@ -269,7 +259,7 @@ adds a file, not a branch.
 **Done when.** Neither modal file is over 200 lines, and adding a room-specific
 panel touches one new file plus one line in the lookup.
 
-### 8. Luck does something
+### 7. Luck does something
 
 **Why.** Three rooms run on Luck — the Comms Array, the Trading Hub and the
 Reclamation Bay — and two are at the far end of the curve. Every other stat has
@@ -287,7 +277,7 @@ suffers incidents measurably less, and a seeded test says so.
 
 ## Haiku
 
-### 9. A `CLAUDE.md`
+### 8. A `CLAUDE.md`
 
 **Why.** There is none. Every session re-learns the reducer discipline, the
 `.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
@@ -302,7 +292,7 @@ extension.
 **Done when.** The file exists and a new session can find the layer order and
 the test commands without reading `engine.ts`.
 
-### 10. Re-deal portraits on load
+### 9. Re-deal portraits on load
 
 **Why.** A save from before portraits were dealt has crew with no `portrait`
 field, so they draw from the seed and can share a face.
@@ -313,7 +303,7 @@ field, so they draw from the seed and can share a face.
 **Done when.** Loading such a save gives every crew member a distinct portrait
 where the pool allows, and a test loads a fixture without portraits and checks.
 
-### 11. Tests for the parts of the split that changed visibility
+### 10. Tests for the parts of the split that changed visibility
 
 **Why.** The refactor exported about two dozen previously private helpers
 (`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
@@ -328,7 +318,7 @@ use it as the pattern.
 **Done when.** Each newly exported helper with a branch in it has at least one
 test that exercises the branch.
 
-### 12. PWA manifest and service worker
+### 11. PWA manifest and service worker
 
 **Why.** The web build is not installable and does not run offline, though
 nothing in it needs a network. An idle station you check on through the day
@@ -342,7 +332,7 @@ app icon can come from an existing asset until there is a proper one.
 **Done when.** The deployed page passes the browser's install check and loads
 with the network off after one visit.
 
-### 13. Rename the branch to `main`
+### 12. Rename the branch to `main`
 
 **Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
 and the deployment is tied to it.
@@ -360,7 +350,7 @@ is gone.
 Both of these are specified and neither ships with placeholder art. They move
 into the tiers the day the renders arrive.
 
-### 14. New kit for the Research Lab
+### 13. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -378,7 +368,7 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 15. Art for the rooms and the ships
+### 14. Art for the rooms and the ships
 
 **Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.

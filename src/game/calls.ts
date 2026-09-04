@@ -162,9 +162,80 @@ const CALLS: Record<Mission['kind'], MissionCall[]> = {
   ],
 }
 
+/**
+ * Hails only a far team ever sends.
+ *
+ * Out past the comms envelope a decision is not a question, it is a report that
+ * arrives late enough that the answer no longer matters — so these read as
+ * things already half in motion. They are the only content in the game the
+ * Deep Space Operations room unlocks, and they exist because far work was
+ * otherwise the same job with a bigger number on it.
+ */
+const FAR_CALLS: MissionCall[] = [
+  {
+    text: 'Relayed eleven hours late, and badly: there is a beacon out here transmitting a hull number that was struck off the register before any of us were born. It has not stopped since we arrived.',
+    options: [
+      {
+        label: 'Take the bearing and go',
+        detail: 'Whatever that is, it is somebody else’s to explain.',
+        odds: 0.08,
+        note: 'They logged the bearing, did not investigate, and left. The transmission was still going when they lost it.',
+      },
+      {
+        label: 'Go and look',
+        detail: 'Nobody has been out that far to check. That is rather the point.',
+        haul: 1.4,
+        odds: -0.15,
+        strain: 0.5,
+        note: 'They went and looked. The report is four words long and one of them is crossed out.',
+      },
+    ],
+  },
+  {
+    text: 'We are outside the envelope, so this is not a question, it is a notification. We have found somebody else’s survey markers on our claim. They are recent.',
+    options: [
+      {
+        label: 'Work around them',
+        detail: 'Whoever put them there is still out here somewhere.',
+        odds: 0.05,
+        note: 'They worked around the markers and did not meet whoever left them.',
+      },
+      {
+        label: 'Pull them up',
+        detail: 'A claim nobody defends is not a claim.',
+        haul: 1.3,
+        odds: -0.1,
+        standing: ['unlisted', -0.03],
+        note: 'They pulled the markers and brought two home. Somebody will notice.',
+      },
+    ],
+  },
+  {
+    text: 'Nobody has spoken to a station in nine days and it is starting to tell. Two of the team want to turn for home now while the sums still work.',
+    options: [
+      {
+        label: 'Let them turn for home',
+        detail: 'A team that has had enough is a team that makes mistakes.',
+        haul: 0.7,
+        odds: 0.16,
+        note: 'They cut it short and came home with less. Everybody came home.',
+      },
+      {
+        label: 'Hold them out there',
+        detail: 'They signed for the far rate. This is what the far rate is.',
+        haul: 1.45,
+        odds: -0.14,
+        strain: 0.6,
+        note: 'They stayed. The report is professional and there is nothing personal in it at all.',
+      },
+    ],
+  },
+]
+
 /** A hail for this job, or null if its kind has nothing to say. */
 export const rollCall = (rng: Rng, m: Mission): MissionCall | null => {
-  const pool = CALLS[m.kind]
+  // Far work has its own troubles, and mostly they are the only ones it has.
+  const pool = m.far && rng() < 0.75 ? FAR_CALLS : CALLS[m.kind]
   if (!pool || pool.length === 0) return null
   return pool[Math.floor(rng() * pool.length)]
 }

@@ -165,6 +165,8 @@ export const newGame = (name = 'Spaceport-99', seed = newSeed()): GameState => {
     covert: blankStanding(),
     nextApproachIn: 0,
     nextLoiterIn: 0,
+    nextLevyIn: 0,
+    nextClaimIn: 0,
     burned: 0,
     seenIntro: false,
     gameOver: false,

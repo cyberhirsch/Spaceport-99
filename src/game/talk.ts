@@ -29,6 +29,8 @@ export type ScriptId =
   | 'covert'
   | 'loiter'
   | 'demand'
+  | 'claim'
+  | 'levy'
 
 /** One exchanged line, kept so the conversation reads as a conversation. */
 export interface TalkLine {

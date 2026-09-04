@@ -62,6 +62,28 @@ than killed unless the station had nothing to fight with and ignored every step
 that led there — and even then somebody is always left to shut the door. Meeting
 it on your own timing, rather than theirs, measurably reduces what they bring.
 
+## Second acts
+
+Three systems used to end where they started, and now do not.
+
+**The Brig.** Holding somebody used to be one conversation with three doors.
+Hold them long enough and you find out who their people are: a hull turns up
+flying their paper and asks for them back. Hand them over for the money, give
+them up for nothing and open a channel that money cannot buy, refuse and keep a
+prisoner whose people now have an opinion about this station — or ask what they
+are worth to somebody else, which gets you one better offer and no second one.
+
+**A takeover.** Losing the flag used to be the end of the story. It is now the
+start of a different one: within the hour the new owner's first assessment
+arrives, and it wants credits, or two of your crew, or nothing at all if you
+refuse — refusing costs you standing with the people who hold your clamps and
+is heard, within the hour, by everybody you used to fly for. Who then get in
+touch.
+
+**Far work.** Past the comms envelope nobody is waiting on you, so what arrives
+is not a question but a report of a decision already taken, hours late. Far
+contracts also draw on hails no near job ever sends.
+
 ## Two standings
 
 Every power keeps two opinions of the station: the one on the record, and the

@@ -400,6 +400,8 @@ export interface Visitor {
    * price, and this one is quoted twice on the same screen.
    */
   asking?: number
+  /** The prisoner this hull has come to collect, if that is why it is here. */
+  claiming?: string
   /**
    * A quiet word somebody asked them to have with you. The hull carrying it is
    * rarely flying the paper of the power that sent it — that is the point.
@@ -650,6 +652,13 @@ export interface GameState {
   nextApproachIn: number
   /** Seconds until a hull turns up and does not ask for anything. */
   nextLoiterIn: number
+  /**
+   * Seconds until whoever took the station makes their first demand of it. Set
+   * only when the flag changes by force; zero the rest of the time.
+   */
+  nextLevyIn: number
+  /** How long a prisoner may sit before their people come asking. */
+  nextClaimIn: number
   /** How many arrangements have come out. Nobody forgets the second one. */
   burned: number
   seenIntro: boolean

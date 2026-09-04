@@ -94,8 +94,8 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
   a death stands; and the tests pin a seed instead of averaging over sixty
   draws, so the suite gives the same answer every run. Pure generators
   (`makeCrew`, `makeVisitor`, `makeMission`, …) take an `Rng`; anything holding
-  a `GameState` rolls from it. `SAVE_VERSION` went to 8 — see the note on
-  task 6 below.
+  a `GameState` rolls from it. `SAVE_VERSION` went to 8, brought forward by
+  the save migration below rather than a wipe.
 
 - **Built the Covert Ops room, and the second standing behind it.** Every power
   now keeps two opinions of the station: `standing` on the record and `covert`
@@ -178,6 +178,18 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
 
 ---
 
+
+- **Save migrations have full test coverage.** `migrate()` already walked a
+  chain of `{ from, up }` steps; what was missing was coverage through the
+  functions that actually touch `localStorage`. `src/game/__tests__/save.test.ts`
+  stubs `globalThis.localStorage` and round-trips `loadGame`/`saveGame`/
+  `readSlot`/`writeSlot`/`slotInfo`/`clearSave`/`clearSlot`, including an old
+  save migrating on the way in, a save with no path forward being refused, a
+  hand-edited/truncated save being rejected rather than half-loaded, and a
+  quota error not crashing the game. 11 new tests.
+
+---
+
 ## Opus
 
 Nothing outstanding. The five that were here are in **Done** above; what is
@@ -188,29 +200,7 @@ can be handed.
 
 ## Sonnet
 
-### 1. Save migrations instead of save wipes
-
-**Why.** `SAVE_VERSION` is 7 and has been bumped every session. Each bump makes
-every existing save unloadable. Fine while nobody is playing; the day someone
-is, it is the worst thing the game does.
-
-**Mostly done already.** The seeded-luck change needed a version bump, so
-`migrate(raw)` now lives in `src/game/save.ts`: a list of `{ from, up }` steps
-walked in order, refusing only a save with no path (too old, or from a build
-newer than this one). The 7 → 8 step is written and tested, and the chain does
-not back-port 5 or 6.
-
-**What is left.** Every bump from here adds a step — that is the whole
-discipline, and it is worth a line in `CLAUDE.md` (task 6) so it is not
-forgotten. The remaining gap is coverage: `migrate` is tested through
-`luck.test.ts`, not through `loadGame`/`readSlot`, which are the functions that
-actually touch `localStorage`.
-
-**Done when.** There is a `src/game/__tests__/save.test.ts` that round-trips a
-fixture through `loadGame` with a stubbed `localStorage`, and the next feature
-to change the save shape adds its step rather than bumping and wiping.
-
-### 2. Split the tick
+### 1. Split the tick
 
 **Why.** `src/game/tick.ts` is 516 lines and `step()` is most of it: the power
 grid, production, life support, the med bay, the engineering bay, the lab, the
@@ -225,7 +215,7 @@ already commented as a section. They should be functions.
 **Done when.** `step()` is under 40 lines, every section is a named function
 with its doc comment, and the tests are untouched and green.
 
-### 3. Something other than bunks moves the roster
+### 2. Something other than bunks moves the roster
 
 **Why.** Reaching 60 crew is a matter of building Crew Quarters and waiting.
 The Comms Array, the Docking Port, standing with your patron and the station's
@@ -251,7 +241,7 @@ roll), `src/game/reducer.ts` (`requestCrew`), `src/game/core.ts`
 supposed to — count, faction mix, mean stat, unasked arrivals — and quarters
 remain the ceiling rather than the only lever.
 
-### 4. Break up the two long modals
+### 3. Break up the two long modals
 
 **Why.** `src/components/VisitorModal.tsx` is resource trade, the bonded cage,
 kit, the boarding party, the auto-accept toggle and a talk button.
@@ -266,7 +256,7 @@ adds a file, not a branch.
 **Done when.** Neither modal file is over 200 lines, and adding a room-specific
 panel touches one new file plus one line in the lookup.
 
-### 5. Luck does something
+### 4. Luck does something
 
 **Why.** Three rooms run on Luck — the Comms Array, the Trading Hub and the
 Reclamation Bay — and two are at the far end of the curve. Every other stat has
@@ -284,7 +274,7 @@ suffers incidents measurably less, and a seeded test says so.
 
 ## Haiku
 
-### 6. A `CLAUDE.md`
+### 5. A `CLAUDE.md`
 
 **Why.** There is none. Every session re-learns the reducer discipline, the
 `.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
@@ -299,7 +289,7 @@ extension.
 **Done when.** The file exists and a new session can find the layer order and
 the test commands without reading `engine.ts`.
 
-### 7. Re-deal portraits on load
+### 6. Re-deal portraits on load
 
 **Why.** A save from before portraits were dealt has crew with no `portrait`
 field, so they draw from the seed and can share a face.
@@ -310,7 +300,7 @@ field, so they draw from the seed and can share a face.
 **Done when.** Loading such a save gives every crew member a distinct portrait
 where the pool allows, and a test loads a fixture without portraits and checks.
 
-### 8. Tests for the parts of the split that changed visibility
+### 7. Tests for the parts of the split that changed visibility
 
 **Why.** The refactor exported about two dozen previously private helpers
 (`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
@@ -325,7 +315,7 @@ use it as the pattern.
 **Done when.** Each newly exported helper with a branch in it has at least one
 test that exercises the branch.
 
-### 9. PWA manifest and service worker
+### 8. PWA manifest and service worker
 
 **Why.** The web build is not installable and does not run offline, though
 nothing in it needs a network. An idle station you check on through the day
@@ -339,7 +329,7 @@ app icon can come from an existing asset until there is a proper one.
 **Done when.** The deployed page passes the browser's install check and loads
 with the network off after one visit.
 
-### 10. Rename the branch to `main`
+### 9. Rename the branch to `main`
 
 **Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
 and the deployment is tied to it.
@@ -357,7 +347,7 @@ is gone.
 Both of these are specified and neither ships with placeholder art. They move
 into the tiers the day the renders arrive.
 
-### 11. New kit for the Research Lab
+### 10. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -375,7 +365,7 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 12. Art for the rooms and the ships
+### 11. Art for the rooms and the ships
 
 **Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.

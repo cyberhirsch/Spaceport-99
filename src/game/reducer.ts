@@ -62,7 +62,7 @@ import {
   scrapValue,
 } from './station.ts'
 import { shift, appeal } from './standing.ts'
-import { makeCandidate, closeHire } from './recruit.ts'
+import { makeCandidate, closeHire, reportAboard } from './recruit.ts'
 import { rollFar, answerCall, missionCapacity, inContact } from './missions.ts'
 import { admitVisitor } from './traffic.ts'
 import { completeCycle, advance } from './tick.ts'
@@ -128,6 +128,7 @@ const onEnter = (s: GameState, talk: Talk): void => {
   const c = speaker(s, talk.with)
   if (!c) return
   if (talk.script === 'hire' && talk.node === 'done') closeHire(s, talk, c)
+  if (talk.script === 'welcome' && talk.node === 'aboard') reportAboard(s, talk, c)
   if (talk.script === 'conquest' && talk.node === 'fight') resolveFight(c)
   if (talk.script === 'siege' && talk.node === 'through') resolveSiege(c)
 }
@@ -679,11 +680,19 @@ export const reducer = (state: GameState, action: Action): GameState => {
     case 'talk': {
       // One conversation at a time. Opening a new one abandons the old.
       const ref = action.with
+      // Somebody HQ posted here is not being talked into anything — they are
+      // crew already, and the conversation is meeting them. Which conversation
+      // that is follows from why they are standing there, so the UI does not
+      // have to know.
+      const posted =
+        ref.kind === 'candidate' &&
+        s.candidates.find((x) => x.id === ref.id)?.origin === 'posted'
+      const script = action.script === 'hire' && posted ? 'welcome' : action.script
       // Look them up before committing, so a stale id opens nothing.
-      const probe: GameState = { ...s, talk: beginTalk(action.script, ref, '') }
+      const probe: GameState = { ...s, talk: beginTalk(script, ref, '') }
       const found = speaker(probe, ref)
       if (!found) return state
-      s.talk = beginTalk(action.script, ref, found.name, action.node)
+      s.talk = beginTalk(script, ref, found.name, action.node)
       break
     }
     case 'endTalk': {

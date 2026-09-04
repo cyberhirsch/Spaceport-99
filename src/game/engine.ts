@@ -14,6 +14,7 @@
 // Importing the scripts is what registers them. Nothing else references these.
 import './talks/crew.ts'
 import './talks/hire.ts'
+import './talks/welcome.ts'
 import './talks/captain.ts'
 import './talks/prisoner.ts'
 import './talks/conquest.ts'

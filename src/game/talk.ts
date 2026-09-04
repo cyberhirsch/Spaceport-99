@@ -23,6 +23,7 @@ export type SpeakerRef =
 export type ScriptId =
   | 'crew'
   | 'hire'
+  | 'welcome'
   | 'captain'
   | 'conquest'
   | 'prisoner'

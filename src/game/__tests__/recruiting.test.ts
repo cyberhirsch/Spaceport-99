@@ -18,7 +18,7 @@ import { PORTRAIT_COUNT, crewPortrait, makeCrew } from '../crew.ts'
 import { STANDING_CEILING } from '../factions.ts'
 import { labels, line, open, say } from './talkHelp.ts'
 import { STAT_KEYS } from '../types.ts'
-import type { GameState, ModuleKind, Stats } from '../types.ts'
+import type { Candidate, GameState, ModuleKind, Stats } from '../types.ts'
 
 // Every station in this file is founded from a known seed, so a run that passes
 // today passes tomorrow. Each call moves the seed on, so a loop that founds
@@ -45,6 +45,27 @@ const staffed = (): GameState => {
   }
   return rich(s)
 }
+
+/**
+ * Somebody HQ dispatched, at the door, with their story pinned. Which of the
+ * two conversations they get turns on `origin`, so every test below says which
+ * one it means rather than leaving it to the draw.
+ */
+const dispatched = (over: Partial<Candidate>): GameState => {
+  const s = advance(reducer(staffed(), { type: 'requestCrew' }), 60)
+  return { ...s, candidates: [{ ...s.candidates[0], ...over }] }
+}
+
+/** One who put in for the berth, and so has to be talked round. */
+const applicant = (over: Partial<Candidate> = {}): GameState =>
+  dispatched({ origin: 'applied', ...over })
+
+/** One who was posted here, and is crew whatever is said. */
+const posted = (over: Partial<Candidate> = {}): GameState =>
+  dispatched({ origin: 'posted', ...over })
+
+/** Sit down with them. Each station deals its own applicant, so read its id. */
+const sitWith = (s: GameState) => open(s, 'hire', { kind: 'candidate', id: s.candidates[0].id })
 
 /** Interview an applicant the whole way through, then ask for their answer. */
 const interview = (s: GameState, id: string, ...moves: string[]): GameState => {
@@ -122,8 +143,7 @@ test('a promised posting swings on whether it suits them', () => {
 })
 
 test('the bonus costs its asking price, and can only be offered once', () => {
-  let s = reducer(staffed(), { type: 'requestCrew' })
-  s = advance(s, 60)
+  let s = applicant()
   const id = s.candidates[0].id
   const ask = s.candidates[0].askingBonus
   const before = s.credits
@@ -145,7 +165,7 @@ test('a fully convinced applicant signs, and joins the post they were promised',
   s = advance(s, 60)
   s = build(s, 'gym', WING - 3)
   const gym = s.modules.find((m) => m.kind === 'gym')!
-  const cand = { ...s.candidates[0], interest: 100, promised: gym.id }
+  const cand = { ...s.candidates[0], origin: 'applied' as const, interest: 100, promised: gym.id }
   s = { ...s, candidates: [cand] }
   const crewBefore = s.crew.length
 
@@ -161,7 +181,7 @@ test('a fully convinced applicant signs, and joins the post they were promised',
 test('an unconvinced applicant always walks', () => {
   let s = reducer(staffed(), { type: 'requestCrew' })
   s = advance(s, 60)
-  const cand = { ...s.candidates[0], interest: 0 }
+  const cand = { ...s.candidates[0], origin: 'applied' as const, interest: 0 }
   s = { ...s, candidates: [cand] }
   const crewBefore = s.crew.length
   s = interview(s, cand.id)
@@ -211,7 +231,7 @@ test('every portrait is used before any of them repeats', () => {
 test('an applicant keeps the face you interviewed when they sign', () => {
   let s = reducer(staffed(), { type: 'requestCrew' })
   s = advance(s, 60)
-  const cand = { ...s.candidates[0], interest: 100 }
+  const cand = { ...s.candidates[0], origin: 'applied' as const, interest: 100 }
   s = { ...s, candidates: [cand] }
   assert.ok(cand.portrait, 'applicants are dealt a face on dispatch')
   assert.ok(
@@ -225,18 +245,6 @@ test('an applicant keeps the face you interviewed when they sign', () => {
 })
 
 // ------------------------------------ asked for it, or told to come here --
-
-/** The candidate HQ dispatched, at the door, with their story overridden. */
-const arrived = (over: Partial<GameState['candidates'][number]> = {}) => {
-  const s = advance(reducer(staffed(), { type: 'requestCrew' }), 60)
-  return { ...s, candidates: [{ ...s.candidates[0], ...over }] }
-}
-
-/** Sit down with that candidate. Each station deals its own, so read its id. */
-const sitWith = (over: Partial<GameState['candidates'][number]> = {}) => {
-  const s = arrived(over)
-  return open(s, 'hire', { kind: 'candidate', id: s.candidates[0].id })
-}
 
 test('HQ sends people who asked for the berth and people who were told', () => {
   const base = staffed()
@@ -267,31 +275,72 @@ test('somebody who walked off a hull was never posted anywhere', () => {
   assert.equal(makeWalkIn(staffed()).origin, 'walkIn')
 })
 
-test('an applicant and a posted recruit do not open the same way', () => {
-  const keen = line(sitWith({ origin: 'applied' }))
-  const sent = line(sitWith({ origin: 'posted' }))
-  assert.notEqual(keen, sent, 'the same posting reads differently for having chosen it')
-  assert.match(keen, /put in for this posting/, 'they asked to come')
-  assert.match(sent, /did not say much else about the posting/, 'they were told to')
+test('somebody posted here is met, not negotiated with', () => {
+  const met = sitWith(posted())
+  assert.equal(met.talk?.script, 'welcome', 'a different conversation entirely')
+  const onOffer = labels(met)
+  assert.ok(
+    !onOffer.some((l) => l.includes('offer')),
+    `nothing is being sold to them — on offer: ${onOffer.join(' | ')}`,
+  )
+  assert.ok(onOffer.some((l) => l.includes('Welcome them aboard')))
+
+  const asked = sitWith(applicant())
+  assert.equal(asked.talk?.script, 'hire', 'somebody who put in for it still has to be won')
 })
 
-test('what brought you out this far lands differently on somebody who was sent', () => {
-  const why = (origin: 'applied' | 'posted') =>
-    line(say(sitWith({ origin }), 'What brought you out'))
-  assert.match(why('posted'), /I was posted|transfer order/, 'nothing brought them')
-  assert.match(why('applied'), /before I put in for it/, 'they went looking')
+test('a posted recruit is crew whatever is said to them', () => {
+  const s = posted()
+  const before = s.crew.length
+  const done = say(sitWith(s), 'Welcome them aboard')
+  assert.equal(done.crew.length, before + 1, 'the transfer was done before they arrived')
+  assert.equal(done.candidates.length, 0, 'and they are off the dock')
+  assert.equal(done.crew.at(-1)!.name, s.candidates[0].name)
 })
 
-test('being told you are needed lands on somebody nobody asked', () => {
-  // One seed, wanting money either way, so the only thing that differs is
-  // whether they chose to be standing here.
-  const moved = (origin: 'posted' | 'walkIn') => {
-    const said = say(
-      say(sitWith({ seed: 0, tier: 0.5, interest: 40, origin }), 'Make them an offer'),
-      'Tell them you need them',
-    )
-    return said.candidates[0].interest - 40
+test('two posted recruits are not the same arrival', () => {
+  // Same name on both, so the only thing that can differ is the person.
+  const said = (seed: number) => line(sitWith(posted({ seed, name: 'Ilse Vaughn' })))
+  assert.notEqual(said(0), said(1), 'the welcome varies with the person')
+  assert.equal(said(0), said(0), 'and is the same every time for the same person')
+  assert.equal(new Set([0, 1, 2, 3].map(said)).size, 4, 'four different arrivals')
+})
+
+test('the whole welcome varies, not only the greeting', () => {
+  // The first version of this varied the opener and then said the same three
+  // things to everybody, which is the failure worth a test of its own.
+  const exchange = (seed: number, ask: string) =>
+    line(say(sitWith(posted({ seed, name: 'Ilse Vaughn' })), ask))
+  for (const ask of ['What were you doing before', 'Did you ask for this']) {
+    const heard = new Set([0, 1, 2, 3].map((seed) => exchange(seed, ask)))
+    assert.ok(heard.size > 1, `"${ask}" is the same answer from everybody`)
   }
-  assert.ok(moved('posted') > 0, 'the posting was finally put to them as a choice')
-  assert.ok(moved('walkIn') < 0, 'somebody who chose to be here has heard it before')
+  const closing = new Set(
+    ['Ilse Vaughn', 'Rook Nwosu', 'Dmitri Ilves'].map((name) =>
+      line(say(sitWith(posted({ name })), 'Welcome them aboard')),
+    ),
+  )
+  assert.ok(closing.size > 1, 'even the sign-off is not one line for everybody')
+})
+
+test('getting to know them does not decide anything', () => {
+  const s = posted({ seed: 0 })
+  const straight = say(sitWith(s), 'Welcome them aboard')
+  const talked = say(
+    say(say(sitWith(s), 'What were you doing before'), 'What do you make of the place'),
+    'Welcome them aboard',
+  )
+  assert.equal(talked.crew.length, straight.crew.length, 'asking changed nothing about the outcome')
+  assert.equal(talked.crew.at(-1)!.name, straight.crew.at(-1)!.name)
+})
+
+test('a posted recruit with nowhere to sleep waits on the dock', () => {
+  const s = posted()
+  const packed: GameState = {
+    ...s,
+    crew: [...s.crew, ...Array.from({ length: 40 }, () => makeCrew(rng))],
+  }
+  const done = say(sitWith(packed), 'Welcome them aboard')
+  assert.equal(done.candidates.length, 1, 'they are still standing there')
+  assert.match(line(done), /nowhere to put me/, 'and they have noticed')
 })

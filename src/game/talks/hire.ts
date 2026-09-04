@@ -44,6 +44,12 @@ export const wantOf = (p: Prospect & { seed: number; captain?: boolean }): Want 
   if (grip > 0 && grip < 0.35 && p.seed % 3 !== 0) return 'escape'
   if (p.captain) return 'belief'
   const roll = (p.seed >> 3) % 100
+  // Somebody posted here did not pick the place and is not looking for a cause
+  // to join. Make the transfer worth something, or put them where they are not
+  // being wasted — those are the two things left. Somebody who put in for the
+  // berth wants the opposite: they came for a reason and want it confirmed.
+  if (p.origin === 'posted') return roll < 55 ? 'money' : 'post'
+  if (p.origin === 'applied') return roll < 30 ? 'post' : 'belief'
   if (p.tier > 0.6) return roll < 55 ? 'belief' : 'post'
   if (roll < 38) return 'money'
   if (roll < 72) return 'post'
@@ -89,7 +95,9 @@ const spent = (c: TalkCtx, flag: string) => c.has(flag)
 const theyAre = (c: TalkCtx): string => {
   if (c.guest?.captain) return `master of the ${c.ship?.name ?? 'ship'}`
   if (c.guest) return `${c.guest.role} off the ${c.ship?.name ?? 'ship'}`
-  return 'sent over by HQ'
+  if (c.candidate?.origin === 'applied') return 'put in for this posting'
+  if (c.candidate?.origin === 'walkIn') return 'off a hull at the Trading Hub'
+  return 'posted here by HQ'
 }
 
 const script: TalkScript = {
@@ -99,8 +107,14 @@ const script: TalkScript = {
       if (c.guest?.captain) {
         return `"You wanted a word with me, not my crew. That is either flattering or a problem." They do not sit down.`
       }
+      if (c.candidate?.origin === 'applied') {
+        return `"${c.name}. I put in for this posting twice before anybody answered." They sit down without being asked. "So I would like to hear it is worth the wait."`
+      }
+      if (c.candidate?.origin === 'walkIn') {
+        return `"I came in on somebody else's hull this morning and I have not gone back aboard." They are looking past you at the rooms already.`
+      }
       if (c.candidate) {
-        return `"${c.name}. HQ put me on a courier eleven days ago and did not say much else about the posting." They wait.`
+        return `"${c.name}. HQ put me on a courier eleven days ago and did not say much else about the posting." They wait, and do not sit down.`
       }
       return `"I have got about ten minutes before they want me back at the ship."`
     },
@@ -140,6 +154,16 @@ const script: TalkScript = {
     text: (c) => {
       const p = c.prospect
       if (!p) return ''
+      // Nothing brought a posted recruit out this far. They were sent, and the
+      // question lands as slightly beside the point.
+      if (p.origin === 'posted') {
+        return wantOf(p as Prospect & { seed: number }) === 'money'
+          ? `"A transfer order brought me out this far." They almost smile. "The rates are the part I would have chosen."`
+          : `"Nothing brought me. I was posted." A pause. "I would rather be some use out here than none. That is as far as I have got."`
+      }
+      if (p.origin === 'applied') {
+        return `"I read the filings on this place before I put in for it." They are watching you carefully. "Most stations out here are somebody's write-off. I did not think this one read like that."`
+      }
       switch (wantOf(p as Prospect & { seed: number })) {
         case 'money':
           return `"Same reason as everyone. The rates out here are better and there is nothing to spend it on, so it stacks up."`
@@ -285,8 +309,15 @@ const script: TalkScript = {
         sets: ['said-need'],
         effect: (c) => {
           const p = c.prospect!
-          // This works on somebody looking for a way off a ship, and on nobody
-          // else, because everyone else has heard it before.
+          // Nobody asked a posted recruit whether they wanted to come. Being
+          // told they are needed is the first time the posting has been put to
+          // them as anything but a berth number, and it lands accordingly.
+          if (p.origin === 'posted') {
+            move(c, Math.round(24 * holdOut(p)))
+            return
+          }
+          // Otherwise this works on somebody looking for a way off a ship, and
+          // on nobody else, because everyone else has heard it before.
           const want = wantOf(p as Prospect & { seed: number })
           move(c, want === 'escape' ? Math.round(38 * holdOut(p)) : want === 'belief' ? 10 : -4)
         },

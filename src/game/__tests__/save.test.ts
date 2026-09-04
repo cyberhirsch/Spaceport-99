@@ -186,3 +186,34 @@ test('a save without portraits gets all crew dealt distinct faces on load', () =
   const unique = new Set(portraits)
   assert.equal(unique.size, portraits.length, 'all portraits are distinct where the pool allows')
 })
+
+test('a save from before recruits had a reason for being here reads them as posted', () => {
+  const old = newGame('No Reasons', 909) as unknown as Record<string, unknown>
+  old.version = 13
+  // A candidate as an older build wrote them: no story about how they got here.
+  old.candidates = [
+    {
+      id: 'a_old',
+      name: 'Wren Halloway',
+      seed: 12,
+      stats: { O: 4, R: 4, B: 4, I: 4, T: 4, A: 4, L: 4 },
+      tier: 0.4,
+      interest: 30,
+      askingBonus: 150,
+      patience: 240,
+      promised: null,
+      arrivesIn: 0,
+      faction: 'concern',
+    },
+  ]
+  storage.setItem('spaceport99.save', JSON.stringify(old))
+
+  const loaded = loadGame()
+  assert.ok(loaded, 'the old save loads')
+  assert.equal(loaded.candidates.length, 1, 'the applicant survived the migration')
+  assert.equal(
+    loaded.candidates[0].origin,
+    'posted',
+    'which is what the one line they used to share always said about them',
+  )
+})

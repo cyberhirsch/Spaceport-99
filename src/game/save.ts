@@ -66,6 +66,18 @@ const STEPS: { from: number; up: (raw: Record<string, unknown>) => void }[] = [
       }
     },
   },
+  // 13 → 14: applicants started arriving with a reason for being here. Anyone
+  // already on an older station's dock was posted — which is exactly what the
+  // one opening line they used to share said about them.
+  {
+    from: 13,
+    up: (raw) => {
+      const s = raw as unknown as GameState
+      for (const cand of s.candidates) {
+        if (!cand.origin) cand.origin = 'posted'
+      }
+    },
+  },
 ]
 
 export const migrate = (raw: GameState): GameState | null => {

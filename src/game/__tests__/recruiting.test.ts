@@ -4,6 +4,8 @@ import {
   advance,
   allocatePortrait,
   appeal,
+  candidateOrigin,
+  makeWalkIn,
   dockBerths,
   newGame,
   PATIENCE_SECONDS,
@@ -13,7 +15,8 @@ import {
   WING,
 } from '../engine.ts'
 import { PORTRAIT_COUNT, crewPortrait, makeCrew } from '../crew.ts'
-import { labels, open, say } from './talkHelp.ts'
+import { STANDING_CEILING } from '../factions.ts'
+import { labels, line, open, say } from './talkHelp.ts'
 import { STAT_KEYS } from '../types.ts'
 import type { GameState, ModuleKind, Stats } from '../types.ts'
 
@@ -219,4 +222,76 @@ test('an applicant keeps the face you interviewed when they sign', () => {
   s = interview(s, cand.id)
   const hired = s.crew.at(-1)!
   assert.equal(crewPortrait(hired), cand.portrait, 'the face follows them onto the roster')
+})
+
+// ------------------------------------ asked for it, or told to come here --
+
+/** The candidate HQ dispatched, at the door, with their story overridden. */
+const arrived = (over: Partial<GameState['candidates'][number]> = {}) => {
+  const s = advance(reducer(staffed(), { type: 'requestCrew' }), 60)
+  return { ...s, candidates: [{ ...s.candidates[0], ...over }] }
+}
+
+/** Sit down with that candidate. Each station deals its own, so read its id. */
+const sitWith = (over: Partial<GameState['candidates'][number]> = {}) => {
+  const s = arrived(over)
+  return open(s, 'hire', { kind: 'candidate', id: s.candidates[0].id })
+}
+
+test('HQ sends people who asked for the berth and people who were told', () => {
+  const base = staffed()
+  const warm: GameState = {
+    ...base,
+    patron: 'concern',
+    standing: { ...base.standing, concern: STANDING_CEILING },
+  }
+  const cold: GameState = { ...base, patron: null }
+  const applicantsIn = (s: GameState) => {
+    const draw = seeded(4242)
+    let applied = 0
+    for (let i = 0; i < 200; i += 1) {
+      if (candidateOrigin(s, draw) === 'applied') applied += 1
+    }
+    return applied
+  }
+  const keen = applicantsIn(warm)
+  const indifferent = applicantsIn(cold)
+  assert.ok(keen > 0 && keen < 200, 'HQ sends both kinds')
+  assert.ok(
+    keen > indifferent,
+    `a station its patron thinks well of has people asking to be sent (${keen} vs ${indifferent})`,
+  )
+})
+
+test('somebody who walked off a hull was never posted anywhere', () => {
+  assert.equal(makeWalkIn(staffed()).origin, 'walkIn')
+})
+
+test('an applicant and a posted recruit do not open the same way', () => {
+  const keen = line(sitWith({ origin: 'applied' }))
+  const sent = line(sitWith({ origin: 'posted' }))
+  assert.notEqual(keen, sent, 'the same posting reads differently for having chosen it')
+  assert.match(keen, /put in for this posting/, 'they asked to come')
+  assert.match(sent, /did not say much else about the posting/, 'they were told to')
+})
+
+test('what brought you out this far lands differently on somebody who was sent', () => {
+  const why = (origin: 'applied' | 'posted') =>
+    line(say(sitWith({ origin }), 'What brought you out'))
+  assert.match(why('posted'), /I was posted|transfer order/, 'nothing brought them')
+  assert.match(why('applied'), /before I put in for it/, 'they went looking')
+})
+
+test('being told you are needed lands on somebody nobody asked', () => {
+  // One seed, wanting money either way, so the only thing that differs is
+  // whether they chose to be standing here.
+  const moved = (origin: 'posted' | 'walkIn') => {
+    const said = say(
+      say(sitWith({ seed: 0, tier: 0.5, interest: 40, origin }), 'Make them an offer'),
+      'Tell them you need them',
+    )
+    return said.candidates[0].interest - 40
+  }
+  assert.ok(moved('posted') > 0, 'the posting was finally put to them as a choice')
+  assert.ok(moved('walkIn') < 0, 'somebody who chose to be here has heard it before')
 })

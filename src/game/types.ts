@@ -201,8 +201,16 @@ export interface LogEntry {
 }
 
 /**
- * Someone HQ has sent over, waiting at the docking port. They are not crew yet
- * and cost nothing until they sign.
+ * How somebody came to be standing on your dock. HQ either found a spacer who
+ * put in for the berth, or filled the slot with whoever was next on the list;
+ * a walk-in came off a hull at the Trading Hub under their own steam.
+ */
+export type CandidateOrigin = 'applied' | 'posted' | 'walkIn'
+
+/**
+ * Someone waiting at the docking port to be talked into signing — sent by HQ
+ * or off a hull of their own. They are not crew yet and cost nothing until
+ * they sign.
  */
 export interface Candidate {
   id: string
@@ -225,6 +233,8 @@ export interface Candidate {
   arrivesIn: number
   /** Who sent them, or who they last flew for. Shifts with patron standing. */
   faction: FactionId
+  /** Whether they asked to come, were posted here, or walked up on their own. */
+  origin: CandidateOrigin
 }
 
 // --------------------------------------------------------------- visitors --
@@ -382,6 +392,8 @@ export interface Prospect {
   grip?: number
   /** True for a ship's master. They want different things. */
   captain?: boolean
+  /** How they got here. Absent for a guest off a hull, who got here on it. */
+  origin?: CandidateOrigin
 }
 
 export interface Visitor {

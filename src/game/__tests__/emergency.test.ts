@@ -4,6 +4,12 @@ import { WING, advance, newGame, reducer } from '../engine.ts'
 import { incidentDef } from '../incidents.ts'
 import type { GameState, Incident, IncidentKind, StationModule } from '../types.ts'
 
+// Every station in this file is founded from a known seed, so a run that passes
+// today passes tomorrow. Each call moves the seed on, so a loop that founds
+// forty stations still sees forty different ones.
+let founded = 0
+const fresh = () => newGame('Spaceport-99', 1100 + (founded += 1))
+
 const roomAt = (s: GameState, col: number, deck = 0): StationModule =>
   s.modules.find((m) => m.deck === deck && col >= m.col && col < m.col + m.width) as StationModule
 
@@ -34,7 +40,7 @@ const clear = (s: GameState, module: StationModule): GameState => {
 }
 
 test('drafting crew into an emergency remembers the station they left', () => {
-  let s = newGame()
+  let s = fresh()
   const reactor = roomAt(s, WING)
   const air = roomAt(s, WING - 1)
   const hand = s.crew[0]
@@ -51,7 +57,7 @@ test('drafting crew into an emergency remembers the station they left', () => {
 })
 
 test('crew walk back to their own station once the emergency is out', () => {
-  let s = newGame()
+  let s = fresh()
   const reactor = roomAt(s, WING)
   const air = roomAt(s, WING - 1)
   const hand = s.crew[0]
@@ -70,7 +76,7 @@ test('crew walk back to their own station once the emergency is out', () => {
 })
 
 test('a drafted hand who is beaten back still remembers their real post', () => {
-  let s = newGame()
+  let s = fresh()
   const reactor = roomAt(s, WING)
   const air = roomAt(s, WING - 1)
   const hand = s.crew[0]
@@ -92,7 +98,7 @@ test('a drafted hand who is beaten back still remembers their real post', () => 
 })
 
 test('crew with nowhere to return to just stay where they fought', () => {
-  let s = newGame()
+  let s = fresh()
   const air = roomAt(s, WING - 1)
   const hand = s.crew[0]
   s = clear(s, air)

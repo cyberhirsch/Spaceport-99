@@ -3,6 +3,12 @@ import test from 'node:test'
 import { WING, canBuildAt, canDemolish, newGame, reducer } from '../engine.ts'
 import type { GameState, ModuleKind } from '../types.ts'
 
+// Every station in this file is founded from a known seed, so a run that passes
+// today passes tomorrow. Each call moves the seed on, so a loop that founds
+// forty stations still sees forty different ones.
+let founded = 0
+const fresh = () => newGame('Spaceport-99', 1500 + (founded += 1))
+
 const rich = (s: GameState): GameState => ({ ...s, credits: 999999 })
 const build = (s: GameState, kind: ModuleKind, col: number, deck = 0) =>
   reducer(rich(s), { type: 'build', kind, deck, col })
@@ -10,7 +16,7 @@ const at = (s: GameState, col: number, deck = 0) =>
   s.modules.find((m) => m.deck === deck && col >= m.col && col < m.col + m.width)
 
 test('the founding station straddles the lift shaft', () => {
-  const g = newGame()
+  const g = fresh()
   assert.equal(g.modules.length, 4)
   assert.equal(g.decks, 1)
   assert.equal(at(g, WING - 2)?.kind, 'dock', 'the port the founders arrived through')
@@ -20,7 +26,7 @@ test('the founding station straddles the lift shaft', () => {
 })
 
 test('wings only grow outward from the shaft', () => {
-  const g = newGame()
+  const g = fresh()
   assert.equal(canBuildAt(g, 0, WING - 2), false, 'the dock already holds that slot')
   assert.equal(canBuildAt(g, 0, WING - 3), true, 'next to the last port room')
   assert.equal(canBuildAt(g, 0, WING - 4), false, 'but not with a gap between')
@@ -32,7 +38,7 @@ test('wings only grow outward from the shaft', () => {
 })
 
 test('a wing fills to exactly five slots', () => {
-  let s = newGame()
+  let s = fresh()
   for (let col = WING - 2; col >= 0; col -= 1) s = build(s, 'quarters', col)
   assert.ok(
     [0, 1, 2, 3, 4].every((col) => at(s, col)),
@@ -45,7 +51,7 @@ test('a wing fills to exactly five slots', () => {
 })
 
 test('rooms never merge across the shaft', () => {
-  const s = build(newGame(), 'reactor', WING - 1)
+  const s = build(fresh(), 'reactor', WING - 1)
   const port = at(s, WING - 1)
   const starboard = at(s, WING)
   assert.notEqual(port?.id, starboard?.id, 'the two reactors stay separate rooms')
@@ -54,7 +60,7 @@ test('rooms never merge across the shaft', () => {
 })
 
 test('rooms do merge within a wing', () => {
-  let s = build(newGame(), 'reactor', WING + 2)
+  let s = build(fresh(), 'reactor', WING + 2)
   s = build(s, 'reactor', WING + 3)
   const merged = s.modules.filter((m) => m.kind === 'reactor' && m.col > WING)
   assert.equal(merged.length, 1, 'the pair became one room')
@@ -64,7 +70,7 @@ test('rooms do merge within a wing', () => {
 })
 
 test('only the outer end of a run can be scrapped', () => {
-  let s = build(newGame(), 'quarters', WING + 2)
+  let s = build(fresh(), 'quarters', WING + 2)
   s = build(s, 'gym', WING + 3)
   assert.equal(canDemolish(s, at(s, WING + 2)!), false, 'a room with one beyond it is stuck')
   assert.equal(canDemolish(s, at(s, WING + 3)!), true, 'the end of the run is free')
@@ -88,7 +94,7 @@ test('only the outer end of a run can be scrapped', () => {
 test('an emergency cannot spread across the shaft', () => {
   // Port and starboard rooms on the same deck are not neighbours, so a fire in
   // one wing has to burn out rather than jump the lift.
-  let s = build(newGame(), 'quarters', WING - 2)
+  let s = build(fresh(), 'quarters', WING - 2)
   s = { ...s, nextIncidentIn: 0 }
   const portRooms = s.modules.filter((m) => m.col < WING).map((m) => m.id)
   assert.ok(portRooms.length >= 2)

@@ -10,11 +10,14 @@ import { makeVisitor } from './visitors.ts'
 import type { ModuleDef, GameState, ResourceKey, StationModule } from './types.ts'
 import {
   AIR_PER_CREW,
-  FOOD_PER_CREW,
-  MAX_CATCHUP_SECONDS,
-  log,
   clamp,
+  FOOD_PER_CREW,
+  log,
+  MAX_CATCHUP_SECONDS,
   namesInPlay,
+  pickOne,
+  roll,
+  roller,
 } from './core.ts'
 import { crewGuard, workRate, unassign, assign, trainingSeconds, awardXp } from './staffing.ts'
 import {
@@ -264,7 +267,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
           (o) => !s.incidents.some((i) => i.moduleId === o.id),
         )
         if (targets.length > 0) {
-          startIncident(s, inc.kind, targets[Math.floor(Math.random() * targets.length)])
+          startIncident(s, inc.kind, pickOne(roller(s), targets))
         }
       }
     }
@@ -342,7 +345,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
   if (!offline && !s.talk && s.elapsed > CONQUEST_EARLIEST && worthTaking(s)) {
     s.nextTakeoverIn -= dt
     if (s.nextTakeoverIn <= 0) {
-      s.nextTakeoverIn = CONQUEST_GAP + Math.random() * CONQUEST_GAP
+      s.nextTakeoverIn = CONQUEST_GAP + roll(s) * CONQUEST_GAP
       const who = wouldCome(s)
       if (who) sendConqueror(s, who)
     }
@@ -353,9 +356,9 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
   if (s.nextVisitorIn <= 0) {
     // A hub is a reason to stop here rather than pass by.
     const pull = 1 / (1 + commerce(s) * 0.55)
-    s.nextVisitorIn = (80 + Math.random() * 120) * pull
+    s.nextVisitorIn = (80 + roll(s) * 120) * pull
     if (s.visitors.length < visitorBerths(s)) {
-      const hail = makeVisitor(namesInPlay(s))
+      const hail = makeVisitor(roller(s), namesInPlay(s))
       s.visitors.push(hail)
       log(s, `${hail.name} is on approach.`, 'info')
     }
@@ -368,7 +371,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
     if (v.status === 'inbound') {
       if (v.timer <= 0) {
         v.status = 'requesting'
-        v.timer = 60 + Math.random() * 40
+        v.timer = 60 + roll(s) * 40
         log(s, `${v.name} is requesting permission to dock.`, 'info')
       }
       continue
@@ -393,7 +396,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
   // --- the fleet ------------------------------------------------------
   s.nextContractIn -= dt
   if (s.nextContractIn <= 0) {
-    s.nextContractIn = 70 + Math.random() * 80
+    s.nextContractIn = 70 + roll(s) * 80
     // A command module has to be crewed for anyone to be listening to the wire.
     const listening = s.modules.some((m) => m.kind === 'command' && m.staff.length > 0)
     const offers = s.missions.filter((m) => m.status === 'offered').length
@@ -401,16 +404,16 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       // A power you fly for does not only offer work. Sometimes it assigns it,
       // and the only reward is not being the station that said no.
       const patron = s.patron
-      const duty = patron !== null && Math.random() < 0.22
+      const duty = patron !== null && roll(s) < 0.22
       s.missions.push(
         patron && duty
-          ? makeMission(appeal(s), {
+          ? makeMission(roller(s), appeal(s), {
               far: rollFar(s),
               obligation: true,
               standing: [patron, 0.05],
               name: `${factionDef(patron).short} tasking`,
             })
-          : makeMission(appeal(s), { far: rollFar(s) }),
+          : makeMission(roller(s), appeal(s), { far: rollFar(s) }),
       )
       if (patron && duty) log(s, `${factionDef(patron).name} has tasked the station.`, 'warn')
     }
@@ -448,7 +451,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       // Strain is not a timer. It is the odds getting worse while you decide:
       // a per-second chance that grows once the team is past what they can
       // comfortably carry.
-      if (m.strain > 1 && Math.random() < (m.strain - 1) * 0.004 * dt) {
+      if (m.strain > 1 && roll(s) < (m.strain - 1) * 0.004 * dt) {
         log(s, `${m.name} is in trouble and nobody called them home.`, 'bad')
         m.odds -= 0.3
         m.recalled = true
@@ -462,7 +465,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
     if (m.shape === 'unfolding' && m.nextCall > 0) {
       m.nextCall -= dt
       if (m.nextCall <= 0) {
-        const call = rollCall(m)
+        const call = rollCall(roller(s), m)
         if (call) {
           m.call = call
           m.status = 'calling'
@@ -494,7 +497,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
   }
   s.nextIncidentIn -= dt
   if (s.nextIncidentIn <= 0) {
-    s.nextIncidentIn = 90 + Math.random() * 150
+    s.nextIncidentIn = 90 + roll(s) * 150
     rollIncident(s)
   }
 

@@ -1,18 +1,28 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  SIGN_THRESHOLD,
-  WING,
   fleetCapacity,
   guestAboard,
   holdOut,
   newGame,
   reducer,
+  seeded,
+  SIGN_THRESHOLD,
+  WING,
 } from '../engine.ts'
 import { wantOf } from '../talks/hire.ts'
 import { makeVisitor } from '../visitors.ts'
 import { labels, open, say } from './talkHelp.ts'
 import type { GameState, Guest, ModuleKind, Visitor } from '../types.ts'
+
+// Every station in this file is founded from a known seed, so a run that passes
+// today passes tomorrow. Each call moves the seed on, so a loop that founds
+// forty stations still sees forty different ones.
+let founded = 0
+const fresh = () => newGame('Spaceport-99', 1700 + (founded += 1))
+
+// One seed per file, so every draw below is the same draw every run.
+const rng = seeded(55)
 
 /** Talk a guest round the whole way, from the greeting to the answer. */
 const talkRound = (s: GameState, guestId: string, ...moves: string[]): GameState => {
@@ -38,7 +48,7 @@ const berthed = (s: GameState, over: Partial<Visitor> = {}): [GameState, Visitor
   // with a hull in the fleet — one pool serves both.
   const taken = [...s.ships.map((h) => h.name), ...s.visitors.map((x) => x.name)]
   const v: Visitor = {
-    ...makeVisitor(taken),
+    ...makeVisitor(rng, taken),
     status: 'requesting',
     timer: 900,
     kind: 'trader',
@@ -54,16 +64,20 @@ const berthed = (s: GameState, over: Partial<Visitor> = {}): [GameState, Visitor
 
 /** Keeps rolling boarding parties until one throws up the role we need. */
 const partyWith = (s: GameState, captain: boolean): [GameState, Guest, Visitor] => {
+  // Rolls come out of the state now, so a retry has to start from a state whose
+  // luck has moved on. Deal from the same one twice and you get the same party.
+  let from = s
   for (let i = 0; i < 200; i += 1) {
-    const [next, v] = berthed(s)
+    const [next, v] = berthed(from)
     const found = v.aboard.find((g) => g.captain === captain)
     if (found) return [next, found, v]
+    from = { ...from, rng: next.rng }
   }
   throw new Error('no such role turned up')
 }
 
 test('everyone who comes aboard can be asked to stay', () => {
-  const [, , v] = partyWith(rich(newGame()), false)
+  const [, , v] = partyWith(rich(fresh()), false)
   assert.ok(v.aboard.length > 0)
   for (const g of v.aboard) {
     assert.ok(g.stats && g.tier > 0, 'they are a real person, not scenery')
@@ -73,8 +87,8 @@ test('everyone who comes aboard can be asked to stay', () => {
 })
 
 test('a master is harder to move than a hand, on the same station', () => {
-  const [withMaster, master] = partyWith(rich(newGame()), true)
-  const [, hand] = partyWith(rich(newGame()), false)
+  const [withMaster, master] = partyWith(rich(fresh()), true)
+  const [, hand] = partyWith(rich(fresh()), false)
 
   assert.ok(master.interest < hand.interest, 'they start far less interested')
   assert.ok(master.grip > hand.grip)
@@ -94,7 +108,7 @@ test('a master is harder to move than a hand, on the same station', () => {
 })
 
 test('what talks a master round is the station, not the chequebook', () => {
-  const [poor, master] = partyWith(rich(newGame()), true)
+  const [poor, master] = partyWith(rich(fresh()), true)
   // A station worth moving to: room, surplus, a full account and a staffed dock.
   let good = poor
   for (const col of [WING - 3, WING - 4, WING + 2, WING + 3]) {
@@ -121,7 +135,7 @@ test('what talks a master round is the station, not the chequebook', () => {
 })
 
 test('each thing you can say lands once, and costs what it costs', () => {
-  const [s0, guest] = partyWith(rich(newGame()), false)
+  const [s0, guest] = partyWith(rich(fresh()), false)
   let s = open(s0, 'hire', { kind: 'guest', id: guest.id })
   s = say(s, 'Make them an offer')
   s = say(s, 'up front')
@@ -136,7 +150,7 @@ test('each thing you can say lands once, and costs what it costs', () => {
 })
 
 test('a hand who says yes joins the crew and leaves the manifest', () => {
-  const [s0, guest, v] = partyWith(rich(newGame()), false)
+  const [s0, guest, v] = partyWith(rich(fresh()), false)
   const sure = {
     ...s0,
     visitors: s0.visitors.map((x) =>
@@ -153,7 +167,7 @@ test('a hand who says yes joins the crew and leaves the manifest', () => {
 })
 
 test('a master brings the hull with them when a berth is free', () => {
-  let base = rich(newGame())
+  let base = rich(fresh())
   // Two bays weld into one two-berth run; HQ issues a shuttle with the first,
   // which leaves exactly one berth standing empty.
   base = build(base, 'hangar', WING - 3)
@@ -181,7 +195,7 @@ test('a master brings the hull with them when a berth is free', () => {
 })
 
 test('with no berth for her, the hull is sold on the dock instead', () => {
-  const [s0, master, v] = partyWith(rich(newGame()), true)
+  const [s0, master, v] = partyWith(rich(fresh()), true)
   assert.equal(fleetCapacity(s0), 0, 'the founding station has no hangar')
 
   const sure = {
@@ -199,7 +213,7 @@ test('with no berth for her, the hull is sold on the dock instead', () => {
 })
 
 test('nobody comes aboard a station with no bunk for them', () => {
-  const [s0, guest] = partyWith(rich(newGame()), false)
+  const [s0, guest] = partyWith(rich(fresh()), false)
   // Fill every bunk the founding station has.
   const packed = { ...s0, crew: [...s0.crew, ...Array.from({ length: 20 }, () => s0.crew[0])] }
   const s = talkRound(packed, guest.id)

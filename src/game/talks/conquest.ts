@@ -1,4 +1,4 @@
-import { clamp, defence, log, shift } from '../engine.ts'
+import { clamp, defence, log, pickOne, roll, roller, shift } from '../engine.ts'
 import { STANDING_CEILING, factionDef } from '../factions.ts'
 import { registerScript, type TalkCtx, type TalkScript } from '../talk.ts'
 
@@ -51,21 +51,21 @@ const battle = (c: TalkCtx, won: boolean): void => {
   if (!v) return
   const hurt = won ? 0.25 : 0.6
   const scar = (m: { condition: number }) => {
-    m.condition = clamp(m.condition - 0.2 - Math.random() * 0.3, 0.2, 1)
+    m.condition = clamp(m.condition - 0.2 - roll(c.s) * 0.3, 0.2, 1)
   }
   let marked = false
   for (const m of c.s.modules) {
-    if (Math.random() >= hurt) continue
+    if (roll(c.s) >= hurt) continue
     scar(m)
     marked = true
   }
   // Nobody trades fire without something to show for it afterwards.
   if (!marked && c.s.modules.length > 0) {
-    scar(c.s.modules[Math.floor(Math.random() * c.s.modules.length)])
+    scar(pickOne(roller(c.s), c.s.modules))
   }
   for (const crew of c.s.crew) {
     if (crew.dead) continue
-    if (Math.random() >= hurt * 0.55) continue
+    if (roll(c.s) >= hurt * 0.55) continue
     crew.hp = Math.max(1, Math.round(crew.hp * (won ? 0.65 : 0.35)))
   }
   if (won) {
@@ -255,7 +255,7 @@ const lostText = (c: TalkCtx): string =>
 
 /** Run when the fight node is entered. The reducer calls this. */
 export const resolveFight = (c: TalkCtx): void => {
-  const won = Math.random() < odds(c)
+  const won = roll(c.s) < odds(c)
   battle(c, won)
   c.talk.flags.push(won ? 'won' : 'lost')
   const v = c.ship

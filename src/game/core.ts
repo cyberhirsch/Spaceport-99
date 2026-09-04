@@ -1,9 +1,53 @@
 import { uid } from './crew.ts'
-import type { GameState, LogEntry } from './types.ts'
+import type { GameState, LogEntry, Rng } from './types.ts'
 
 // Constants and the two helpers everything else leans on.
 
-export const SAVE_VERSION = 7
+export const SAVE_VERSION = 8
+
+/**
+ * The station's luck.
+ *
+ * Every roll in the game comes from here rather than from Math.random(), which
+ * buys three things: a reducer that answers the same way twice for the same
+ * input (React calls it twice on purpose in development), a save that cannot be
+ * reloaded to reroll a death, and tests that can pin a seed instead of
+ * averaging over sixty draws.
+ *
+ * The generator is mulberry32 — one multiply-and-shift round over a 32-bit
+ * word. It is not cryptographic and does not need to be. It needs to be small,
+ * fast, and to have a period no station will outlive, and it is all three.
+ */
+export interface Luck {
+  rng: number
+}
+
+/** Advance the luck and hand back the next number in [0, 1). */
+export const roll = (s: Luck): number => {
+  s.rng = (s.rng + 0x6d2b79f5) | 0
+  let t = s.rng
+  t = Math.imul(t ^ (t >>> 15), t | 1)
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+}
+
+/** A roller bound to one state, for handing to the generators. */
+export const roller = (s: Luck): Rng => () => roll(s)
+
+/** A standalone roller from a fixed seed, for tests and for founding a game. */
+export const seeded = (seed: number): Rng => {
+  const box: Luck = { rng: seed | 0 }
+  return () => roll(box)
+}
+
+/** One of them, uniformly. */
+export const pickOne = <T,>(rng: Rng, arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)]
+
+/** A number in [lo, hi). */
+export const spread = (rng: Rng, lo: number, hi: number): number => lo + rng() * (hi - lo)
+
+/** A seed for a station nobody has founded yet. The one unrepeatable roll. */
+export const newSeed = (): number => (Date.now() ^ (performance.now() * 1e6)) | 0
 
 export const BASE_CREW_CAP = 8
 

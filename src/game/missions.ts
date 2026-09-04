@@ -3,7 +3,7 @@ import { makeCrew } from './crew.ts'
 import { SPEC_IDS, specDef } from './specs.ts'
 import { OUTCOME_INFO, makeShip, rollOutcome, shipCargo, shipHull } from './fleet.ts'
 import type { Crew, Mission, Ship, GameState } from './types.ts'
-import { log, clamp, namesInPlay } from './core.ts'
+import { clamp, log, namesInPlay, pickOne, roll, roller } from './core.ts'
 import { unassign, awardXpTo, allocatePortrait } from './staffing.ts'
 import { reach, fleetCapacity } from './rooms.ts'
 import { derive } from './state.ts'
@@ -18,7 +18,7 @@ import { shift } from './standing.ts'
  */
 export const rollFar = (s: GameState): boolean => {
   const r = reach(s)
-  return r > 0 && Math.random() < Math.min(0.45, 0.18 + r * 0.12)
+  return r > 0 && roll(s) < Math.min(0.45, 0.18 + r * 0.12)
 }
 
 /**
@@ -45,7 +45,7 @@ export const answerCall = (s: GameState, m: Mission, index: number, theirs = fal
   m.call = null
   m.status = 'flying'
   // One hail is rarely the end of it.
-  m.nextCall = m.remaining > 90 ? Math.round(m.remaining * (0.4 + Math.random() * 0.3)) : 0
+  m.nextCall = m.remaining > 90 ? Math.round(m.remaining * (0.4 + roll(s) * 0.3)) : 0
   if (theirs) log(s, `${m.name} stopped waiting for an answer and made the call themselves.`, 'warn')
 }
 
@@ -54,7 +54,7 @@ export const resolveMission = (s: GameState, m: Mission): void => {
   const team = m.crewIds
     .map((id) => s.crew.find((c) => c.id === id))
     .filter((c): c is Crew => c !== undefined && !c.dead)
-  const outcome = rollOutcome(team, m, ship)
+  const outcome = rollOutcome(roller(s), team, m, ship)
   m.status = 'report'
   m.outcome = outcome
   m.remaining = 0
@@ -90,14 +90,14 @@ export const resolveMission = (s: GameState, m: Mission): void => {
   for (const c of team) {
     const idx = s.crew.findIndex((x) => x.id === c.id)
     if (idx < 0) continue
-    const hurt = Math.round(s.crew[idx].maxHp * harm * (0.6 + Math.random() * 0.8))
+    const hurt = Math.round(s.crew[idx].maxHp * harm * (0.6 + roll(s) * 0.8))
     s.crew[idx] = { ...s.crew[idx], hp: Math.max(1, s.crew[idx].hp - hurt) }
   }
 
   // Only a disaster can cost you the hull or the people, and even then not always.
   let lostShip = false
   if (outcome === 'disaster' && ship) {
-    if (ship.hull <= 0 || Math.random() < 0.35) {
+    if (ship.hull <= 0 || roll(s) < 0.35) {
       s.ships = s.ships.filter((x) => x.id !== ship.id)
       lostShip = true
     }
@@ -105,7 +105,7 @@ export const resolveMission = (s: GameState, m: Mission): void => {
   let lostCrew = 0
   if (outcome === 'disaster') {
     for (const c of team) {
-      if (Math.random() >= 0.18) continue
+      if (roll(s) >= 0.18) continue
       const idx = s.crew.findIndex((x) => x.id === c.id)
       if (idx < 0) continue
       s.crew[idx] = { ...s.crew[idx], dead: true, hp: 0, returnTo: null }
@@ -121,9 +121,9 @@ export const resolveMission = (s: GameState, m: Mission): void => {
   if (
     fresh.length > 0 &&
     outcome !== 'disaster' &&
-    Math.random() < (outcome === 'triumph' ? 0.24 : 0.1) + m.danger * 0.22
+    roll(s) < (outcome === 'triumph' ? 0.24 : 0.1) + m.danger * 0.22
   ) {
-    const id = fresh[Math.floor(Math.random() * fresh.length)]
+    const id = pickOne(roller(s), fresh)
     s.specs[id] = 0
     if (!s.researching) s.researching = id
     const sd = specDef(id)
@@ -132,14 +132,14 @@ export const resolveMission = (s: GameState, m: Mission): void => {
   }
 
   // Rare finds, and never on a run that went wrong.
-  if (!m.find && (outcome === 'triumph' || (outcome === 'success' && Math.random() < 0.15))) {
-    const roll = Math.random()
-    if (roll < 0.4 && s.crew.filter((c) => !c.dead).length < derive(s).crewCap) {
-      const survivor = makeCrew({ portrait: allocatePortrait(s) })
+  if (!m.find && (outcome === 'triumph' || (outcome === 'success' && roll(s) < 0.15))) {
+    const r = roll(s)
+    if (r < 0.4 && s.crew.filter((c) => !c.dead).length < derive(s).crewCap) {
+      const survivor = makeCrew(roller(s), { portrait: allocatePortrait(s) })
       s.crew.push(survivor)
       m.find = { kind: 'survivor', detail: `${survivor.name} came back with them and stayed.` }
-    } else if (roll < 0.65 && s.ships.length < fleetCapacity(s)) {
-      const hull = makeShip('shuttle', undefined, namesInPlay(s))
+    } else if (r < 0.65 && s.ships.length < fleetCapacity(s)) {
+      const hull = makeShip(roller(s), 'shuttle', undefined, namesInPlay(s))
       hull.hull = Math.round(hull.maxHull * 0.5)
       s.ships.push(hull)
       m.find = { kind: 'ship', detail: `They towed home a derelict — the ${hull.name}, half-dead.` }

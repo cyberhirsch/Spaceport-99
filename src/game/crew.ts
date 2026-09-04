@@ -1,5 +1,5 @@
 import { ITEM_DEFS } from './gear.ts'
-import { STAT_KEYS, type Crew, type StatKey, type Stats } from './types.ts'
+import { STAT_KEYS, type Crew, type Rng, type StatKey, type Stats } from './types.ts'
 
 const FIRST = [
   'Ada', 'Bex', 'Cyrus', 'Dara', 'Emil', 'Fenn', 'Greer', 'Halcyon', 'Ilse', 'Juno',
@@ -15,29 +15,32 @@ const LAST = [
   'Zhu', 'Bellamy', 'Nwosu', 'Kaspar', 'Trent', 'Solano', 'Weatherly', 'Bright-Ito',
 ]
 
+// Identity, not luck: a monotonic counter inside a session and the clock
+// between them. Deliberately outside the seeded rolls — two stations from the
+// same seed play out identically, they just do not share id strings.
 let counter = 0
 export const uid = (prefix: string): string => {
   counter += 1
-  return `${prefix}_${Date.now().toString(36)}_${counter.toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`
+  return `${prefix}_${Date.now().toString(36)}_${counter.toString(36)}`
 }
 
-const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)]
+const pick = <T,>(rng: Rng, arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)]
 
-export const randomName = (): string => `${pick(FIRST)} ${pick(LAST)}`
+export const randomName = (rng: Rng): string => `${pick(rng, FIRST)} ${pick(rng, LAST)}`
 
 /**
  * New recruits start at 1 in everything with a handful of points sprinkled on
  * top. Pass a `focus` stat to guarantee a specialist — used for the founders so
  * the opening station is never staffed entirely by people who can't run it.
  */
-export const rollStats = (points = 6, focus?: StatKey): Stats => {
+export const rollStats = (rng: Rng, points = 6, focus?: StatKey): Stats => {
   const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, 1])) as Stats
   if (focus) {
     stats[focus] = 4
     points = Math.max(0, points - 3)
   }
   for (let i = 0; i < points; i += 1) {
-    const k = pick(STAT_KEYS)
+    const k = pick(rng, STAT_KEYS)
     if (stats[k] < 6) stats[k] += 1
     else i -= 1
   }
@@ -51,13 +54,13 @@ export const maxHpFor = (level: number, stats: Stats): number =>
 
 export const xpForLevel = (level: number): number => Math.round(55 * Math.pow(level, 1.55))
 
-export const makeCrew = (overrides: Partial<Crew> = {}): Crew => {
-  const stats = overrides.stats ?? rollStats()
+export const makeCrew = (rng: Rng, overrides: Partial<Crew> = {}): Crew => {
+  const stats = overrides.stats ?? rollStats(rng)
   const level = overrides.level ?? 1
   const maxHp = maxHpFor(level, stats)
   return {
     id: uid('c'),
-    name: randomName(),
+    name: randomName(rng),
     gear: {},
     stats,
     level,
@@ -67,7 +70,7 @@ export const makeCrew = (overrides: Partial<Crew> = {}): Crew => {
     morale: 0.8,
     assignment: null,
     returnTo: null,
-    seed: Math.floor(Math.random() * 1e9),
+    seed: Math.floor(rng() * 1e9),
     dead: false,
     ...overrides,
     // Keep derived values consistent even when overrides set stats/level.

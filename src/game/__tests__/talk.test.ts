@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  ARMED_ENOUGH,
-  WING,
   advance,
+  ARMED_ENOUGH,
   def,
   defence,
   derive,
   guestAboard,
   newGame,
   reducer,
+  seeded,
+  WING,
 } from '../engine.ts'
 import { nodeOf, offered, scriptOf, speaker } from '../talk.ts'
 import type { ScriptId } from '../talk.ts'
@@ -18,6 +19,15 @@ import { wantOf } from '../talks/hire.ts'
 import { barredReason, labels, line, open, say } from './talkHelp.ts'
 import { STAT_KEYS } from '../types.ts'
 import type { GameState, ModuleKind, Visitor } from '../types.ts'
+
+// Every station in this file is founded from a known seed, so a run that passes
+// today passes tomorrow. Each call moves the seed on, so a loop that founds
+// forty stations still sees forty different ones.
+let founded = 0
+const fresh = () => newGame('Spaceport-99', 2200 + (founded += 1))
+
+// One seed per file, so every draw below is the same draw every run.
+const rng = seeded(88)
 
 const rich = (s: GameState): GameState => ({ ...s, credits: 80000 })
 const build = (s: GameState, kind: ModuleKind, col: number, deck = 0): GameState =>
@@ -29,7 +39,7 @@ const SCRIPTS: ScriptId[] = ['crew', 'hire', 'captain', 'conquest']
 const berthed = (s: GameState, over: Partial<Visitor> = {}): [GameState, Visitor] => {
   const v: Visitor = {
     // One name pool serves the fleet and the traffic, so exclude what is in play.
-    ...makeVisitor([...s.ships.map((h) => h.name), ...s.visitors.map((x) => x.name)]),
+    ...makeVisitor(rng, [...s.ships.map((h) => h.name), ...s.visitors.map((x) => x.name)]),
     status: 'requesting',
     timer: 900,
     kind: 'trader',
@@ -59,13 +69,13 @@ test('every script is registered and every reply goes somewhere real', () => {
 })
 
 test('a conversation with nobody in it does not open', () => {
-  const s = newGame()
+  const s = fresh()
   assert.equal(reducer(s, { type: 'talk', script: 'crew', with: { kind: 'crew', id: 'nope' } }), s)
   assert.equal(s.talk, null)
 })
 
 test('opening a conversation says nothing until you speak', () => {
-  const s = newGame()
+  const s = fresh()
   const talking = open(s, 'crew', { kind: 'crew', id: s.crew[0].id })
   assert.ok(talking.talk)
   assert.equal(talking.talk.node, 'start')
@@ -75,7 +85,7 @@ test('opening a conversation says nothing until you speak', () => {
 })
 
 test('what was said stays said, in the order it happened', () => {
-  const s = newGame()
+  const s = fresh()
   let talking = open(s, 'crew', { kind: 'crew', id: s.crew[0].id })
   const opener = line(talking)
   talking = say(talking, 'How are you holding up')
@@ -86,13 +96,13 @@ test('what was said stays said, in the order it happened', () => {
 })
 
 test('a reply that goes nowhere closes the conversation', () => {
-  const s = newGame()
+  const s = fresh()
   const talking = open(s, 'crew', { kind: 'crew', id: s.crew[0].id })
   assert.equal(say(talking, 'Carry on').talk, null)
 })
 
 test('a conversation can be walked away from, unless it cannot', () => {
-  const s = newGame()
+  const s = fresh()
   const chat = open(s, 'crew', { kind: 'crew', id: s.crew[0].id })
   assert.equal(reducer(chat, { type: 'endTalk' }).talk, null)
 
@@ -104,13 +114,13 @@ test('a conversation can be walked away from, unless it cannot', () => {
 })
 
 test('a reply nobody offered is refused', () => {
-  const s = newGame()
+  const s = fresh()
   const talking = open(s, 'crew', { kind: 'crew', id: s.crew[0].id })
   assert.equal(reducer(talking, { type: 'say', reply: 99 }), talking)
 })
 
 test('opening a second conversation abandons the first', () => {
-  const s = newGame()
+  const s = fresh()
   const first = open(s, 'crew', { kind: 'crew', id: s.crew[0].id })
   const second = open(first, 'crew', { kind: 'crew', id: s.crew[1].id })
   assert.deepEqual(second.talk?.with, { kind: 'crew', id: s.crew[1].id })
@@ -119,7 +129,7 @@ test('opening a second conversation abandons the first', () => {
 // ----------------------------------------------------------------- hiring --
 
 test('what somebody wants is fixed, and asking properly gets it out of them', () => {
-  const [docked, v] = berthed(rich(newGame()))
+  const [docked, v] = berthed(rich(fresh()))
   const guest = v.aboard[0]
   const want = wantOf(guest)
   assert.equal(wantOf(guest), want, 'it does not move between reads')
@@ -141,7 +151,7 @@ test('the right offer is worth far more than the wrong one', () => {
   // Somebody who wants money, and somebody who does not.
   const swings: Record<string, number[]> = { match: [], miss: [] }
   for (let i = 0; i < 60; i += 1) {
-    const [docked, v] = berthed(rich(newGame()))
+    const [docked, v] = berthed(rich(fresh()))
     const guest = v.aboard.find((g) => !g.captain)
     if (!guest) continue
     let s = open(docked, 'hire', { kind: 'guest', id: guest.id })
@@ -160,7 +170,7 @@ test('the right offer is worth far more than the wrong one', () => {
 })
 
 test('a posting cannot be promised when every room is full', () => {
-  const [docked, v] = berthed(newGame())
+  const [docked, v] = berthed(fresh())
   const guest = v.aboard[0]
   // Cram every slot on the station.
   const packed: GameState = {
@@ -172,7 +182,7 @@ test('a posting cannot be promised when every room is full', () => {
 })
 
 test('with nothing in the account, money is not on the table', () => {
-  const [alongside, v] = berthed(newGame())
+  const [alongside, v] = berthed(fresh())
   // Berthing her paid a docking fee, so empty the account afterwards.
   const docked: GameState = { ...alongside, credits: 0 }
   const guest = v.aboard[0]
@@ -181,7 +191,7 @@ test('with nothing in the account, money is not on the table', () => {
 })
 
 test('the closing line still shows after they have left the manifest', () => {
-  const [alongside, v] = berthed(rich(newGame()))
+  const [alongside, v] = berthed(rich(fresh()))
   const guest = v.aboard[0]
   const sure: GameState = {
     ...alongside,
@@ -209,7 +219,7 @@ test('the closing line still shows after they have left the manifest', () => {
 // ------------------------------------------------------------------- crew --
 
 test('the crew tell you what is actually wrong, and only what is wrong', () => {
-  const s = newGame()
+  const s = fresh()
   const sound = say(open(s, 'crew', { kind: 'crew', id: s.crew[0].id }), 'What is actually wrong')
   assert.match(line(sound), /Nothing I would raise|One thing/)
 
@@ -220,7 +230,7 @@ test('the crew tell you what is actually wrong, and only what is wrong', () => {
 })
 
 test('being heard is worth something, once', () => {
-  const airless: GameState = { ...newGame(), resources: { power: 100, air: 0, food: 0 } }
+  const airless: GameState = { ...fresh(), resources: { power: 100, air: 0, food: 0 } }
   const who = airless.crew[0]
   let s = say(open(airless, 'crew', { kind: 'crew', id: who.id }), 'What is actually wrong')
   s = say(s, 'Thank you for saying it')
@@ -235,7 +245,7 @@ test('being heard is worth something, once', () => {
 })
 
 test('a crew member can ask for the posting they are built for', () => {
-  let s = build(newGame(), 'gym', WING - 3)
+  let s = build(fresh(), 'gym', WING - 3)
   const who = s.crew.find((c) => c.assignment !== s.modules.find((m) => m.kind === 'gym')!.id)!
   s = open(s, 'crew', { kind: 'crew', id: who.id })
   s = say(s, 'Where would you rather be posted')
@@ -258,7 +268,7 @@ test('a crew member can ask for the posting they are built for', () => {
 // --------------------------------------------------------------- captains --
 
 test('leaning on a hull is cheap with guns and expensive without', () => {
-  const [bare, v1] = berthed(newGame(), { faction: 'concern' })
+  const [bare, v1] = berthed(fresh(), { faction: 'concern' })
   const leaned = say(
     open(bare, 'captain', { kind: 'visitor', id: v1.id }),
     'Make it clear whose station this is',
@@ -268,7 +278,7 @@ test('leaning on a hull is cheap with guns and expensive without', () => {
 
   // Same words, from behind a staffed battery.
   // One battery is a decoration. Two weld into a run worth talking behind.
-  let armed = build(build(newGame(), 'battery', WING - 3), 'battery', WING - 4)
+  let armed = build(build(fresh(), 'battery', WING - 3), 'battery', WING - 4)
   const gun = armed.modules.find((m) => m.kind === 'battery')!
   for (const c of armed.crew) {
     armed = reducer(armed, { type: 'assign', crewId: c.id, moduleId: gun.id })
@@ -284,7 +294,7 @@ test('leaning on a hull is cheap with guns and expensive without', () => {
 
 test('a dirty hull can be pressed, and letting it go is worth something', () => {
   // A smuggler claiming to be honest: the scan overlaps, the manifest does not.
-  const [docked, v] = berthed(newGame(), { kind: 'smuggler', claim: 'trader', faction: 'unlisted' })
+  const [docked, v] = berthed(fresh(), { kind: 'smuggler', claim: 'trader', faction: 'unlisted' })
   let s = open(docked, 'captain', { kind: 'visitor', id: v.id })
   s = say(s, 'Ask what they are really carrying')
   assert.match(line(s), /wrong answer in it/)
@@ -300,7 +310,7 @@ test('a dirty hull can be pressed, and letting it go is worth something', () => 
 // -------------------------------------------------------------- conquest --
 
 test('a takeover changes the flag, and striking it costs nothing else', () => {
-  const s = rich(newGame())
+  const s = rich(fresh())
   assert.equal(s.patron, 'terran')
   const [docked, v] = berthed(s, { intent: 'conquest', force: 40, faction: 'concern' })
 
@@ -314,7 +324,7 @@ test('a takeover changes the flag, and striking it costs nothing else', () => {
 })
 
 test('paying them off keeps the flag and empties the account', () => {
-  const s = rich(newGame())
+  const s = rich(fresh())
   const [docked, v] = berthed(s, { intent: 'conquest', force: 20, faction: 'compact' })
   let talk = open(docked, 'conquest', { kind: 'visitor', id: v.id })
   const paid = say(talk, 'Pay them off')
@@ -324,7 +334,7 @@ test('paying them off keeps the flag and empties the account', () => {
 })
 
 test('with nothing in the account there is nothing to pay them with', () => {
-  const [docked, v] = berthed({ ...newGame(), credits: 0 }, { intent: 'conquest', force: 40 })
+  const [docked, v] = berthed({ ...fresh(), credits: 0 }, { intent: 'conquest', force: 40 })
   const talk = open(docked, 'conquest', { kind: 'visitor', id: v.id })
   assert.equal(barredReason(talk, 'Pay them off'), 'Not in the account')
 })
@@ -333,7 +343,7 @@ test('fighting resolves one way or the other, and costs either way', () => {
   let ceded = 0
   let held = 0
   for (let i = 0; i < 40; i += 1) {
-    const [docked, v] = berthed(rich(newGame()), {
+    const [docked, v] = berthed(rich(fresh()), {
       intent: 'conquest',
       force: 20,
       faction: 'concern',
@@ -354,7 +364,7 @@ test('fighting resolves one way or the other, and costs either way', () => {
 })
 
 test('the patron answers when you have been worth something to them', () => {
-  const warm: GameState = { ...rich(newGame()), standing: { ...newGame().standing, terran: 0.2 } }
+  const warm: GameState = { ...rich(fresh()), standing: { ...fresh().standing, terran: 0.2 } }
   const [docked, v] = berthed(warm, { intent: 'conquest', force: 40, faction: 'concern' })
   const called = say(open(docked, 'conquest', { kind: 'visitor', id: v.id }), 'Call')
   assert.equal(called.patron, 'terran', 'they held them off')
@@ -362,7 +372,7 @@ test('the patron answers when you have been worth something to them', () => {
 })
 
 test('and does not when you have not', () => {
-  const cold: GameState = { ...rich(newGame()), standing: { ...newGame().standing, terran: 0 } }
+  const cold: GameState = { ...rich(fresh()), standing: { ...fresh().standing, terran: 0 } }
   const [docked, v] = berthed(cold, { intent: 'conquest', force: 40, faction: 'concern' })
   const called = say(open(docked, 'conquest', { kind: 'visitor', id: v.id }), 'Call')
   assert.match(line(called), /acknowledges your situation/)
@@ -372,13 +382,13 @@ test('and does not when you have not', () => {
 
 test('nobody comes for a station not worth the fuel', () => {
   // Small, thinly crewed, and left running for a very long time.
-  const s = advance({ ...newGame(), nextTakeoverIn: 0, elapsed: 60 * 60 }, 600)
+  const s = advance({ ...fresh(), nextTakeoverIn: 0, elapsed: 60 * 60 }, 600)
   assert.equal(s.visitors.filter((v) => v.intent).length, 0)
   assert.equal(s.patron, 'terran')
 })
 
 test('a hull that came to take the station does not wander off', () => {
-  const [docked, v] = berthed(rich(newGame()), { intent: 'conquest', force: 20, timer: 1 })
+  const [docked, v] = berthed(rich(fresh()), { intent: 'conquest', force: 20, timer: 1 })
   const later = advance({ ...docked, talk: null }, 300)
   const still = later.visitors.find((x) => x.id === v.id)
   assert.ok(still, 'she is still alongside')
@@ -386,7 +396,7 @@ test('a hull that came to take the station does not wander off', () => {
 })
 
 test('offered replies are filtered, barred ones are kept and marked', () => {
-  const [alongside, v] = berthed(newGame())
+  const [alongside, v] = berthed(fresh())
   const docked: GameState = { ...alongside, credits: 0 }
   const guest = v.aboard[0]
   const s = say(open(docked, 'hire', { kind: 'guest', id: guest.id }), 'Make them an offer')
@@ -398,7 +408,7 @@ test('offered replies are filtered, barred ones are kept and marked', () => {
 })
 
 test('a hull never arrives sharing a name with one in the fleet', () => {
-  let s = rich(newGame())
+  let s = rich(fresh())
   // Every name in the pool, handed out until it runs dry.
   for (let i = 0; i < 40; i += 1) {
     const [next] = berthed(s)

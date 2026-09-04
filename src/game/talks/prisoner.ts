@@ -1,5 +1,5 @@
 import { crewPortrait, makeCrew } from '../crew.ts'
-import { assign, derive, log, shift } from '../engine.ts'
+import { assign, derive, log, roll, roller, shift } from '../engine.ts'
 import { factionDef } from '../factions.ts'
 import { registerScript, type TalkCtx, type TalkScript } from '../talk.ts'
 
@@ -141,13 +141,13 @@ const script: TalkScript = {
           }
           // With the door open it is an honest offer, and mostly taken — the
           // people who end up in a cell out here rarely have somewhere better.
-          const takes = Math.random() < (c.s.standing[p.faction] < -0.05 ? 0.85 : 0.55)
+          const takes = roll(c.s) < (c.s.standing[p.faction] < -0.05 ? 0.85 : 0.55)
           if (!takes) {
             shift(c.s, 'unlisted', 0.03)
             log(c.s, `${p.name} thanked you for the offer and left on the next hull.`, 'info')
             return
           }
-          const hire = makeCrew({
+          const hire = makeCrew(roller(c.s), {
             name: p.name,
             stats: p.stats,
             seed: p.seed,

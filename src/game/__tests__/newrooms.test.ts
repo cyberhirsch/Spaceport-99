@@ -1,18 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  BASE_CREW_CAP,
   advance,
+  BASE_CREW_CAP,
   cellsAboard,
   commerce,
   derive,
   inContact,
   lotsAboard,
-  recycled,
-  reach,
-  reducer,
   newGame,
+  reach,
+  recycled,
+  reducer,
   scanOf,
+  seeded,
   sellMargin,
   sensorEdge,
 } from '../engine.ts'
@@ -23,13 +24,22 @@ import { MODULE_SPEC, SPEC_IDS } from '../specs.ts'
 import { open, say, labels, barredReason, line } from './talkHelp.ts'
 import type { GameState, ModuleKind, SpecId, Visitor } from '../types.ts'
 
+// Every station in this file is founded from a known seed, so a run that passes
+// today passes tomorrow. Each call moves the seed on, so a loop that founds
+// forty stations still sees forty different ones.
+let founded = 0
+const fresh = () => newGame('Spaceport-99', 1600 + (founded += 1))
+
+// One seed per file, so every draw below is the same draw every run.
+const rng = seeded(44)
+
 const rich = (s: GameState): GameState => ({ ...s, credits: 200000 })
 
 /** Builds a room and puts the whole watch in it, so it actually runs. */
 const running = (kind: ModuleKind, over: Partial<GameState> = {}): GameState => {
   const spec = MODULE_SPEC[kind]
   let s: GameState = {
-    ...rich(newGame()),
+    ...rich(fresh()),
     ...(spec ? { specs: { [spec]: 1 } as Partial<Record<SpecId, number>> } : {}),
     ...over,
   }
@@ -44,7 +54,7 @@ const running = (kind: ModuleKind, over: Partial<GameState> = {}): GameState => 
 
 const berthed = (s: GameState, over: Partial<Visitor> = {}): [GameState, Visitor] => {
   const v: Visitor = {
-    ...makeVisitor([...s.ships.map((h) => h.name), ...s.visitors.map((x) => x.name)]),
+    ...makeVisitor(rng, [...s.ships.map((h) => h.name), ...s.visitors.map((x) => x.name)]),
     status: 'requesting',
     timer: 9000,
     kind: 'trader',
@@ -145,7 +155,7 @@ test('a dishonest hull can be arrested, and only into a free cell', () => {
 })
 
 test('with no brig there is nothing to arrest anyone into', () => {
-  const [docked, v] = berthed(rich(newGame()), {
+  const [docked, v] = berthed(rich(fresh()), {
     kind: 'smuggler',
     claim: 'trader',
     faction: 'unlisted',
@@ -231,14 +241,14 @@ test('a sensor array pulls the scan towards what the hull actually is', () => {
   const s = running('sensor')
   assert.ok(sensorEdge(s) > 0)
 
-  const dirty: Visitor = { ...makeVisitor(), kind: 'raider', claim: 'trader', suspicion: 0.4 }
-  const clean: Visitor = { ...makeVisitor(), kind: 'trader', claim: 'trader', suspicion: 0.6 }
+  const dirty: Visitor = { ...makeVisitor(rng), kind: 'raider', claim: 'trader', suspicion: 0.4 }
+  const clean: Visitor = { ...makeVisitor(rng), kind: 'trader', claim: 'trader', suspicion: 0.6 }
   assert.ok(scanOf(s, dirty) > dirty.suspicion, 'trouble reads dirtier than it was pretending')
   assert.ok(scanOf(s, clean) < clean.suspicion, 'and an honest hull reads cleaner')
 
   // Never certain, whatever you build.
   assert.ok(scanOf(s, dirty) < 1)
-  assert.equal(scanOf(newGame(), dirty), dirty.suspicion, 'with no array the reading is raw')
+  assert.equal(scanOf(fresh(), dirty), dirty.suspicion, 'with no array the reading is raw')
 })
 
 // ----------------------------------------------------------- trading hub --
@@ -248,16 +258,23 @@ test('a trading hub narrows the spread and pulls traffic in', () => {
   assert.ok(commerce(s) > 0)
   assert.ok(sellMargin(s) > SELL_MARGIN, 'you sell nearer to what they ask')
   assert.ok(sellMargin(s) <= 0.92, 'and never at parity')
-  assert.equal(sellMargin(newGame()), SELL_MARGIN)
+  assert.equal(sellMargin(fresh()), SELL_MARGIN)
 
   // The gap between hulls is rolled, so compare the average of many rather
   // than two draws that overlap.
   const gap = (from: GameState) => {
+    // Each sample has to carry the last one's luck forward, or eighty draws are
+    // one draw eighty times.
+    let at = from
     let total = 0
-    for (let i = 0; i < 80; i += 1) total += advance({ ...from, nextVisitorIn: 0 }, 1).nextVisitorIn
+    for (let i = 0; i < 80; i += 1) {
+      const next = advance({ ...at, nextVisitorIn: 0 }, 1)
+      total += next.nextVisitorIn
+      at = { ...at, rng: next.rng }
+    }
     return total / 80
   }
-  assert.ok(gap(s) < gap(rich(newGame())) * 0.9, 'traffic comes noticeably more often')
+  assert.ok(gap(s) < gap(rich(fresh())) * 0.9, 'traffic comes noticeably more often')
 })
 
 test('bonded cargo is bought to sell on, and never touches the tanks', () => {
@@ -305,7 +322,7 @@ test('the cage will not take more than it holds', () => {
 // -------------------------------------------------- deep space operations --
 
 test('far work is offered only once somebody can plot it', () => {
-  assert.equal(reach(newGame()), 0)
+  assert.equal(reach(fresh()), 0)
   const s = running('dso')
   assert.ok(reach(s) > 0)
 })
@@ -315,13 +332,13 @@ test('a far contract pays more, takes far longer, and is never in contact', () =
   // two single draws.
   const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
   const roll = (far: boolean, pick: (m: ReturnType<typeof makeMission>) => number) =>
-    mean(Array.from({ length: 60 }, () => pick(makeMission(0.4, { far }))))
+    mean(Array.from({ length: 60 }, () => pick(makeMission(rng, 0.4, { far }))))
 
   assert.ok(roll(true, (m) => m.seconds) > roll(false, (m) => m.seconds) * 2, 'weeks, not hours')
   assert.ok(roll(true, (m) => m.payout.credits) > roll(false, (m) => m.payout.credits) * 2)
 
-  const near = makeMission(0.4, { far: false })
-  const far = makeMission(0.4, { far: true })
+  const near = makeMission(rng, 0.4, { far: false })
+  const far = makeMission(rng, 0.4, { far: true })
   assert.equal(near.far, false)
   assert.equal(far.far, true)
   assert.match(far.name, /Far /)
@@ -337,7 +354,7 @@ test('a far contract pays more, takes far longer, and is never in contact', () =
 
 test('a far team answers its own hails, because nobody else can', () => {
   const s = running('command')
-  const far = { ...makeMission(0.4, { far: true }), status: 'flying' as const, nextCall: 1 }
+  const far = { ...makeMission(rng, 0.4, { far: true }), status: 'flying' as const, nextCall: 1 }
   const out = advance({ ...s, missions: [far] }, 6)
   const m = out.missions[0]
   // Either it has not hailed yet or it hailed and decided for itself, but it
@@ -346,8 +363,8 @@ test('a far team answers its own hails, because nobody else can', () => {
 })
 
 test('the far-work warning is on the contract before it is taken', () => {
-  const far = makeMission(0.4, { far: true })
+  const far = makeMission(rng, 0.4, { far: true })
   assert.ok(far.far)
   assert.equal(far.status, 'offered')
-  assert.ok(line(newGame()) === '', 'no conversation is open')
+  assert.ok(line(fresh()) === '', 'no conversation is open')
 })

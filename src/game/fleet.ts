@@ -8,6 +8,7 @@ import type {
   MissionKind,
   MissionShape,
   MissionOutcome,
+  Rng,
   Ship,
   ShipClass,
   ShipDef,
@@ -78,11 +79,16 @@ export const tradeInValue = (s: Ship): number =>
   Math.round(shipDef(s.cls).price * 0.4 * (1 + (s.level - 1) * 0.3) * (s.hull / shipHull(s)))
 
 
-export const makeShip = (cls: ShipClass, name?: string, taken: Iterable<string> = []): Ship => {
+export const makeShip = (
+  rng: Rng,
+  cls: ShipClass,
+  name?: string,
+  taken: Iterable<string> = [],
+): Ship => {
   const hull = Math.round(shipDef(cls).hull)
   return {
     id: uid('s'),
-    name: name ?? pickHullName(taken),
+    name: name ?? pickHullName(rng, taken),
     cls,
     hull,
     maxHull: hull,
@@ -186,14 +192,14 @@ interface MissionOpts {
   far?: boolean
 }
 
-export const makeMission = (standing: number, opts: MissionOpts = {}): Mission => {
+export const makeMission = (rng: Rng, standing: number, opts: MissionOpts = {}): Mission => {
   const kinds = Object.keys(MISSION_KINDS) as MissionKind[]
-  const kind = kinds[Math.floor(Math.random() * kinds.length)]
+  const kind = kinds[Math.floor(rng() * kinds.length)]
   const d = missionDef(kind)
   const pool = SHAPES[kind]
-  const shape = opts.shape ?? pool[Math.floor(Math.random() * pool.length)]
+  const shape = opts.shape ?? pool[Math.floor(rng() * pool.length)]
   // A better-run station gets offered better, nastier work.
-  const danger = Math.min(1, Math.max(0.1, standing * 0.8 + Math.random() * 0.35 - 0.1))
+  const danger = Math.min(1, Math.max(0.1, standing * 0.8 + rng() * 0.35 - 0.1))
   // An open job has no clock of its own; `seconds` is only its trip home.
   // Far work is a different order of job: weeks out instead of hours, paid to
   // match, and out of reach the whole time.
@@ -207,14 +213,14 @@ export const makeMission = (standing: number, opts: MissionOpts = {}): Mission =
     id: uid('m'),
     name:
       opts.name ??
-      `${far ? 'Far ' : ''}${d.label} — ${(far ? FAR_PLACES : PLACES)[Math.floor(Math.random() * (far ? FAR_PLACES : PLACES).length)]}`,
+      `${far ? 'Far ' : ''}${d.label} — ${(far ? FAR_PLACES : PLACES)[Math.floor(rng() * (far ? FAR_PLACES : PLACES).length)]}`,
     kind,
     shape,
     danger,
     stat: d.stat,
     seconds,
     remaining: seconds,
-    expiresIn: 180 + Math.random() * 120,
+    expiresIn: 180 + rng() * 120,
     status: 'offered',
     shipId: null,
     crewIds: [],
@@ -233,7 +239,7 @@ export const makeMission = (standing: number, opts: MissionOpts = {}): Mission =
     odds: 0,
     choices: [],
     call: null,
-    nextCall: shape === 'unfolding' ? Math.round(seconds * (0.25 + Math.random() * 0.2)) : 0,
+    nextCall: shape === 'unfolding' ? Math.round(seconds * (0.25 + rng() * 0.2)) : 0,
     standing: opts.standing ?? null,
     obligation: Boolean(opts.obligation),
     far,
@@ -260,12 +266,17 @@ export const successOdds = (crew: Crew[], m: Mission, ship: Ship | null): number
   return Math.round(Math.min(0.97, Math.max(0.05, 0.5 + margin * 0.06)) * 100)
 }
 
-export const rollOutcome = (crew: Crew[], m: Mission, ship: Ship | null): MissionOutcome => {
+export const rollOutcome = (
+  rng: Rng,
+  crew: Crew[],
+  m: Mission,
+  ship: Ship | null,
+): MissionOutcome => {
   // Choices already made shift the margin, and an open job that stayed out too
   // long is carrying its own weight into the roll.
   const margin =
     teamScore(crew, m, ship) - missionTarget(m) + m.odds * 30 - Math.max(0, m.strain - 1) * 9
-  const roll = margin + (Math.random() * 20 - 10)
+  const roll = margin + (rng() * 20 - 10)
   if (roll > 12) return 'triumph'
   if (roll > 0) return 'success'
   if (roll > -12) return 'setback'

@@ -38,6 +38,13 @@ a bookmark you place deliberately, kept in its own slot, and the only thing **Lo
 restores. Scuttling the station does not touch it, because starting over is one of the likeliest
 reasons to want it back; **Discard save** is there for a genuinely clean slate.
 
+Luck is part of the save. Every roll the game makes — who arrives, what a
+contract pays, whether a rushed cycle catches fire — comes from a number the
+station carries and advances, not from the clock. So a reload replays what was
+about to happen rather than rerolling it: a death stands, and so does a
+contract that went badly. Saves are brought forward across versions from
+version 8 on, one migration step per bump, rather than being thrown away.
+
 ## Standalone builds
 
 The same bundle, wrapped twice. **Electron** serves it to a desktop window;
@@ -431,7 +438,7 @@ src/
     engine.ts      the simulation, as one import — a barrel over twelve layered modules:
                    core → staffing → rooms → state → hazards → station → standing
                    → recruit → missions → traffic → tick → reducer
-    save.ts        localStorage round-trip
+    save.ts        localStorage round-trip, and the version-to-version migrations
     __tests__/     station geometry, recruiting, and the mission lifecycle
   hooks/
     useGame.ts       tick loop, autosave, offline catch-up
@@ -471,4 +478,8 @@ below it (constants and helpers at the bottom, the reducer at the top). Within
 them, `reducer(state, action)` in `reducer.ts` is the only way state changes,
 `advance(state, seconds)` in `tick.ts` splits any elapsed span into one-second
 steps, and `derive(state)` in `state.ts` computes everything the UI displays but
-never stores.
+never stores. Nothing under `src/game/` calls `Math.random()`: rolls come from
+`roll(state)` in `core.ts`, which advances the seed the state carries. That is
+what makes the reducer safe to call twice on the same input — React does, in
+development — and what makes a test able to pin a seed rather than average over
+sixty draws.

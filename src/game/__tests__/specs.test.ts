@@ -13,6 +13,12 @@ import {
 import { SPEC_IDS, specDef } from '../specs.ts'
 import type { GameState, ModuleKind } from '../types.ts'
 
+// Every station in this file is founded from a known seed, so a run that passes
+// today passes tomorrow. Each call moves the seed on, so a loop that founds
+// forty stations still sees forty different ones.
+let founded = 0
+const fresh = () => newGame('Spaceport-99', 2100 + (founded += 1))
+
 const rich = (s: GameState): GameState => ({ ...s, credits: 80000 })
 
 const build = (s: GameState, kind: ModuleKind, col: number, deck = 0): GameState =>
@@ -43,7 +49,7 @@ const staff = (s: GameState, kind: ModuleKind): GameState => {
 }
 
 test('a fresh station has found nothing and knows nothing', () => {
-  const s = newGame()
+  const s = fresh()
   assert.deepEqual(s.specs, {})
   assert.equal(s.researching, null)
   assert.equal(s.fabricating, null)
@@ -52,7 +58,7 @@ test('a fresh station has found nothing and knows nothing', () => {
 })
 
 test('the gated rooms cannot be built, and the gate names the spec', () => {
-  const s = newGame()
+  const s = fresh()
   assert.equal(moduleLocked(s, 'shield'), 'shield')
   assert.equal(moduleLocked(s, 'vault'), 'vault')
   // The defence battery is not gated — a station can always arm itself.
@@ -61,20 +67,20 @@ test('the gated rooms cannot be built, and the gate names the spec', () => {
 })
 
 test('building a gated room is refused even with the money and the floor', () => {
-  const s = newGame()
+  const s = fresh()
   const tried = build(s, 'shield', 2)
   assert.equal(tried.modules.length, s.modules.length)
 })
 
 test('a found spec is not a known spec', () => {
-  const s: GameState = { ...newGame(), specs: { shield: 0 } }
+  const s: GameState = { ...fresh(), specs: { shield: 0 } }
   assert.equal(knows(s, 'shield'), false)
   assert.deepEqual(openSpecs(s), ['shield'])
   assert.equal(moduleLocked(s, 'shield'), 'shield')
 })
 
 test('the lab works a spec out, and then the room can be built', () => {
-  let s: GameState = { ...newGame(), specs: { shield: 0 }, researching: 'shield' }
+  let s: GameState = { ...fresh(), specs: { shield: 0 }, researching: 'shield' }
   s = build(s, 'library', 2)
   s = staff(s, 'library')
   assert.ok(researchRate(s, new Map(s.crew.map((c) => [c.id, c]))) > 0)
@@ -93,14 +99,14 @@ test('the lab works a spec out, and then the room can be built', () => {
 })
 
 test('nothing is worked out without a lab, however long you wait', () => {
-  const s: GameState = { ...newGame(), specs: { shield: 0 }, researching: 'shield' }
+  const s: GameState = { ...fresh(), specs: { shield: 0 }, researching: 'shield' }
   const later = advance(s, 4000)
   assert.equal(knows(later, 'shield'), false)
   assert.equal(later.specs.shield, 0)
 })
 
 test('the lab moves on to the next drawing on its own', () => {
-  let s: GameState = { ...newGame(), specs: { torch: 0, vault: 0 }, researching: 'torch' }
+  let s: GameState = { ...fresh(), specs: { torch: 0, vault: 0 }, researching: 'torch' }
   s = build(s, 'library', 2)
   s = staff(s, 'library')
   // Stop the clock the moment the first one lands — the lab trains the very
@@ -111,7 +117,7 @@ test('the lab moves on to the next drawing on its own', () => {
 })
 
 test('setting a drawing aside keeps the work already done on it', () => {
-  let s: GameState = { ...newGame(), specs: { torch: 0, vault: 0 }, researching: 'torch' }
+  let s: GameState = { ...fresh(), specs: { torch: 0, vault: 0 }, researching: 'torch' }
   s = build(s, 'library', 2)
   s = staff(s, 'library')
   s = run(s, 60)
@@ -126,12 +132,12 @@ test('setting a drawing aside keeps the work already done on it', () => {
 })
 
 test('the lab will not take up a drawing nobody has found', () => {
-  const s = newGame()
+  const s = fresh()
   assert.equal(reducer(s, { type: 'research', spec: 'torch' }), s)
 })
 
 test('kit has to be worked out before the shop will run it', () => {
-  let s: GameState = { ...newGame(), specs: {}, credits: 80000 }
+  let s: GameState = { ...fresh(), specs: {}, credits: 80000 }
   s = build(s, 'fabricator', 2)
   s = staff(s, 'fabricator')
   assert.deepEqual(fabricable(s), [])
@@ -142,7 +148,7 @@ test('kit has to be worked out before the shop will run it', () => {
 })
 
 test('a fabrication run costs up front and lands one item in the hold', () => {
-  let s: GameState = { ...newGame(), specs: { torch: 1 }, credits: 80000 }
+  let s: GameState = { ...fresh(), specs: { torch: 1 }, credits: 80000 }
   s = build(s, 'fabricator', 2)
   s = staff(s, 'fabricator')
 
@@ -161,7 +167,7 @@ test('a fabrication run costs up front and lands one item in the hold', () => {
 })
 
 test('cancelling a run gives the materials back', () => {
-  let s: GameState = { ...newGame(), specs: { torch: 1 }, credits: 80000 }
+  let s: GameState = { ...fresh(), specs: { torch: 1 }, credits: 80000 }
   s = build(s, 'fabricator', 2)
   s = staff(s, 'fabricator')
   const cost = specDef('torch').build!.credits
@@ -176,7 +182,7 @@ test('cancelling a run gives the materials back', () => {
 })
 
 test('a shop with nobody in it makes nothing', () => {
-  let s: GameState = { ...newGame(), specs: { torch: 1 }, credits: 80000 }
+  let s: GameState = { ...fresh(), specs: { torch: 1 }, credits: 80000 }
   s = build(s, 'fabricator', 2)
   s = reducer(s, { type: 'fabricate', item: 'torch' })
   s = advance(s, 2000)

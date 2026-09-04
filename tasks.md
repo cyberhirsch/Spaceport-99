@@ -85,6 +85,18 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
   changed. Verbatim move; 172 tests unchanged. The imports the split generated
   are wrapped at 100 columns like the rest of the codebase.
 
+- **Seeded the luck.** Every roll in the game came from `Math.random()` — 72
+  calls, most of them inside the reducer. They now come from `roll(state)`,
+  which advances a seed the state carries and saves. Three things follow: the
+  reducer answers the same way twice for the same input, so React's development
+  double-invocation can no longer render one roll and persist another;
+  reloading a save replays what was about to happen instead of rerolling it, so
+  a death stands; and the tests pin a seed instead of averaging over sixty
+  draws, so the suite gives the same answer every run. Pure generators
+  (`makeCrew`, `makeVisitor`, `makeMission`, …) take an `Rng`; anything holding
+  a `GameState` rolls from it. `SAVE_VERSION` went to 8 — see the note on
+  task 6 below.
+
 ---
 
 ## Opus
@@ -204,50 +216,33 @@ number was wrong, where the interface made you guess.
 list of at least five things that dragged, each with a proposed fix. The fixes
 are separate tasks; this one is the list.
 
-### 6. A seeded random number source
-
-**Why.** `Math.random()` is called from inside the reducer in dozens of places.
-That is why tests had to be rewritten to average over sixty draws, why the
-"they moved" assertion flaked, and why React StrictMode's double-invocation can
-render a line from one roll and persist a different one. It is also why a
-player could reload to reroll a death, which is now decided against: rolls come
-from the state, so a reload gives the same answer.
-
-**Where.** A PRNG state on `GameState` and a `roll(s)` helper in
-`src/game/core.ts` that advances it; replace every `Math.random()` under
-`src/game/` (about 80 sites). The seed is generated in `newGame()` and never
-shown. Saves carry it, so loading resumes the same sequence. The averaging
-tests in `src/game/__tests__/` can then assert against a fixed seed.
-
-**Done when.** `grep -r "Math.random" src/game` finds nothing outside the seed
-initialiser, two `newGame()` calls with the same seed produce identical
-stations after identical actions, saving and reloading before a contract
-resolves gives the same outcome both times, and the averaging tests are
-replaced with seeded ones.
-
 ---
 
 ## Sonnet
 
-### 7. Save migrations instead of save wipes
+### 6. Save migrations instead of save wipes
 
 **Why.** `SAVE_VERSION` is 7 and has been bumped every session. Each bump makes
 every existing save unloadable. Fine while nobody is playing; the day someone
 is, it is the worst thing the game does.
 
-**Where.** `src/game/save.ts` loads and refuses on a version mismatch. Add a
-`migrate(raw): GameState | null` that walks a list of `{ from, up }` steps and
-refuses only when there is no path. The chain starts at 7 — versions 5 and 6
-are not back-ported — so the first real step is the one the next feature adds.
-Write the machinery and one step's worth of test scaffolding now so the next
-bump is a five-line change rather than another wipe.
+**Mostly done already.** The seeded-luck change needed a version bump, so
+`migrate(raw)` now lives in `src/game/save.ts`: a list of `{ from, up }` steps
+walked in order, refusing only a save with no path (too old, or from a build
+newer than this one). The 7 → 8 step is written and tested, and the chain does
+not back-port 5 or 6.
 
-**Done when.** A version-7 save loads on a build with a higher `SAVE_VERSION`,
-a test in `src/game/__tests__/save.test.ts` round-trips a fixture through a
-synthetic migration step, and the README's Saving section stops saying old
-saves are lost.
+**What is left.** Every bump from here adds a step — that is the whole
+discipline, and it is worth a line in `CLAUDE.md` (task 11) so it is not
+forgotten. The remaining gap is coverage: `migrate` is tested through
+`luck.test.ts`, not through `loadGame`/`readSlot`, which are the functions that
+actually touch `localStorage`.
 
-### 8. Split the tick
+**Done when.** There is a `src/game/__tests__/save.test.ts` that round-trips a
+fixture through `loadGame` with a stubbed `localStorage`, and the next feature
+to change the save shape adds its step rather than bumping and wiping.
+
+### 7. Split the tick
 
 **Why.** `src/game/tick.ts` is 516 lines and `step()` is most of it: the power
 grid, production, life support, the med bay, the engineering bay, the lab, the
@@ -262,7 +257,7 @@ already commented as a section. They should be functions.
 **Done when.** `step()` is under 40 lines, every section is a named function
 with its doc comment, and the tests are untouched and green.
 
-### 9. Something other than bunks moves the roster
+### 8. Something other than bunks moves the roster
 
 **Why.** Reaching 60 crew is a matter of building Crew Quarters and waiting.
 The Comms Array, the Docking Port, standing with your patron and the station's
@@ -288,7 +283,7 @@ roll), `src/game/reducer.ts` (`requestCrew`), `src/game/core.ts`
 supposed to — count, faction mix, mean stat, unasked arrivals — and quarters
 remain the ceiling rather than the only lever.
 
-### 10. Break up the two long modals
+### 9. Break up the two long modals
 
 **Why.** `src/components/VisitorModal.tsx` is resource trade, the bonded cage,
 kit, the boarding party, the auto-accept toggle and a talk button.
@@ -303,7 +298,7 @@ adds a file, not a branch.
 **Done when.** Neither modal file is over 200 lines, and adding a room-specific
 panel touches one new file plus one line in the lookup.
 
-### 11. Luck does something
+### 10. Luck does something
 
 **Why.** Three rooms run on Luck — the Comms Array, the Trading Hub and the
 Reclamation Bay — and two are at the far end of the curve. Every other stat has
@@ -321,7 +316,7 @@ suffers incidents measurably less, and a seeded test says so.
 
 ## Haiku
 
-### 12. A `CLAUDE.md`
+### 11. A `CLAUDE.md`
 
 **Why.** There is none. Every session re-learns the reducer discipline, the
 `.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
@@ -336,7 +331,7 @@ extension.
 **Done when.** The file exists and a new session can find the layer order and
 the test commands without reading `engine.ts`.
 
-### 13. Re-deal portraits on load
+### 12. Re-deal portraits on load
 
 **Why.** A save from before portraits were dealt has crew with no `portrait`
 field, so they draw from the seed and can share a face.
@@ -347,7 +342,7 @@ field, so they draw from the seed and can share a face.
 **Done when.** Loading such a save gives every crew member a distinct portrait
 where the pool allows, and a test loads a fixture without portraits and checks.
 
-### 14. Tests for the parts of the split that changed visibility
+### 13. Tests for the parts of the split that changed visibility
 
 **Why.** The refactor exported about two dozen previously private helpers
 (`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
@@ -362,7 +357,7 @@ use it as the pattern.
 **Done when.** Each newly exported helper with a branch in it has at least one
 test that exercises the branch.
 
-### 15. PWA manifest and service worker
+### 14. PWA manifest and service worker
 
 **Why.** The web build is not installable and does not run offline, though
 nothing in it needs a network. An idle station you check on through the day
@@ -376,7 +371,7 @@ app icon can come from an existing asset until there is a proper one.
 **Done when.** The deployed page passes the browser's install check and loads
 with the network off after one visit.
 
-### 16. Rename the branch to `main`
+### 15. Rename the branch to `main`
 
 **Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
 and the deployment is tied to it.
@@ -394,7 +389,7 @@ is gone.
 Both of these are specified and neither ships with placeholder art. They move
 into the tiers the day the renders arrive.
 
-### 17. New kit for the Research Lab
+### 16. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -412,7 +407,7 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 18. Art for the rooms and the ships
+### 17. Art for the rooms and the ships
 
 **Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.

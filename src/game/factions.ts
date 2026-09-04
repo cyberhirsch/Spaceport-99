@@ -1,4 +1,4 @@
-import type { FactionId, VisitorKind } from './types.ts'
+import type { FactionId, Rng, VisitorKind } from './types.ts'
 
 /**
  * The powers whose space the station's traffic comes from and goes back to,
@@ -119,10 +119,10 @@ const OWNERS: Record<VisitorKind, [FactionId, number][]> = {
   raider: [['unlisted', 100]],
 }
 
-export const rollOwner = (kind: VisitorKind): FactionId => {
+export const rollOwner = (rng: Rng, kind: VisitorKind): FactionId => {
   const table = OWNERS[kind]
   const total = table.reduce((n, [, w]) => n + w, 0)
-  let roll = Math.random() * total
+  let roll = rng() * total
   for (const [id, weight] of table) {
     roll -= weight
     if (roll <= 0) return id

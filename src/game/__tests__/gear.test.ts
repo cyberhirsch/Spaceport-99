@@ -2,18 +2,28 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   BASE_HOLD,
-  WING,
   crewGuard,
   defence,
   derive,
   heldItems,
   newGame,
   reducer,
+  seeded,
+  WING,
 } from '../engine.ts'
 import { effectiveness } from '../crew.ts'
 import { ITEM_DEFS, itemDef, stock } from '../gear.ts'
 import { makeVisitor } from '../visitors.ts'
 import type { FactionId, GameState, ModuleKind, Visitor } from '../types.ts'
+
+// Every station in this file is founded from a known seed, so a run that passes
+// today passes tomorrow. Each call moves the seed on, so a loop that founds
+// forty stations still sees forty different ones.
+let founded = 0
+const fresh = () => newGame('Spaceport-99', 1400 + (founded += 1))
+
+// One seed per file, so every draw below is the same draw every run.
+const rng = seeded(33)
 
 const rich = (s: GameState): GameState => ({ ...s, credits: 50000 })
 const build = (s: GameState, kind: ModuleKind, col: number, deck = 0) =>
@@ -22,7 +32,7 @@ const build = (s: GameState, kind: ModuleKind, col: number, deck = 0) =>
 /** Berths a hull flying a given power's paper, so its hold can be shopped. */
 const berthed = (s: GameState, faction: FactionId): [GameState, Visitor] => {
   const v: Visitor = {
-    ...makeVisitor(),
+    ...makeVisitor(rng),
     kind: 'trader',
     claim: 'trader',
     faction,
@@ -34,7 +44,7 @@ const berthed = (s: GameState, faction: FactionId): [GameState, Visitor] => {
 }
 
 test('a fresh station carries nothing and nobody is issued anything', () => {
-  const s = newGame()
+  const s = fresh()
   assert.deepEqual(s.stores, {})
   assert.ok(s.crew.every((c) => Object.keys(c.gear).length === 0))
   assert.equal(defence(s).smallArms, 0)
@@ -54,7 +64,7 @@ test('who sells what is a matter of whose paper they fly', () => {
 })
 
 test('kit is bought off a berthed hull and goes into the hold', () => {
-  const [ready, v] = berthed(rich(newGame()), 'concern')
+  const [ready, v] = berthed(rich(fresh()), 'concern')
   const price = stock('concern').find((x) => x.id === 'sidearm')!.price
 
   const early = reducer(
@@ -73,7 +83,7 @@ test('kit is bought off a berthed hull and goes into the hold', () => {
 })
 
 test('issuing kit takes it out of the hold and puts it on somebody', () => {
-  let s = reducer(berthed(rich(newGame()), 'concern')[0], {
+  let s = reducer(berthed(rich(fresh()), 'concern')[0], {
     type: 'buyGear',
     visitorId: '',
     item: 'sidearm',
@@ -100,7 +110,7 @@ test('issuing kit takes it out of the hold and puts it on somebody', () => {
 })
 
 test('two slots, and armour does not go where a sidearm goes', () => {
-  let s: GameState = { ...newGame(), stores: { plate: 1, sidearm: 1 } }
+  let s: GameState = { ...fresh(), stores: { plate: 1, sidearm: 1 } }
   const hand = s.crew[0]
   s = reducer(s, { type: 'issueGear', crewId: hand.id, item: 'plate' })
   s = reducer(s, { type: 'issueGear', crewId: hand.id, item: 'sidearm' })
@@ -115,7 +125,7 @@ test('two slots, and armour does not go where a sidearm goes', () => {
 })
 
 test('a battery and a shield are worth nothing unstaffed or switched off', () => {
-  let s = build(newGame(), 'battery', WING - 3)
+  let s = build(fresh(), 'battery', WING - 3)
   const bay = s.modules.find((m) => m.kind === 'battery')!
   assert.equal(defence(s).guns, 0, 'nobody is sitting at it')
 
@@ -128,7 +138,7 @@ test('a battery and a shield are worth nothing unstaffed or switched off', () =>
 })
 
 test('a shield holds without anyone in it, badly', () => {
-  let s = build({ ...newGame(), specs: { shield: 1 } }, 'shield', WING - 3)
+  let s = build({ ...fresh(), specs: { shield: 1 } }, 'shield', WING - 3)
   const idle = defence(s).shield
   assert.ok(idle > 0, 'the field is up')
 
@@ -138,7 +148,7 @@ test('a shield holds without anyone in it, badly', () => {
 })
 
 test('a hull in its berth is a gun platform; one out on a contract is not', () => {
-  let s = build(newGame(), 'hangar', WING - 3)
+  let s = build(fresh(), 'hangar', WING - 3)
   const armed = { ...s.ships[0], cls: 'cutter' as const }
   s = { ...s, ships: [armed] }
   const home = defence(s).guns
@@ -149,7 +159,7 @@ test('a hull in its berth is a gun platform; one out on a contract is not', () =
 })
 
 test('small arms tell against boarders and nothing else', () => {
-  const s: GameState = { ...newGame(), stores: { plate: 1 } }
+  const s: GameState = { ...fresh(), stores: { plate: 1 } }
   const armed = reducer(s, { type: 'issueGear', crewId: s.crew[0].id, item: 'plate' })
   assert.equal(defence(armed).smallArms, ITEM_DEFS.plate.guard)
 
@@ -173,7 +183,7 @@ test('small arms tell against boarders and nothing else', () => {
 })
 
 test('a dead crew member leaves their kit behind', () => {
-  let s: GameState = { ...newGame(), stores: { sidearm: 1 } }
+  let s: GameState = { ...fresh(), stores: { sidearm: 1 } }
   const hand = s.crew[0]
   s = reducer(s, { type: 'issueGear', crewId: hand.id, item: 'sidearm' })
   assert.equal(s.stores.sidearm, 0)
@@ -194,7 +204,7 @@ test('a dead crew member leaves their kit behind', () => {
 // ----------------------------------------------------- capacity and the hold --
 
 test('a room that makes something also banks it', () => {
-  const s = newGame()
+  const s = fresh()
   const base = derive(s).caps
   const more = derive(build(s, 'reactor', WING - 3)).caps
   assert.ok(more.power > base.power, 'a second reactor buys capacitor space')
@@ -207,8 +217,8 @@ test('a room that makes something also banks it', () => {
 })
 
 test('a merged run of reactors banks more than two apart', () => {
-  const apart = build(build(newGame(), 'reactor', WING - 3), 'reactor', WING + 2)
-  const welded = build(build(newGame(), 'reactor', WING - 3), 'reactor', WING - 4)
+  const apart = build(build(fresh(), 'reactor', WING - 3), 'reactor', WING + 2)
+  const welded = build(build(fresh(), 'reactor', WING - 3), 'reactor', WING - 4)
   assert.ok(
     derive(welded).caps.power > derive(apart).caps.power,
     'the run shares its tankage',
@@ -216,7 +226,7 @@ test('a merged run of reactors banks more than two apart', () => {
 })
 
 test('the Cargo Hold racks kit, and nothing else', () => {
-  const s = newGame()
+  const s = fresh()
   const base = derive(s)
   assert.equal(base.holdCap, BASE_HOLD, 'a station starts with a little racking')
 
@@ -226,7 +236,7 @@ test('the Cargo Hold racks kit, and nothing else', () => {
 })
 
 test('kit cannot be bought with nowhere to rack it', () => {
-  const [ready, v] = berthed(rich(newGame()), 'concern')
+  const [ready, v] = berthed(rich(fresh()), 'concern')
   // Fill the racking to the brim.
   const packed: GameState = {
     ...ready,
@@ -241,7 +251,7 @@ test('kit cannot be bought with nowhere to rack it', () => {
 })
 
 test('a Cargo Hold makes room for the kit that would not fit', () => {
-  const [ready, v] = berthed(rich(newGame()), 'concern')
+  const [ready, v] = berthed(rich(fresh()), 'concern')
   const packed: GameState = { ...ready, stores: { sidearm: derive(ready).holdCap } }
   const roomy = build(packed, 'storage', WING - 3)
   const bought = reducer(roomy, { type: 'buyGear', visitorId: v.id, item: 'plate' })
@@ -249,7 +259,7 @@ test('a Cargo Hold makes room for the kit that would not fit', () => {
 })
 
 test('issuing kit does not take racking, so a full hold can still be emptied', () => {
-  const s = newGame()
+  const s = fresh()
   const packed: GameState = { ...s, stores: { plate: derive(s).holdCap } }
   const who = packed.crew[0]
   const issued = reducer(packed, { type: 'issueGear', crewId: who.id, item: 'plate' })

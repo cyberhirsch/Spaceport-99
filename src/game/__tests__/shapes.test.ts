@@ -1,9 +1,27 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { WING, advance, availableCrew, inContact, missionCapacity, newGame, reducer } from '../engine.ts'
+import {
+  advance,
+  availableCrew,
+  inContact,
+  missionCapacity,
+  newGame,
+  reducer,
+  seeded,
+  WING,
+} from '../engine.ts'
 import { makeMission } from '../fleet.ts'
 import { rollCall, unattended } from '../calls.ts'
 import type { GameState, Mission, MissionShape, ModuleKind } from '../types.ts'
+
+// Every station in this file is founded from a known seed, so a run that passes
+// today passes tomorrow. Each call moves the seed on, so a loop that founds
+// forty stations still sees forty different ones.
+let founded = 0
+const fresh = () => newGame('Spaceport-99', 2000 + (founded += 1))
+
+// One seed per file, so every draw below is the same draw every run.
+const rng = seeded(77)
 
 const rich = (s: GameState): GameState => ({ ...s, credits: 50000 })
 const build = (s: GameState, kind: ModuleKind, col: number, deck = 0) =>
@@ -11,7 +29,7 @@ const build = (s: GameState, kind: ModuleKind, col: number, deck = 0) =>
 
 /** A station with a hull, a command module and controllers sitting in it. */
 const ready = (controllers = 1): GameState => {
-  let s = build(newGame(), 'hangar', WING + 2)
+  let s = build(fresh(), 'hangar', WING + 2)
   s = build(s, 'command', WING + 3)
   const room = s.modules.find((m) => m.kind === 'command')!
   for (let i = 0; i < controllers; i += 1) {
@@ -25,7 +43,7 @@ const offer = (
   over: Partial<Mission> = {},
   shape: MissionShape = 'contract',
 ): [GameState, Mission] => {
-  const m: Mission = { ...makeMission(0.4, { shape }), ...over }
+  const m: Mission = { ...makeMission(rng, 0.4, { shape }), ...over }
   return [{ ...s, missions: [...s.missions, m] }, m]
 }
 
@@ -135,9 +153,9 @@ test('an open job cannot be recalled through a channel nobody is holding', () =>
 })
 
 test('an unattended team never takes the greedy answer', () => {
-  const m = makeMission(0.5, { shape: 'unfolding' })
+  const m = makeMission(rng, 0.5, { shape: 'unfolding' })
   for (let i = 0; i < 60; i += 1) {
-    const call = rollCall(m)
+    const call = rollCall(rng, m)
     if (!call) continue
     const pick = call.options[unattended(call)]
     const worst = Math.min(...call.options.map((o) => o.odds ?? 0))

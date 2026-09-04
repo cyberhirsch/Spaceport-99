@@ -28,14 +28,16 @@ import type {
   ResourceKey,
 } from './types.ts'
 import {
-  MAX_CATCHUP_SECONDS,
   log,
+  MAX_CATCHUP_SECONDS,
   namesInPlay,
+  REQUEST_COOLDOWN,
+  REQUEST_COST,
   resupplyAmount,
   resupplyCost,
-  REQUEST_COST,
-  REQUEST_COOLDOWN,
   REVIVE_COST_PER_LEVEL,
+  roll,
+  roller,
 } from './core.ts'
 import { unassign, assign, autoAssignInto, allocatePortrait } from './staffing.ts'
 import {
@@ -163,7 +165,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       const final = mergeNeighbours(s, placed)
       log(s, `${def(final.kind).name} online — deck ${action.deck + 1}.`, 'good')
       if (firstHangar) {
-        const shuttle = makeShip('shuttle', undefined, namesInPlay(s))
+        const shuttle = makeShip(roller(s), 'shuttle', undefined, namesInPlay(s))
         s.ships.push(shuttle)
         log(s, `HQ issued a shuttle with the bay — the ${shuttle.name}.`, 'good')
       }
@@ -235,11 +237,11 @@ export const reducer = (state: GameState, action: Action): GameState => {
       const md = def(m.kind)
       if (!md.cycleSeconds || m.staff.length === 0) return state
       if (s.incidents.some((i) => i.moduleId === m.id)) return state
-      if (Math.random() < m.rushRisk) {
+      if (roll(s) < m.rushRisk) {
         m.rushRisk = 0.15
         m.progress = 0
-        const roll = Math.random()
-        startIncident(s, roll < 0.55 ? 'fire' : roll < 0.85 ? 'breach' : 'vermin', m)
+        const r = roll(s)
+        startIncident(s, r < 0.55 ? 'fire' : r < 0.85 ? 'breach' : 'vermin', m)
       } else {
         m.rushRisk = Math.min(0.75, m.rushRisk + 0.13)
         m.progress = 0
@@ -341,7 +343,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       if (s.credits < price) return state
       if (s.ships.length >= fleetCapacity(s)) return state
       s.credits -= price
-      const bought = makeShip(action.cls, undefined, namesInPlay(s))
+      const bought = makeShip(roller(s), action.cls, undefined, namesInPlay(s))
       s.ships.push(bought)
       log(s, `HQ delivered the ${bought.name}, a ${shipDef(action.cls).name.toLowerCase()}.`, 'good')
       break
@@ -508,7 +510,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       if (!action.yes) break
 
       if (offer.kind === 'mission') {
-        s.missions.push(makeMission(appeal(s), { far: rollFar(s) }))
+        s.missions.push(makeMission(roller(s), appeal(s), { far: rollFar(s) }))
         log(s, `${g.name} handed over a contract off ${v.name}.`, 'good')
         break
       }
@@ -525,7 +527,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
             log(s, `${g.name}'s passenger had nowhere to sleep and stayed aboard.`, 'warn')
             break
           }
-          const joiner = makeCrew({ portrait: allocatePortrait(s) })
+          const joiner = makeCrew(roller(s), { portrait: allocatePortrait(s) })
           s.crew.push(joiner)
           log(s, `${joiner.name} came off ${v.name} and stayed.`, 'good')
           break
@@ -536,7 +538,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
             break
           }
           s.credits -= effect.price
-          const hull = makeShip(effect.cls, undefined, namesInPlay(s))
+          const hull = makeShip(roller(s), effect.cls, undefined, namesInPlay(s))
           hull.hull = Math.round(hull.maxHull * 0.7)
           s.ships.push(hull)
           log(s, `Bought the ${hull.name} off ${v.name}, no questions asked.`, 'good')
@@ -555,7 +557,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
             break
           }
           s.credits -= price
-          const lead = makeMission(Math.min(1, appeal(s) + 0.3))
+          const lead = makeMission(roller(s), Math.min(1, appeal(s) + 0.3))
           lead.payout.credits = Math.round(lead.payout.credits * 1.6)
           s.missions.push(lead)
           log(s, `Bought a lead off ${v.name}. It had better be good.`, 'info')

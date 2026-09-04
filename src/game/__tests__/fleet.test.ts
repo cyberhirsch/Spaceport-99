@@ -1,21 +1,31 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  WING,
   advance,
   availableCrew,
   berthedShips,
+  derive,
   fleetCapacity,
   missionBerths,
   missionCapacity,
-  derive,
   newGame,
   reducer,
+  seeded,
+  WING,
   workRate,
 } from '../engine.ts'
 import { powerDraw } from '../modules.ts'
 import { makeMission, shipHull, teamSize } from '../fleet.ts'
 import type { GameState, Mission, ModuleKind } from '../types.ts'
+
+// Every station in this file is founded from a known seed, so a run that passes
+// today passes tomorrow. Each call moves the seed on, so a loop that founds
+// forty stations still sees forty different ones.
+let founded = 0
+const fresh = () => newGame('Spaceport-99', 1300 + (founded += 1))
+
+// One seed per file, so every draw below is the same draw every run.
+const rng = seeded(22)
 
 const rich = (s: GameState): GameState => ({ ...s, credits: 50000 })
 const build = (s: GameState, kind: ModuleKind, col: number, deck = 0) =>
@@ -23,7 +33,7 @@ const build = (s: GameState, kind: ModuleKind, col: number, deck = 0) =>
 
 /** A station with somewhere to keep a ship and someone to take contracts. */
 const flightReady = (): GameState => {
-  let s = build(newGame(), 'hangar', WING + 2)
+  let s = build(fresh(), 'hangar', WING + 2)
   s = build(s, 'command', WING + 3)
   const command = s.modules.find((m) => m.kind === 'command')!
   s = reducer(s, { type: 'assign', crewId: s.crew[0].id, moduleId: command.id })
@@ -34,19 +44,19 @@ const flightReady = (): GameState => {
 // These tests are about the fixed-clock job. Shapes with their own rules get
 // their own tests below.
 const withOffer = (s: GameState, over: Partial<Mission> = {}): [GameState, Mission] => {
-  const m = { ...makeMission(0.4, { shape: 'contract' }), ...over }
+  const m = { ...makeMission(rng, 0.4, { shape: 'contract' }), ...over }
   return [{ ...s, missions: [...s.missions, m] }, m]
 }
 
 test('nothing flies before there is a hangar', () => {
-  const bare = newGame()
+  const bare = fresh()
   assert.equal(fleetCapacity(bare), 0)
   assert.equal(missionCapacity(bare), 0)
   assert.equal(bare.ships.length, 0, 'and no ship to fly')
 })
 
 test('the first hangar bay comes with a shuttle, the second does not', () => {
-  const one = build(newGame(), 'hangar', WING + 2)
+  const one = build(fresh(), 'hangar', WING + 2)
   assert.equal(one.ships.length, 1, 'HQ issues a hull with the first bay')
   assert.equal(one.ships[0].cls, 'shuttle')
   assert.equal(fleetCapacity(one), 1, 'one ship per bay')
@@ -182,7 +192,7 @@ test('contracts expire if nobody takes them', () => {
 })
 
 test('a room on standby costs a tenth of the power and produces nothing', () => {
-  const s = newGame()
+  const s = fresh()
   const farm = s.modules.find((m) => m.kind === 'hydroponics')!
   const crewById = new Map(s.crew.map((c) => [c.id, c]))
   const runningDraw = powerDraw(farm)
@@ -207,7 +217,7 @@ test('a room on standby costs a tenth of the power and produces nothing', () => 
 })
 
 test('auto-assign leaves powered-down rooms dark', () => {
-  let s = newGame()
+  let s = fresh()
   const farm = s.modules.find((m) => m.kind === 'hydroponics')!
   s = reducer(s, { type: 'setStandby', moduleId: farm.id, standby: true })
   s = reducer(s, { type: 'autoAssign' })
@@ -219,7 +229,7 @@ test('auto-assign leaves powered-down rooms dark', () => {
 })
 
 test('powering down a room actually relieves the grid', () => {
-  const s = newGame()
+  const s = fresh()
   const before = derive(s).powerRate
   const farm = s.modules.find((m) => m.kind === 'hydroponics')!
   const after = derive(reducer(s, { type: 'setStandby', moduleId: farm.id, standby: true })).powerRate
@@ -280,7 +290,7 @@ test('an away team comes back assignable', () => {
 })
 
 test('a command module is worth what is sitting in it', () => {
-  let s = rich(newGame())
+  let s = rich(fresh())
   s = reducer(s, { type: 'build', kind: 'command', deck: 0, col: WING - 3 })
   const room = s.modules.find((m) => m.kind === 'command')!
   assert.ok(missionBerths(s) > 0, 'the berths exist')

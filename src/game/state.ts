@@ -11,13 +11,16 @@ import { effectiveness, makeCrew, rollStats, uid } from './crew.ts'
 import { blankStanding } from './factions.ts'
 import type { Crew, GameState, ModuleKind, ResourceKey, StatKey, StationModule } from './types.ts'
 import {
-  SAVE_VERSION,
-  BASE_CREW_CAP,
-  BASE_STORAGE,
-  BASE_HOLD,
   AIR_PER_CREW,
+  BASE_CREW_CAP,
+  BASE_HOLD,
+  BASE_STORAGE,
   FOOD_PER_CREW,
   log,
+  newSeed,
+  roll,
+  roller,
+  SAVE_VERSION,
 } from './core.ts'
 import { workRate, assign, autoAssignInto, allocatePortrait } from './staffing.ts'
 import { dockingFees, rateOf, recycled, heldItems } from './rooms.ts'
@@ -111,9 +114,14 @@ export const makeModule = (kind: ModuleKind, deck: number, col: number): Station
   standby: false,
 })
 
-export const newGame = (name = 'Spaceport-99'): GameState => {
+/**
+ * A station nobody has founded yet. `seed` is the one unrepeatable roll in the
+ * game — pass one to found the same station twice.
+ */
+export const newGame = (name = 'Spaceport-99', seed = newSeed()): GameState => {
   const state: GameState = {
     version: SAVE_VERSION,
+    rng: seed,
     name,
     credits: 500,
     resources: { power: 140, air: 140, food: 140 },
@@ -149,17 +157,25 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     talk: null,
     prisoners: [],
     bonded: [],
-    nextTakeoverIn: 20 * 60 + Math.random() * 20 * 60,
+    nextTakeoverIn: 0,
     seenIntro: false,
     gameOver: false,
   }
+  // Nothing has been rolled yet, so this is the station's first draw: how long
+  // it gets before anybody comes for it.
+  state.nextTakeoverIn = 20 * 60 + roll(state) * 20 * 60
   // The founders are hand-picked: one specialist per critical system, a port
   // officer, and two generalists, so a new station is never dead on arrival
   // through bad luck. Six, not five, because the station has seven posts and
   // life support cannot be robbed to man the desk.
   const founders: (StatKey | undefined)[] = ['T', 'O', 'B', 'A', undefined, undefined]
   for (const focus of founders) {
-    state.crew.push(makeCrew({ stats: rollStats(6, focus), portrait: allocatePortrait(state) }))
+    state.crew.push(
+      makeCrew(roller(state), {
+        stats: rollStats(roller(state), 6, focus),
+        portrait: allocatePortrait(state),
+      }),
+    )
   }
   // Put the founding crew straight to work so the station is not dead on
   // arrival, then make sure somebody is on the docking desk: the founders

@@ -2,7 +2,7 @@ import { def, wingOf } from './modules.ts'
 import { uid } from './crew.ts'
 import { incidentDef } from './incidents.ts'
 import type { GameState, IncidentKind, StationModule } from './types.ts'
-import { log } from './core.ts'
+import { log, pickOne, roll, roller } from './core.ts'
 
 // Fires, breaches, vermin and boarders: how they start and where they spread.
 
@@ -47,11 +47,11 @@ export const rollIncident = (s: GameState): void => {
   )
   if (candidates.length === 0) return
   // A tidier station is a safer one; damaged, unstaffed rooms invite trouble.
-  const target = candidates[Math.floor(Math.random() * candidates.length)]
+  const target = pickOne(roller(s), candidates)
   const risk = 0.22 + (1 - target.condition) * 0.4 + (target.staff.length === 0 ? 0.1 : 0)
-  if (Math.random() > risk) return
-  const roll = Math.random()
+  if (roll(s) > risk) return
+  const r = roll(s)
   const kind: IncidentKind =
-    roll < 0.34 ? 'fire' : roll < 0.6 ? 'vermin' : roll < 0.85 ? 'breach' : 'pirates'
+    r < 0.34 ? 'fire' : r < 0.6 ? 'vermin' : r < 0.85 ? 'breach' : 'pirates'
   startIncident(s, kind, target)
 }

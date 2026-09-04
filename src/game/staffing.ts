@@ -2,7 +2,7 @@ import { def, mergeBonus, staffSlots } from './modules.ts'
 import { PORTRAIT_COUNT, crewPortrait, effectiveness, grantXp } from './crew.ts'
 import { SLOTS, itemDef } from './gear.ts'
 import type { Crew, GameState, StatKey, StationModule } from './types.ts'
-import { log } from './core.ts'
+import { log, pickOne, roller } from './core.ts'
 
 // Who is standing in which room, who is free, and how well they work.
 
@@ -181,5 +181,5 @@ export const allocatePortrait = (s: GameState, alsoWorn: number[] = []): number 
   for (const n of alsoWorn) tally(n)
   const fewest = Math.min(...worn.values())
   const spare = [...worn.entries()].filter(([, n]) => n === fewest).map(([i]) => i)
-  return spare[Math.floor(Math.random() * spare.length)]
+  return pickOne(roller(s), spare)
 }

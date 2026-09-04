@@ -1,4 +1,4 @@
-import type { Mission, MissionCall } from './types.ts'
+import type { Mission, MissionCall, Rng } from './types.ts'
 
 /**
  * The hails an away team sends when something happens that is not covered by
@@ -163,10 +163,10 @@ const CALLS: Record<Mission['kind'], MissionCall[]> = {
 }
 
 /** A hail for this job, or null if its kind has nothing to say. */
-export const rollCall = (m: Mission): MissionCall | null => {
+export const rollCall = (rng: Rng, m: Mission): MissionCall | null => {
   const pool = CALLS[m.kind]
   if (!pool || pool.length === 0) return null
-  return pool[Math.floor(Math.random() * pool.length)]
+  return pool[Math.floor(rng() * pool.length)]
 }
 
 /**

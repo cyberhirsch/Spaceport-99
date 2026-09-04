@@ -4,7 +4,7 @@ import { PATRONS, factionDef } from './factions.ts'
 import { makeMission } from './fleet.ts'
 import { makeGuests, makeVisitor } from './visitors.ts'
 import type { FactionId, Prisoner, GameState, Guest, Visitor } from './types.ts'
-import { log, clamp, namesInPlay } from './core.ts'
+import { clamp, log, namesInPlay, roll, roller } from './core.ts'
 import { allocatePortrait } from './staffing.ts'
 import { defence, cellsAboard } from './rooms.ts'
 import { derive } from './state.ts'
@@ -28,14 +28,14 @@ export const arrest = (s: GameState, v: Visitor, charge: string): boolean => {
   }
   // Whoever came down the gangway first is who your people get hold of.
   const taken = v.aboard[0]
-  const seed = taken?.seed ?? Math.floor(Math.random() * 1e9)
+  const seed = taken?.seed ?? Math.floor(roll(s) * 1e9)
   s.prisoners.push({
     id: uid('p'),
-    name: taken?.name ?? randomName(),
+    name: taken?.name ?? randomName(roller(s)),
     faction: v.faction,
     charge,
     hull: v.name,
-    stats: taken?.stats ?? rollStats(6),
+    stats: taken?.stats ?? rollStats(roller(s), 6),
     seed,
     portrait: taken?.portrait ?? allocatePortrait(s),
     held: 0,
@@ -52,14 +52,14 @@ export const prisonerById = (s: GameState, id: string): Prisoner | null =>
 export const admitVisitor = (s: GameState, v: Visitor): void => {
   const caps = derive(s).caps
   v.status = 'docked'
-  v.timer = 45 + Math.random() * 60
+  v.timer = 45 + roll(s) * 60
   // The hull stays at the clamps; the people walk onto your decks. Whatever
   // the ship was carrying to raise with you, one of them now raises it. A
   // smuggler's crew still come ashore — being dodgy is not being hostile — but
   // a raider sends no one friendly. It sends a fight.
   if (v.kind !== 'raider') {
     const dealt: number[] = []
-    v.aboard = makeGuests(v, () => {
+    v.aboard = makeGuests(roller(s), v, () => {
       const face = allocatePortrait(s, dealt)
       dealt.push(face)
       return face
@@ -70,20 +70,20 @@ export const admitVisitor = (s: GameState, v: Visitor): void => {
 
   switch (v.kind) {
     case 'trader': {
-      const paid = Math.round(60 + Math.random() * 140)
+      const paid = Math.round(60 + roll(s) * 140)
       s.credits += paid
       for (const key of ['power', 'air', 'food'] as const) {
-        s.resources[key] = clamp(s.resources[key] + Math.round(20 + Math.random() * 50), 0, caps[key])
+        s.resources[key] = clamp(s.resources[key] + Math.round(20 + roll(s) * 50), 0, caps[key])
       }
       log(s, `${v.name} berthed and sold off a hold. +${paid}c and cargo.`, 'good')
       break
     }
     case 'courier': {
-      const paid = Math.round(90 + Math.random() * 120)
+      const paid = Math.round(90 + roll(s) * 120)
       s.credits += paid
       // Couriers carry paper, which sometimes means work.
       if (s.missions.filter((m) => m.status === 'offered').length < 3) {
-        s.missions.push(makeMission(appeal(s), { far: rollFar(s) }))
+        s.missions.push(makeMission(roller(s), appeal(s), { far: rollFar(s) }))
         log(s, `${v.name} dropped a contract and a bill. +${paid}c.`, 'good')
       } else {
         log(s, `${v.name} dropped the mail. +${paid}c.`, 'good')
@@ -91,7 +91,7 @@ export const admitVisitor = (s: GameState, v: Visitor): void => {
       break
     }
     case 'patrol': {
-      const paid = Math.round(50 + Math.random() * 90)
+      const paid = Math.round(50 + roll(s) * 90)
       s.credits += paid
       shift(s, v.faction, 0.01)
       log(s, `${v.name} took a berth and left the lane a little safer. +${paid}c.`, 'good')
@@ -99,7 +99,7 @@ export const admitVisitor = (s: GameState, v: Visitor): void => {
     }
     case 'drifter': {
       // Helping costs supplies now and buys goodwill that pays later.
-      const given = Math.round(30 + Math.random() * 40)
+      const given = Math.round(30 + roll(s) * 40)
       for (const key of ['air', 'food'] as const) {
         s.resources[key] = Math.max(0, s.resources[key] - given)
       }
@@ -111,7 +111,7 @@ export const admitVisitor = (s: GameState, v: Visitor): void => {
       break
     }
     case 'smuggler': {
-      const stolen = Math.round(Math.min(s.credits, 40 + Math.random() * 120))
+      const stolen = Math.round(Math.min(s.credits, 40 + roll(s) * 120))
       s.credits -= stolen
       if (dock) startIncident(s, 'vermin', dock)
       log(s, `${v.name} was not carrying what the manifest said. -${stolen}c.`, 'bad')
@@ -185,10 +185,10 @@ export const wouldCome = (s: GameState): FactionId | null => {
   if (pool.length === 0) return null
   const weights = pool.map((id) => Math.max(0.05, 0.25 - s.standing[id]))
   const total = weights.reduce((a, b) => a + b, 0)
-  let roll = Math.random() * total
+  let r = roll(s) * total
   for (let i = 0; i < pool.length; i += 1) {
-    roll -= weights[i]
-    if (roll <= 0) return pool[i]
+    r -= weights[i]
+    if (r <= 0) return pool[i]
   }
   return pool[0]
 }
@@ -196,7 +196,7 @@ export const wouldCome = (s: GameState): FactionId | null => {
 /** A hull that is not asking. It is alongside by the time you read the hail. */
 export const sendConqueror = (s: GameState, who: FactionId): void => {
   const d = defence(s)
-  const hull = makeVisitor(namesInPlay(s))
+  const hull = makeVisitor(roller(s), namesInPlay(s))
   hull.kind = 'patrol'
   hull.claim = 'patrol'
   hull.faction = who
@@ -208,7 +208,7 @@ export const sendConqueror = (s: GameState, who: FactionId): void => {
   hull.intent = 'conquest'
   // What they brought scales with what they can see you have, so a well-armed
   // station is threatened by something that can plausibly beat it.
-  hull.force = Math.round(14 + (d.guns + d.shield * 0.7) * (0.75 + Math.random() * 0.6))
+  hull.force = Math.round(14 + (d.guns + d.shield * 0.7) * (0.75 + roll(s) * 0.6))
   hull.timer = 600
   s.visitors.push(hull)
   s.talk = beginTalk('conquest', { kind: 'visitor', id: hull.id }, hull.name)

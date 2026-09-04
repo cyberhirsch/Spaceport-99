@@ -1,20 +1,30 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  PATIENCE_SECONDS,
-  REQUEST_COST,
-  WING,
   advance,
   allocatePortrait,
   appeal,
   dockBerths,
   newGame,
+  PATIENCE_SECONDS,
   reducer,
+  REQUEST_COST,
+  seeded,
+  WING,
 } from '../engine.ts'
 import { PORTRAIT_COUNT, crewPortrait, makeCrew } from '../crew.ts'
 import { labels, open, say } from './talkHelp.ts'
 import { STAT_KEYS } from '../types.ts'
 import type { GameState, ModuleKind, Stats } from '../types.ts'
+
+// Every station in this file is founded from a known seed, so a run that passes
+// today passes tomorrow. Each call moves the seed on, so a loop that founds
+// forty stations still sees forty different ones.
+let founded = 0
+const fresh = () => newGame('Spaceport-99', 1800 + (founded += 1))
+
+// One seed per file, so every draw below is the same draw every run.
+const rng = seeded(66)
 
 const rich = (s: GameState): GameState => ({ ...s, credits: 50000 })
 const build = (s: GameState, kind: ModuleKind, col: number) =>
@@ -22,7 +32,7 @@ const build = (s: GameState, kind: ModuleKind, col: number) =>
 
 /** A station with a staffed comms desk and a docking port, ready to recruit. */
 const staffed = (): GameState => {
-  let s = build(newGame(), 'comms', WING + 2)
+  let s = build(fresh(), 'comms', WING + 2)
   s = build(s, 'dock', WING + 3)
   // The founders are all posted already, so move two of them across; assign
   // pulls them off their previous station.
@@ -48,7 +58,7 @@ const interview = (s: GameState, id: string, ...moves: string[]): GameState => {
 }
 
 test('HQ will not send anyone without a staffed comms desk', () => {
-  const bare = rich(newGame())
+  const bare = rich(fresh())
   assert.ok(dockBerths(bare) > 0, 'the founding station already has its port')
   assert.equal(
     reducer(bare, { type: 'requestCrew' }).candidates.length,
@@ -157,8 +167,8 @@ test('an unconvinced applicant always walks', () => {
 })
 
 test('a better station attracts better people', () => {
-  const humble = appeal(newGame())
-  let grand = rich(newGame())
+  const humble = appeal(fresh())
+  let grand = rich(fresh())
   for (const [kind, col] of [
     ['quarters', WING - 2], ['storage', WING + 2], ['reactor', WING + 3],
     ['medbay', WING - 3], ['fabricator', WING + 4], ['comms', WING - 4],
@@ -171,23 +181,23 @@ test('a better station attracts better people', () => {
 })
 
 test('portraits are dealt out, not guessed, so a small crew has no twins', () => {
-  const s = newGame()
+  const s = fresh()
   const faces = s.crew.map((c) => crewPortrait(c))
   assert.equal(new Set(faces).size, faces.length, 'the founding five all look different')
 })
 
 test('every portrait is used before any of them repeats', () => {
-  let s = rich(newGame())
+  let s = rich(fresh())
   // Fill the roster well past the portrait count, one hire at a time.
   while (s.crew.length < PORTRAIT_COUNT) {
-    s = { ...s, crew: [...s.crew, makeCrew({ portrait: allocatePortrait(s) })] }
+    s = { ...s, crew: [...s.crew, makeCrew(rng, { portrait: allocatePortrait(s) })] }
   }
   const faces = s.crew.map((c) => crewPortrait(c))
   assert.equal(s.crew.length, PORTRAIT_COUNT)
   assert.equal(new Set(faces).size, PORTRAIT_COUNT, 'all of them, each exactly once')
 
   // Only now does anyone wear a face twice, and the pool stays even.
-  s = { ...s, crew: [...s.crew, makeCrew({ portrait: allocatePortrait(s) })] }
+  s = { ...s, crew: [...s.crew, makeCrew(rng, { portrait: allocatePortrait(s) })] }
   const after = s.crew.map((c) => crewPortrait(c))
   assert.equal(new Set(after).size, PORTRAIT_COUNT, 'the 25th has to reuse one')
   const counts = new Map<number, number>()

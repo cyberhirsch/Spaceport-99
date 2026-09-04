@@ -1,7 +1,7 @@
 import { randomName, rollStats, uid } from './crew.ts'
 import { rollOwner } from './factions.ts'
 import { pickHullName } from './hulls.ts'
-import type { Guest, ShipClass, Visitor, VisitorKind, VisitorOffer } from './types.ts'
+import type { Guest, Rng, ShipClass, Visitor, VisitorKind, VisitorOffer } from './types.ts'
 
 /** How many units a single trade moves. */
 export const TRADE_LOT = 50
@@ -186,12 +186,12 @@ const CREW_ROLES: Record<VisitorKind, RoleDef[]> = {
  * people; the business the ship was carrying is now something a person says to
  * your face.
  */
-export const makeGuests = (v: Visitor, deal: () => number): Guest[] => {
+export const makeGuests = (rng: Rng, v: Visitor, deal: () => number): Guest[] => {
   const roles = [...CREW_ROLES[v.kind]]
-  const count = 1 + Math.floor(Math.random() * 3)
+  const count = 1 + Math.floor(rng() * 3)
   const out: Guest[] = []
   for (let i = 0; i < count; i += 1) {
-    const role = roles.splice(Math.floor(Math.random() * roles.length), 1)[0] ?? {
+    const role = roles.splice(Math.floor(rng() * roles.length), 1)[0] ?? {
       label: 'deckhand',
       grip: 0.3,
       points: 7,
@@ -199,11 +199,11 @@ export const makeGuests = (v: Visitor, deal: () => number): Guest[] => {
     const tier = Math.min(1, Math.max(0.15, role.points / 18))
     out.push({
       id: uid('g'),
-      name: randomName(),
+      name: randomName(rng),
       role: role.label,
       captain: Boolean(role.captain),
       grip: role.grip,
-      stats: rollStats(role.points),
+      stats: rollStats(rng, role.points),
       tier,
       // Someone with a berth already has less reason to listen than someone HQ
       // sent looking for one.
@@ -211,12 +211,12 @@ export const makeGuests = (v: Visitor, deal: () => number): Guest[] => {
       askingBonus: Math.round(60 + role.points * 22 + role.grip * 120),
       promised: null,
       portrait: deal(),
-      seed: Math.floor(Math.random() * 1e9),
+      seed: Math.floor(rng() * 1e9),
       offer: null,
     })
   }
   // Whatever the ship wanted to raise, one of them is the one who raises it.
-  if (v.offer && out.length > 0) out[Math.floor(Math.random() * out.length)].offer = v.offer
+  if (v.offer && out.length > 0) out[Math.floor(rng() * out.length)].offer = v.offer
   return out
 }
 
@@ -225,10 +225,10 @@ export const makeGuests = (v: Visitor, deal: () => number): Guest[] => {
  * A hull on the board. `taken` is every name already in play, so the same
  * ship never arrives twice while the first one is still at the clamps.
  */
-export const makeVisitor = (taken: Iterable<string> = []): Visitor => {
+export const makeVisitor = (rng: Rng, taken: Iterable<string> = []): Visitor => {
   const pool = Object.values(VISITOR_DEFS)
   const total = pool.reduce((n, d) => n + d.weight, 0)
-  let roll = Math.random() * total
+  let roll = rng() * total
   let def = pool[0]
   for (const d of pool) {
     roll -= d.weight
@@ -241,36 +241,36 @@ export const makeVisitor = (taken: Iterable<string> = []): Visitor => {
   // Honest ships mostly scan clean; trouble mostly scans dirty. The overlap in
   // the middle is the whole point — a clean reading is not a guarantee.
   const suspicion = def.trouble
-    ? Math.min(1, 0.35 + Math.random() * 0.65)
-    : Math.min(1, Math.random() * 0.6)
+    ? Math.min(1, 0.35 + rng() * 0.65)
+    : Math.min(1, rng() * 0.6)
 
   // Trouble hides behind an honest-looking hail.
   const claim: VisitorKind = def.trouble
-    ? (['trader', 'courier', 'patrol'] as VisitorKind[])[Math.floor(Math.random() * 3)]
+    ? (['trader', 'courier', 'patrol'] as VisitorKind[])[Math.floor(rng() * 3)]
     : def.kind
 
   // Roughly half of honest ships want to raise something once berthed.
   let offer: VisitorOffer | null = null
   if (!def.trouble) {
-    const roll = Math.random()
+    const roll = rng()
     if (def.kind === 'courier' || roll < 0.2) offer = { ...MISSION_HANDOFF }
-    else if (roll < 0.55) offer = { ...DIALOGUES[Math.floor(Math.random() * DIALOGUES.length)] }
+    else if (roll < 0.55) offer = { ...DIALOGUES[Math.floor(rng() * DIALOGUES.length)] }
   }
 
-  const scarcity = 0.8 + Math.random() * 0.9
+  const scarcity = 0.8 + rng() * 0.9
   return {
     id: uid('v'),
-    name: pickHullName(taken),
-    cls: HULLS[Math.floor(Math.random() * HULLS.length)],
+    name: pickHullName(rng, taken),
+    cls: HULLS[Math.floor(rng() * HULLS.length)],
     kind: def.kind,
     claim,
-    faction: rollOwner(def.kind),
+    faction: rollOwner(rng, def.kind),
     suspicion,
     // Traffic shows on the board well before anyone hails for a berth.
     status: 'inbound',
     aboard: [],
-    timer: 40 + Math.random() * 60,
-    fee: 0.4 + Math.random() * 0.8,
+    timer: 40 + rng() * 60,
+    fee: 0.4 + rng() * 0.8,
     prices: {
       power: Math.round(1.4 * scarcity * 10) / 10,
       air: Math.round(1.7 * scarcity * 10) / 10,

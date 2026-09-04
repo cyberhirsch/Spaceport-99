@@ -1,3 +1,5 @@
+import type { Rng } from './types.ts'
+
 /**
  * Ship names.
  *
@@ -133,9 +135,9 @@ export const HULL_NAMES: string[] = [
  * A name nothing else is currently using. Falls back to a numbered hull if the
  * pool is somehow exhausted, which needs a hundred ships in play at once.
  */
-export const pickHullName = (taken: Iterable<string>): string => {
+export const pickHullName = (rng: Rng, taken: Iterable<string>): string => {
   const used = new Set(taken)
   const free = HULL_NAMES.filter((n) => !used.has(n))
-  if (free.length === 0) return `Hull ${Math.floor(1000 + Math.random() * 9000)}`
-  return free[Math.floor(Math.random() * free.length)]
+  if (free.length === 0) return `Hull ${Math.floor(1000 + rng() * 9000)}`
+  return free[Math.floor(rng() * free.length)]
 }

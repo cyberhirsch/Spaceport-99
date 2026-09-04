@@ -511,8 +511,19 @@ export interface Resources {
   food: number
 }
 
+/**
+ * A source of luck. Everything that rolls takes one of these rather than
+ * reaching for Math.random(), so a roll can be replayed.
+ */
+export type Rng = () => number
+
 export interface GameState {
   version: number
+  /**
+   * The station's luck, as a number you can save. Every roll advances it, so
+   * reloading cannot reroll a death and the reducer answers the same twice.
+   */
+  rng: number
   /** Station name, editable by the player. */
   name: string
   credits: number

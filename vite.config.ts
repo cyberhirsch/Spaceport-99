@@ -15,4 +15,17 @@ const base = process.env.GITHUB_PAGES === 'true' && repo ? `/${repo}/` : '/'
 export default defineConfig({
   base,
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        sw: 'src/sw.ts',
+      },
+      output: {
+        entryFileNames: (chunkInfo) => {
+          return chunkInfo.name === 'sw' ? '[name].js' : 'assets/[name]-[hash].js'
+        },
+      },
+    },
+  },
 })

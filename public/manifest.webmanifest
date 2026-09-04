@@ -1,0 +1,18 @@
+{
+  "name": "Spaceport-99",
+  "short_name": "Spaceport-99",
+  "description": "Build, staff and survive your own orbital station.",
+  "start_url": "/",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#05080d",
+  "background_color": "#05080d",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

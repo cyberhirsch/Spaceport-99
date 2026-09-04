@@ -10,6 +10,7 @@ import {
   reducer,
 } from '../engine.ts'
 import { staffSlots } from '../modules.ts'
+import { unassign } from '../staffing.ts'
 import type { GameState, ModuleKind } from '../types.ts'
 
 let founded = 0
@@ -103,4 +104,23 @@ test('a station that is left alone grows rather than standing still', () => {
     if (asked !== s) s = asked
   }
   assert.ok(s.candidates.length > 0 || derive(s).crewAlive.length > start, 'people are arriving')
+})
+
+test('unassign clears a crew member from their station', () => {
+  let s = fresh()
+  const assigned = s.crew.find((c) => c.assignment)!
+  assert.ok(assigned, 'a crew member is assigned at startup')
+  const moduleId = assigned.assignment
+  const module = s.modules.find((m) => m.id === moduleId)!
+  unassign(s, assigned.id)
+  assert.equal(assigned.assignment, null, 'they are no longer assigned')
+  assert.equal(module.staff.some((id) => id === assigned.id), false, 'they are off the staff list')
+})
+
+test('unassign remembers returnTo when asked', () => {
+  let s = fresh()
+  const assigned = s.crew.find((c) => c.assignment)!
+  const moduleId = assigned.assignment
+  unassign(s, assigned.id, true)
+  assert.ok(assigned.returnTo === moduleId, 'returnTo is set to the original assignment')
 })

@@ -170,3 +170,19 @@ test('two rounds through save and load produce the same station', () => {
   const twice = loadGame()!
   assert.equal(shape(once), shape(twice))
 })
+
+test('a save without portraits gets all crew dealt distinct faces on load', () => {
+  const old = newGame('No Portraits', 707) as unknown as Record<string, unknown>
+  old.version = 12
+  // Strip portraits from crew so they fall back to seed derivation.
+  const crew = old.crew as unknown as Array<{ portrait?: number }>
+  for (const c of crew) delete c.portrait
+  storage.setItem('spaceport99.save', JSON.stringify(old))
+
+  const loaded = loadGame()
+  assert.ok(loaded, 'an old save without portraits loads')
+  const portraits = loaded.crew.map((c) => c.portrait).filter((p) => p !== undefined)
+  assert.equal(portraits.length, loaded.crew.length, 'all crew got a portrait')
+  const unique = new Set(portraits)
+  assert.equal(unique.size, portraits.length, 'all portraits are distinct where the pool allows')
+})

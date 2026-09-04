@@ -1,4 +1,5 @@
 import { SAVE_VERSION, newGame, newSeed } from './engine.ts'
+import { allocatePortrait } from './staffing.ts'
 import { blankStanding } from './factions.ts'
 import { blankQuest } from './quest.ts'
 import type { GameState } from './types.ts'
@@ -50,6 +51,19 @@ const STEPS: { from: number; up: (raw: Record<string, unknown>) => void }[] = [
     up: (raw) => {
       raw.quest = blankQuest()
       raw.nextQuestIn = 0
+    },
+  },
+  // 12 → 13: crew started getting dealt portraits. An older station's crew all
+  // fall back to deriving from seed; give them distinct faces.
+  {
+    from: 12,
+    up: (raw) => {
+      const s = raw as unknown as GameState
+      for (const crew of s.crew) {
+        if (!crew.portrait) {
+          crew.portrait = allocatePortrait(s, s.crew.filter((c) => c.portrait).map((c) => c.portrait!))
+        }
+      }
     },
   },
 ]

@@ -265,6 +265,45 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
 
 ---
 
+
+- **Luck does something.** It ran three rooms already — the Comms Array, the
+  Trading Hub and the Reclamation Bay — same as any other stat runs the rooms
+  it is staffed in. What it never had was a job in the systemic rolls the
+  other six each get somewhere. Now it does, in three places, always the
+  luckiest one on hand rather than an average:
+  - **A mission's outcome.** `rollOutcome` in `src/game/fleet.ts` nudges the
+    margin by the luckiest team member's Luck. Better odds at every tier, on
+    every kind of job, not just the ones Luck already drove.
+  - **A mission's find.** The rare-find gate in `resolveMission`
+    (`src/game/missions.ts`) widens past its 15% floor by the same measure,
+    on top of the better odds above of reaching a tier that is eligible at
+    all. A triumph already finds something; an ordinary success now does more
+    often the luckier the team.
+  - **An incident's target.** `rollIncident` (`src/game/hazards.ts`) shaves
+    its risk by the luckiest person actually on watch in the room it rolled
+    against — an empty room gets nothing to shave.
+  - **A quiet arrangement.** `exposureOdds` in `src/game/talks/covert.ts`
+    (exported from what was a private `risk`, so it could be tested directly)
+    shaves the same way off the luckiest one staffing Covert Ops. The
+    percentage shown before you take the offer is the same number the roll
+    uses, so what you are told is what you are risking.
+
+  `luckiest(crew)` lives in `src/game/crew.ts` — the best `effectiveness(c,
+  'L')` at the table, or 0 with nobody there to have any — and every site
+  above calls the same one. Small numbers throughout, checked against a
+  simulation before writing the tests: a Luck-10 crew's mean outcome tier
+  moves noticeably up the disaster/setback/success/triumph scale over a
+  Luck-1 one's, finds anything 1.5× as often and a cache specifically 2.4×
+  as often, a Luck-10 watch is caught by an emergency roughly half as often
+  as a Luck-1 one, and a Luck-10 Covert Ops hand cuts a 17%-odds arrangement
+  from what a Luck-1 hand would show. 4 new tests in
+  `src/game/__tests__/luckshading.test.ts` hold each of the four measurably
+  apart; 277 tests total. Checked live too — a maxed-Luck Covert Ops hand
+  reads "About 17% chance it comes out" on an ask that would run higher off a
+  greener crew.
+
+---
+
 ## Opus
 
 Nothing outstanding. The five that were here are in **Done** above; what is
@@ -275,25 +314,13 @@ can be handed.
 
 ## Sonnet
 
-### 1. Luck does something
-
-**Why.** Three rooms run on Luck — the Comms Array, the Trading Hub and the
-Reclamation Bay — and two are at the far end of the curve. Every other stat has
-a job by 15 crew.
-
-**Where.** `src/game/missions.ts` and `rollOutcome` in `src/game/fleet.ts`
-(Luck shades the find roll), `src/game/hazards.ts` (`rollIncident` picks a
-target; the luckiest person in the room should shade it), and the exposure roll
-in the Covert Ops room. Small numbers.
-
-**Done when.** A crew with high Luck finds caches measurably more often and
-suffers incidents measurably less, and a seeded test says so.
+Nothing outstanding. The task that was here is in **Done** above.
 
 ---
 
 ## Haiku
 
-### 2. A `CLAUDE.md`
+### 1. A `CLAUDE.md`
 
 **Why.** There is none. Every session re-learns the reducer discipline, the
 `.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
@@ -308,7 +335,7 @@ extension.
 **Done when.** The file exists and a new session can find the layer order and
 the test commands without reading `engine.ts`.
 
-### 3. Re-deal portraits on load
+### 2. Re-deal portraits on load
 
 **Why.** A save from before portraits were dealt has crew with no `portrait`
 field, so they draw from the seed and can share a face.
@@ -319,7 +346,7 @@ field, so they draw from the seed and can share a face.
 **Done when.** Loading such a save gives every crew member a distinct portrait
 where the pool allows, and a test loads a fixture without portraits and checks.
 
-### 4. Tests for the parts of the split that changed visibility
+### 3. Tests for the parts of the split that changed visibility
 
 **Why.** The refactor exported about two dozen previously private helpers
 (`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
@@ -334,7 +361,7 @@ use it as the pattern.
 **Done when.** Each newly exported helper with a branch in it has at least one
 test that exercises the branch.
 
-### 5. PWA manifest and service worker
+### 4. PWA manifest and service worker
 
 **Why.** The web build is not installable and does not run offline, though
 nothing in it needs a network. An idle station you check on through the day
@@ -348,7 +375,7 @@ app icon can come from an existing asset until there is a proper one.
 **Done when.** The deployed page passes the browser's install check and loads
 with the network off after one visit.
 
-### 6. Rename the branch to `main`
+### 5. Rename the branch to `main`
 
 **Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
 and the deployment is tied to it.
@@ -366,7 +393,7 @@ is gone.
 Both of these are specified and neither ships with placeholder art. They move
 into the tiers the day the renders arrive.
 
-### 7. New kit for the Research Lab
+### 6. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -384,7 +411,7 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 8. Art for the rooms and the ships
+### 7. Art for the rooms and the ships
 
 **Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.

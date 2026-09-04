@@ -1,4 +1,4 @@
-import { effectiveness, uid } from './crew.ts'
+import { effectiveness, luckiest, uid } from './crew.ts'
 import { pickHullName } from './hulls.ts'
 import { STAT_INFO, STAT_KEYS } from './types.ts'
 import type {
@@ -275,10 +275,12 @@ export const rollOutcome = (
   m: Mission,
   ship: Ship | null,
 ): MissionOutcome => {
-  // Choices already made shift the margin, and an open job that stayed out too
-  // long is carrying its own weight into the roll.
+  // Choices already made shift the margin, an open job that stayed out too
+  // long is carrying its own weight into the roll, and the luckiest one aboard
+  // nudges it their way whatever the job actually needed.
   const margin =
-    teamScore(crew, m, ship) - missionTarget(m) + m.odds * 30 - Math.max(0, m.strain - 1) * 9
+    teamScore(crew, m, ship) - missionTarget(m) + m.odds * 30 - Math.max(0, m.strain - 1) * 9 +
+    luckiest(crew) * 0.4
   const roll = margin + (rng() * 20 - 10)
   if (roll > 12) return 'triumph'
   if (roll > 0) return 'success'

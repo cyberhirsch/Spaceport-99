@@ -427,7 +427,12 @@ way, from the hangar list.
 Luck. Every room is driven by one stat, and a room runs at the speed of the
 people standing in it. A full crew of rookies runs a room at roughly 100%; a
 well-trained veteran crew pushes past 170%. *Auto-assign roster* does a
-greedy best-fit pass if you would rather not micromanage.
+greedy best-fit pass if you would rather not micromanage. Luck also works off
+the clock: whoever is luckiest on a mission shades it toward a better outcome
+and a better chance of finding something out there; whoever is luckiest on
+watch in a room makes it measurably less likely to be the one an emergency
+catches; and whoever is luckiest in the Covert Ops room shaves a little off
+the odds an arrangement comes out.
 
 **Every deck is symmetrical.** A lift shaft runs down the centre of the station
 with a five-slot wing either side of it. Rooms hang off the shaft and grow

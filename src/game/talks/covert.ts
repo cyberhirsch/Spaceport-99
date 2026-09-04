@@ -1,6 +1,7 @@
 import { ASK_RISK, expose } from '../engine.ts'
 import { covertShift, exposureRisk, log, roll, shift } from '../engine.ts'
 import { factionDef } from '../factions.ts'
+import { luckiest } from '../crew.ts'
 import { registerScript, type TalkCtx, type TalkScript } from '../talk.ts'
 import type { CovertAsk, CovertOffer } from '../types.ts'
 
@@ -46,10 +47,15 @@ const TAKEN: Record<CovertAsk, string> = {
 }
 
 /** The odds this one does not stay quiet, as a percentage. */
-const risk = (c: TalkCtx): number => {
+export const exposureOdds = (c: TalkCtx): number => {
   const o = offerOf(c)
   if (!o) return 0
-  return Math.min(0.95, exposureRisk(c.s) * ASK_RISK[o.ask])
+  // The luckiest one on the Covert Ops watch shades the odds a little, same as
+  // everywhere else the stat works.
+  const onWatch = c.s.crew.filter((cr) =>
+    c.s.modules.some((m) => m.kind === 'covertops' && m.staff.includes(cr.id)),
+  )
+  return Math.max(0.03, Math.min(0.95, exposureRisk(c.s) * ASK_RISK[o.ask] - luckiest(onWatch) * 0.01))
 }
 
 const script: TalkScript = {
@@ -96,7 +102,7 @@ const script: TalkScript = {
         note: (c) => {
           const o = offerOf(c)
           if (!o) return null
-          const pct = Math.round(risk(c) * 100)
+          const pct = Math.round(exposureOdds(c) * 100)
           return `+${o.pays}c and ${factionDef(o.from).short} owe you one. About ${pct}% chance it comes out.`
         },
         effect: (c) => {
@@ -112,7 +118,7 @@ const script: TalkScript = {
           c.talk.flags.push(`ask:${o.ask}`)
           log(c.s, `An arrangement with ${factionDef(o.from).short}. +${o.pays}c.`, 'good')
           // And then the part you do not control.
-          if (roll(c.s) < risk(c)) {
+          if (roll(c.s) < exposureOdds(c)) {
             expose(c.s, o.from, o.ask)
             c.talk.flags.push('exposed')
           }

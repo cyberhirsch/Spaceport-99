@@ -118,6 +118,10 @@ export const effectiveness = (c: Crew, stat: StatKey): number => {
   return base * health * mood
 }
 
+/** The best Luck at the table, or 0 with nobody there to have any. */
+export const luckiest = (crew: Crew[]): number =>
+  crew.reduce((best, c) => Math.max(best, effectiveness(c, 'L')), 0)
+
 /** How many portrait images live in `public/crew`. */
 export const PORTRAIT_COUNT = 24
 

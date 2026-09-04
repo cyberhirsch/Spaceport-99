@@ -1,5 +1,5 @@
 import { def, wingOf } from './modules.ts'
-import { uid } from './crew.ts'
+import { luckiest, uid } from './crew.ts'
 import { incidentDef } from './incidents.ts'
 import type { GameState, IncidentKind, StationModule } from './types.ts'
 import { log, pickOne, roll, roller } from './core.ts'
@@ -47,8 +47,14 @@ export const rollIncident = (s: GameState): void => {
   )
   if (candidates.length === 0) return
   // A tidier station is a safer one; damaged, unstaffed rooms invite trouble.
+  // Whoever is luckiest on watch there shaves a little off it too.
   const target = pickOne(roller(s), candidates)
-  const risk = 0.22 + (1 - target.condition) * 0.4 + (target.staff.length === 0 ? 0.1 : 0)
+  const onWatch = s.crew.filter((c) => target.staff.includes(c.id))
+  const risk = Math.max(
+    0.05,
+    0.22 + (1 - target.condition) * 0.4 + (target.staff.length === 0 ? 0.1 : 0) -
+      luckiest(onWatch) * 0.012,
+  )
   if (roll(s) > risk) return
   const r = roll(s)
   const kind: IncidentKind =

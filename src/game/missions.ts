@@ -1,5 +1,5 @@
 import { missionSlots } from './modules.ts'
-import { makeCrew } from './crew.ts'
+import { luckiest, makeCrew } from './crew.ts'
 import { SPEC_IDS, specDef } from './specs.ts'
 import { OUTCOME_INFO, makeShip, rollOutcome, shipCargo, shipHull } from './fleet.ts'
 import type { Crew, Mission, Ship, GameState } from './types.ts'
@@ -168,8 +168,12 @@ export const resolveMission = (s: GameState, m: Mission): void => {
     log(s, `${m.name} came back with a spec: ${sd.name}.`, 'good')
   }
 
-  // Rare finds, and never on a run that went wrong.
-  if (!m.find && (outcome === 'triumph' || (outcome === 'success' && roll(s) < 0.15))) {
+  // Rare finds, and never on a run that went wrong. The luckiest one aboard
+  // widens the door on an ordinary success; a triumph already finds something.
+  if (
+    !m.find &&
+    (outcome === 'triumph' || (outcome === 'success' && roll(s) < 0.15 + luckiest(team) * 0.012))
+  ) {
     const r = roll(s)
     if (r < 0.4 && s.crew.filter((c) => !c.dead).length < derive(s).crewCap) {
       const survivor = makeCrew(roller(s), { portrait: allocatePortrait(s) })

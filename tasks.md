@@ -190,6 +190,24 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
 
 ---
 
+
+- **Split the tick.** `step()` was 516 lines of `tick.ts`'s 649 and did
+  everything: the power grid, production, life support, the med bay, the
+  engineering bay, research, the fab shop, incidents, crew wellbeing, docking
+  fees, the cells, the takeover sequence, the questline, loiterers, quiet
+  approaches, the clamps, the fleet, applicants and the random-incident roll.
+  It is now 21 named functions called in order, each with the doc comment the
+  section already had. A small `TickCtx` carries the handful of values several
+  sections genuinely share — `crewById`, `derived`, `alive`, `grid`,
+  `brownout`, `starving`, `suffocating`, `healRate` — filled in as the section
+  that owns each one runs; everything else takes only `s` and `dt`. `step()`
+  itself is 36 lines: a context literal and 21 calls. Verbatim move — verified
+  by diffing full-state JSON (ids stripped, since `uid()` embeds the wall
+  clock) between the old and new implementations across four seeds and up to
+  three hours of simulated time each, byte-identical. 259 tests unchanged.
+
+---
+
 ## Opus
 
 Nothing outstanding. The five that were here are in **Done** above; what is
@@ -200,22 +218,7 @@ can be handed.
 
 ## Sonnet
 
-### 1. Split the tick
-
-**Why.** `src/game/tick.ts` is 516 lines and `step()` is most of it: the power
-grid, production, life support, the med bay, the engineering bay, the lab, the
-fab shop, the cells, conquest, the clamps, visitors, missions, incidents,
-deaths, recruiting, and the random-event roll, in one function. Each block is
-already commented as a section. They should be functions.
-
-**Where.** `src/game/tick.ts`. One exported function per section, each taking
-`(s, dt, ctx)` where `ctx` carries `crewById`, `derived`, `grid` and `alive`.
-`step()` becomes twelve calls in order. No behaviour change.
-
-**Done when.** `step()` is under 40 lines, every section is a named function
-with its doc comment, and the tests are untouched and green.
-
-### 2. Something other than bunks moves the roster
+### 1. Something other than bunks moves the roster
 
 **Why.** Reaching 60 crew is a matter of building Crew Quarters and waiting.
 The Comms Array, the Docking Port, standing with your patron and the station's
@@ -241,7 +244,7 @@ roll), `src/game/reducer.ts` (`requestCrew`), `src/game/core.ts`
 supposed to — count, faction mix, mean stat, unasked arrivals — and quarters
 remain the ceiling rather than the only lever.
 
-### 3. Break up the two long modals
+### 2. Break up the two long modals
 
 **Why.** `src/components/VisitorModal.tsx` is resource trade, the bonded cage,
 kit, the boarding party, the auto-accept toggle and a talk button.
@@ -256,7 +259,7 @@ adds a file, not a branch.
 **Done when.** Neither modal file is over 200 lines, and adding a room-specific
 panel touches one new file plus one line in the lookup.
 
-### 4. Luck does something
+### 3. Luck does something
 
 **Why.** Three rooms run on Luck — the Comms Array, the Trading Hub and the
 Reclamation Bay — and two are at the far end of the curve. Every other stat has
@@ -274,7 +277,7 @@ suffers incidents measurably less, and a seeded test says so.
 
 ## Haiku
 
-### 5. A `CLAUDE.md`
+### 4. A `CLAUDE.md`
 
 **Why.** There is none. Every session re-learns the reducer discipline, the
 `.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
@@ -289,7 +292,7 @@ extension.
 **Done when.** The file exists and a new session can find the layer order and
 the test commands without reading `engine.ts`.
 
-### 6. Re-deal portraits on load
+### 5. Re-deal portraits on load
 
 **Why.** A save from before portraits were dealt has crew with no `portrait`
 field, so they draw from the seed and can share a face.
@@ -300,7 +303,7 @@ field, so they draw from the seed and can share a face.
 **Done when.** Loading such a save gives every crew member a distinct portrait
 where the pool allows, and a test loads a fixture without portraits and checks.
 
-### 7. Tests for the parts of the split that changed visibility
+### 6. Tests for the parts of the split that changed visibility
 
 **Why.** The refactor exported about two dozen previously private helpers
 (`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
@@ -315,7 +318,7 @@ use it as the pattern.
 **Done when.** Each newly exported helper with a branch in it has at least one
 test that exercises the branch.
 
-### 8. PWA manifest and service worker
+### 7. PWA manifest and service worker
 
 **Why.** The web build is not installable and does not run offline, though
 nothing in it needs a network. An idle station you check on through the day
@@ -329,7 +332,7 @@ app icon can come from an existing asset until there is a proper one.
 **Done when.** The deployed page passes the browser's install check and loads
 with the network off after one visit.
 
-### 9. Rename the branch to `main`
+### 8. Rename the branch to `main`
 
 **Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
 and the deployment is tied to it.
@@ -347,7 +350,7 @@ is gone.
 Both of these are specified and neither ships with placeholder art. They move
 into the tiers the day the renders arrive.
 
-### 10. New kit for the Research Lab
+### 9. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -365,7 +368,7 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 11. Art for the rooms and the ships
+### 10. Art for the rooms and the ships
 
 **Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.

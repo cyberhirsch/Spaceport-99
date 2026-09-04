@@ -7,7 +7,7 @@ import { ITEM_SPEC, specDef } from './specs.ts'
 import { factionDef } from './factions.ts'
 import { makeMission, type MissionOpts, OPEN_HAUL_PER_MINUTE, OPEN_STRAIN_PER_MINUTE } from './fleet.ts'
 import { makeVisitor } from './visitors.ts'
-import type { ModuleDef, GameState, ResourceKey, StationModule } from './types.ts'
+import type { Crew, ModuleDef, GameState, ResourceKey, StationModule } from './types.ts'
 import {
   AIR_PER_CREW,
   APPROACH_GAP,
@@ -34,7 +34,7 @@ import {
   visitorBerths,
   autoAccepting,
 } from './rooms.ts'
-import { derive } from './state.ts'
+import { derive, type Derived } from './state.ts'
 import { adjacentModules, incidentCap, startIncident, rollIncident } from './hazards.ts'
 import { shift, appeal } from './standing.ts'
 import { answerCall, inContact, questBearing, resolveMission, rollFar } from './missions.ts'
@@ -70,39 +70,48 @@ export const gridFactorFor = (md: ModuleDef, grid: number): number => {
 }
 
 /**
- * Advances the simulation by `dt` seconds. `dt` should stay at or below 1.
- * While catching up on offline time nobody dies — the player comes back to a
- * station in crisis rather than to a tomb they had no chance to prevent.
+ * Values several sections of the tick share: who is aboard, what the station
+ * can support this second, and what state life support is in. Built once at
+ * the top of `step` and filled in as the sections that own each figure run.
  */
-export const step = (s: GameState, dt: number, offline: boolean): void => {
-  const crewById = new Map(s.crew.map((c) => [c.id, c]))
-  const alive = s.crew.filter((c) => !c.dead)
-  const d = derive(s)
-  s.elapsed += dt
+interface TickCtx {
+  crewById: Map<string, Crew>
+  derived: Derived
+  alive: Crew[]
+  /** Fraction of demand the reactor could actually cover this tick. */
+  grid: number
+  brownout: boolean
+  starving: boolean
+  suffocating: boolean
+  healRate: number
+}
 
-  // --- power grid -----------------------------------------------------
-  const demand = d.draw * dt
-  let grid = 1
+/** Power grid: draws the tick's demand from storage, or brings on a brownout. */
+const stepPowerGrid = (s: GameState, dt: number, ctx: TickCtx): void => {
+  const demand = ctx.derived.draw * dt
   if (demand > 0) {
     if (s.resources.power >= demand) {
       s.resources.power -= demand
     } else {
-      grid = s.resources.power / demand
+      ctx.grid = s.resources.power / demand
       s.resources.power = 0
     }
   }
-  const brownout = grid < 0.999
+  ctx.brownout = ctx.grid < 0.999
+}
 
-  // --- production -----------------------------------------------------
+/** Production: every room with a cycle advances it, and pays out on completion. */
+const stepProduction = (s: GameState, dt: number, ctx: TickCtx): void => {
+  const d = ctx.derived
   for (const m of s.modules) {
     const md = def(m.kind)
-    const cycle = md.cycleSeconds ?? (md.trains ? trainingSeconds(m, crewById) : 0)
+    const cycle = md.cycleSeconds ?? (md.trains ? trainingSeconds(m, ctx.crewById) : 0)
     if (!cycle) {
       // Passive rooms (quarters, cargo) still earn their crew a little xp.
       if (m.staff.length > 0) awardXp(s, m, 0.25 * dt)
       continue
     }
-    const rate = workRate(m, crewById) * gridFactorFor(md, grid)
+    const rate = workRate(m, ctx.crewById) * gridFactorFor(md, ctx.grid)
     if (rate <= 0) continue
     m.progress += (dt / cycle) * rate
     m.rushRisk = Math.max(0.15, m.rushRisk - dt * 0.004)
@@ -111,103 +120,126 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       completeCycle(s, m, d.caps)
     }
   }
+}
 
-  // --- life support ---------------------------------------------------
+/** Life support: air and food drain with the crew, clamped to what the station can hold. */
+const stepLifeSupport = (s: GameState, dt: number, ctx: TickCtx): void => {
+  const d = ctx.derived
   s.resources.power = clamp(s.resources.power, 0, d.caps.power)
   const kept = 1 - recycled(s)
-  s.resources.air = clamp(s.resources.air - alive.length * AIR_PER_CREW * kept * dt, 0, d.caps.air)
+  s.resources.air = clamp(
+    s.resources.air - ctx.alive.length * AIR_PER_CREW * kept * dt,
+    0,
+    d.caps.air,
+  )
   s.resources.food = clamp(
-    s.resources.food - alive.length * FOOD_PER_CREW * kept * dt,
+    s.resources.food - ctx.alive.length * FOOD_PER_CREW * kept * dt,
     0,
     d.caps.food,
   )
+  ctx.starving = s.resources.food <= 0
+  ctx.suffocating = s.resources.air <= 0
+}
 
-  const starving = s.resources.food <= 0
-  const suffocating = s.resources.air <= 0
-
-  // --- med bay --------------------------------------------------------
+/** Med bay: a staffed autodoc heals everyone aboard, and idle air/food gives a trickle for free. */
+const stepMedBay = (s: GameState, ctx: TickCtx): void => {
   let healRate = 0
   for (const m of s.modules) {
     const md = def(m.kind)
     if (!md.heals) continue
     healRate +=
-      md.heals * m.width * m.level * mergeBonus(m) * workRate(m, crewById) * Math.max(0.6, grid)
+      md.heals *
+      m.width *
+      m.level *
+      mergeBonus(m) *
+      workRate(m, ctx.crewById) *
+      Math.max(0.6, ctx.grid)
   }
-  if (!starving && !suffocating) healRate += 0.15
+  if (!ctx.starving && !ctx.suffocating) healRate += 0.15
+  ctx.healRate = healRate
+}
 
-  // --- the engineering bay ---------------------------------------------
-  // A staffed bay works the worst room on the station back towards sound. It is
-  // one party, so its attention goes where the damage is deepest — which means
-  // equally battered rooms come up together.
+/**
+ * The engineering bay: works the worst room on the station back towards sound.
+ * It is one party, so its attention goes where the damage is deepest — which
+ * means equally battered rooms come up together.
+ */
+const stepEngineeringBay = (s: GameState, dt: number, ctx: TickCtx): void => {
   let repairRate = 0
   for (const m of s.modules) {
     const md = def(m.kind)
     if (!md.repairs || m.standby) continue
     repairRate +=
-      md.repairs * m.width * m.level * mergeBonus(m) * workRate(m, crewById) * Math.max(0.6, grid)
+      md.repairs *
+      m.width *
+      m.level *
+      mergeBonus(m) *
+      workRate(m, ctx.crewById) *
+      Math.max(0.6, ctx.grid)
   }
-  if (repairRate > 0) {
-    const worst = s.modules
-      .filter((m) => m.condition < 1 && !s.incidents.some((i) => i.moduleId === m.id))
-      .sort((a, b) => a.condition - b.condition)[0]
-    if (worst) {
-      const was = worst.condition
-      worst.condition = clamp(worst.condition + repairRate * dt, 0.2, 1)
-      if (was < 1 && worst.condition >= 1) {
-        log(s, `${def(worst.kind).name} repaired to sound.`, 'good')
-      }
-    }
+  if (repairRate <= 0) return
+  const worst = s.modules
+    .filter((m) => m.condition < 1 && !s.incidents.some((i) => i.moduleId === m.id))
+    .sort((a, b) => a.condition - b.condition)[0]
+  if (!worst) return
+  const was = worst.condition
+  worst.condition = clamp(worst.condition + repairRate * dt, 0.2, 1)
+  if (was < 1 && worst.condition >= 1) {
+    log(s, `${def(worst.kind).name} repaired to sound.`, 'good')
   }
+}
 
-  // --- the research lab -------------------------------------------------
-  // A recovered spec is a stack of somebody else's paper. The lab turns it into
-  // something the station can actually build. Nothing else does, and it only
-  // works on one at a time.
-  if (s.researching) {
-    const id = s.researching
-    if ((s.specs[id] ?? 0) >= 1) {
-      s.researching = null
-    } else {
-      const rate = researchRate(s, crewById) * Math.max(0.6, grid)
-      if (rate > 0) {
-        const sd = specDef(id)
-        s.specs[id] = Math.min(1, (s.specs[id] ?? 0) + (rate / sd.effort) * dt)
-        if (s.specs[id]! >= 1) {
-          s.researching = null
-          const what =
-            sd.unlocks.kind === 'module'
-              ? `${def(sd.unlocks.module).name} can be built.`
-              : `${itemDef(sd.unlocks.item).name} can be run off in the Fab Shop.`
-          log(s, `${sd.name} worked out. ${what}`, 'good')
-          const next = openSpecs(s)[0]
-          if (next) {
-            s.researching = next
-            log(s, `The lab moved on to ${specDef(next).name}.`, 'info')
-          }
-        }
-      }
-    }
+/**
+ * The research lab: a recovered spec is a stack of somebody else's paper. The
+ * lab turns it into something the station can actually build. Nothing else
+ * does, and it only works on one at a time.
+ */
+const stepResearchLab = (s: GameState, dt: number, ctx: TickCtx): void => {
+  if (!s.researching) return
+  const id = s.researching
+  if ((s.specs[id] ?? 0) >= 1) {
+    s.researching = null
+    return
   }
-
-  // --- the Fab Shop ------------------------------------------------------
-  if (s.fabricating) {
-    const spec = ITEM_SPEC[s.fabricating.item]
-    const build = spec ? specDef(spec).build : undefined
-    if (!build) {
-      s.fabricating = null
-    } else {
-      const rate = fabRate(s, crewById) * Math.max(0.6, grid)
-      s.fabricating.progress += (rate / build.seconds) * dt
-      if (s.fabricating.progress >= 1) {
-        const item = s.fabricating.item
-        s.stores[item] = (s.stores[item] ?? 0) + 1
-        s.fabricating = null
-        log(s, `The Fab Shop finished a ${itemDef(item).name}. It is in the hold.`, 'good')
-      }
-    }
+  const rate = researchRate(s, ctx.crewById) * Math.max(0.6, ctx.grid)
+  if (rate <= 0) return
+  const sd = specDef(id)
+  s.specs[id] = Math.min(1, (s.specs[id] ?? 0) + (rate / sd.effort) * dt)
+  if (s.specs[id]! < 1) return
+  s.researching = null
+  const what =
+    sd.unlocks.kind === 'module'
+      ? `${def(sd.unlocks.module).name} can be built.`
+      : `${itemDef(sd.unlocks.item).name} can be run off in the Fab Shop.`
+  log(s, `${sd.name} worked out. ${what}`, 'good')
+  const next = openSpecs(s)[0]
+  if (next) {
+    s.researching = next
+    log(s, `The lab moved on to ${specDef(next).name}.`, 'info')
   }
+}
 
-  // --- incidents ------------------------------------------------------
+/** The Fab Shop: runs one item off at a time from whatever spec unlocked it. */
+const stepFabShop = (s: GameState, dt: number, ctx: TickCtx): void => {
+  if (!s.fabricating) return
+  const spec = ITEM_SPEC[s.fabricating.item]
+  const build = spec ? specDef(spec).build : undefined
+  if (!build) {
+    s.fabricating = null
+    return
+  }
+  const rate = fabRate(s, ctx.crewById) * Math.max(0.6, ctx.grid)
+  s.fabricating.progress += (rate / build.seconds) * dt
+  if (s.fabricating.progress >= 1) {
+    const item = s.fabricating.item
+    s.stores[item] = (s.stores[item] ?? 0) + 1
+    s.fabricating = null
+    log(s, `The Fab Shop finished a ${itemDef(item).name}. It is in the hold.`, 'good')
+  }
+}
+
+/** Incidents: fire, vermin, breach and pirates burn down, spread, and get fought. */
+const stepIncidents = (s: GameState, dt: number, ctx: TickCtx): void => {
   for (const inc of [...s.incidents]) {
     const idef = incidentDef(inc.kind)
     const m = s.modules.find((x) => x.id === inc.moduleId)
@@ -218,7 +250,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
     // Automated suppression works alone, just far too slowly to rely on.
     let firepower = 0.45
     for (const id of m.staff) {
-      const c = crewById.get(id)
+      const c = ctx.crewById.get(id)
       if (!c || c.dead) continue
       firepower += effectiveness(c, idef.counter) * 0.55
       // Kit tells most against people. A hull breach does not care what you
@@ -228,7 +260,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
     inc.hp -= firepower * dt
     m.condition = clamp(m.condition - idef.structureDps * dt, 0.2, 1)
     for (const id of [...m.staff]) {
-      const c = crewById.get(id)
+      const c = ctx.crewById.get(id)
       if (!c || c.dead) continue
       c.hp -= idef.crewDps * dt
       // Nobody dies holding a fire hose. Badly hurt crew fall back to the spine.
@@ -253,7 +285,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       // station they left. If that post is gone, full, powered down or itself
       // burning, they simply stay put.
       for (const id of [...m.staff]) {
-        const c = crewById.get(id)
+        const c = ctx.crewById.get(id)
         if (!c || c.dead || !c.returnTo || c.returnTo === m.id) continue
         const post = s.modules.find((x) => x.id === c.returnTo)
         const free =
@@ -284,14 +316,22 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       }
     }
   }
+}
 
-  // --- crew wellbeing -------------------------------------------------
-  const bunkPressure = alive.length > d.crewCap ? 0.2 : 0
+/**
+ * Crew wellbeing: hp and morale drift towards what the station can support,
+ * the dead are dead, and anyone patched up heads back to their post. Nobody
+ * dies while the station is catching up offline — it comes back to a crisis,
+ * not a tomb it had no chance to prevent.
+ */
+const stepCrewWellbeing = (s: GameState, dt: number, ctx: TickCtx, offline: boolean): void => {
+  const d = ctx.derived
+  const bunkPressure = ctx.alive.length > d.crewCap ? 0.2 : 0
   const moraleTarget = clamp(
     0.55 +
       (s.resources.air > 20 ? 0.15 : -0.35) +
       (s.resources.food > 20 ? 0.15 : -0.35) +
-      (brownout ? -0.2 : 0.05) +
+      (ctx.brownout ? -0.2 : 0.05) +
       (s.incidents.length > 0 ? -0.15 : 0.05) -
       bunkPressure,
     0.15,
@@ -299,13 +339,13 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
   )
   for (const c of s.crew) {
     if (c.dead) continue
-    if (suffocating) c.hp -= 0.8 * dt
-    if (starving) c.hp -= 0.4 * dt
-    if (healRate > 0 && c.hp < c.maxHp) c.hp = Math.min(c.maxHp, c.hp + healRate * dt)
+    if (ctx.suffocating) c.hp -= 0.8 * dt
+    if (ctx.starving) c.hp -= 0.4 * dt
+    if (ctx.healRate > 0 && c.hp < c.maxHp) c.hp = Math.min(c.maxHp, c.hp + ctx.healRate * dt)
     c.morale = clamp(c.morale + (moraleTarget - c.morale) * dt * 0.06, 0, 1)
     // Once patched up, crew head back to the post they retreated from — and
     // immediately, injuries and all, if the station is out of air or food.
-    const allHands = suffocating || starving
+    const allHands = ctx.suffocating || ctx.starving
     if (c.returnTo && !c.assignment && (allHands || c.hp > c.maxHp * 0.4)) {
       const post = s.modules.find((m) => m.id === c.returnTo)
       const safe = post && !s.incidents.some((i) => i.moduleId === post.id)
@@ -333,86 +373,112 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       log(s, `${c.name} has died. The station observes a minute of silence.`, 'bad')
     }
   }
+}
 
+/** Docking fees: berthed traffic pays for the privilege, every tick it stays. */
+const stepDockingFees = (s: GameState, dt: number): void => {
   s.credits += dockingFees(s) * dt
+}
 
-  // --- random events --------------------------------------------------
+/** Cooldowns that just count down on their own. */
+const stepCooldowns = (s: GameState, dt: number): void => {
   s.broadcastCooldown = Math.max(0, s.broadcastCooldown - dt)
-  // --- the cells --------------------------------------------------------
-  // A brig that is dark, or that nobody is standing in, does not hold anybody.
-  if (s.prisoners.length > 0) {
-    for (const p of s.prisoners) p.held += dt
-    const cells = cellsAboard(s)
-    while (s.prisoners.length > cells) {
-      const gone = s.prisoners.pop()
-      if (!gone) break
-      log(s, `${gone.name} is out of the cells and off the station.`, 'bad')
-      shift(s, gone.faction, 0.02)
-    }
-    // Hold somebody long enough and you find out who their people are. One
-    // hull at a time, and never while one is already alongside asking.
-    s.nextClaimIn -= dt
-    if (s.nextClaimIn <= 0) {
-      const ripe = s.prisoners.find((p) => p.held >= CLAIM_AFTER)
-      if (ripe && !s.visitors.some((v) => v.claiming) && !s.talk) {
-        sendClaimant(s, ripe.id)
-        s.nextClaimIn = 6 * 60
-      } else {
-        s.nextClaimIn = 30
-      }
-    }
-  }
+}
 
-  // --- somebody coming for the station --------------------------------
-  // Only while nothing else is being said, and never to a station nobody
-  // would bother with.
-  if (!offline && !s.talk && s.elapsed > CONQUEST_EARLIEST && worthTaking(s)) {
-    s.nextTakeoverIn -= dt
-    if (s.nextTakeoverIn <= 0) {
-      s.nextTakeoverIn = CONQUEST_GAP + roll(s) * CONQUEST_GAP
-      const who = wouldCome(s)
-      if (who) sendConqueror(s, who)
+/**
+ * The cells: a brig that is dark, or that nobody is standing in, does not hold
+ * anybody. Hold somebody long enough and their people come asking.
+ */
+const stepCells = (s: GameState, dt: number): void => {
+  if (s.prisoners.length === 0) return
+  for (const p of s.prisoners) p.held += dt
+  const cells = cellsAboard(s)
+  while (s.prisoners.length > cells) {
+    const gone = s.prisoners.pop()
+    if (!gone) break
+    log(s, `${gone.name} is out of the cells and off the station.`, 'bad')
+    shift(s, gone.faction, 0.02)
+  }
+  // Hold somebody long enough and you find out who their people are. One
+  // hull at a time, and never while one is already alongside asking.
+  s.nextClaimIn -= dt
+  if (s.nextClaimIn <= 0) {
+    const ripe = s.prisoners.find((p) => p.held >= CLAIM_AFTER)
+    if (ripe && !s.visitors.some((v) => v.claiming) && !s.talk) {
+      sendClaimant(s, ripe.id)
+      s.nextClaimIn = 6 * 60
+    } else {
+      s.nextClaimIn = 30
     }
   }
+}
 
-  // --- the seven hulls ------------------------------------------------
-  // Only while nothing else is being said: none of this is urgent enough to
-  // interrupt a conversation already on screen.
-  if (!s.talk) {
-    s.nextQuestIn -= dt
-    if (s.nextQuestIn <= 0) questBeat(s)
+/**
+ * Somebody coming for the station. Only while nothing else is being said, and
+ * never to a station nobody would bother with.
+ */
+const stepTakeover = (s: GameState, dt: number, offline: boolean): void => {
+  if (offline || s.talk || s.elapsed <= CONQUEST_EARLIEST || !worthTaking(s)) return
+  s.nextTakeoverIn -= dt
+  if (s.nextTakeoverIn <= 0) {
+    s.nextTakeoverIn = CONQUEST_GAP + roll(s) * CONQUEST_GAP
+    const who = wouldCome(s)
+    if (who) sendConqueror(s, who)
   }
+}
 
-  // --- what follows a takeover ----------------------------------------
-  if (s.nextLevyIn > 0) {
-    s.nextLevyIn -= dt
-    if (s.nextLevyIn <= 0) {
-      s.nextLevyIn = 0
-      sendLevy(s)
-    }
+/**
+ * The seven hulls. Only while nothing else is being said: none of this is
+ * urgent enough to interrupt a conversation already on screen.
+ */
+const stepQuestline = (s: GameState, dt: number): void => {
+  if (s.talk) return
+  s.nextQuestIn -= dt
+  if (s.nextQuestIn <= 0) questBeat(s)
+}
+
+/** What follows a takeover: the new owner's first assessment. */
+const stepLevy = (s: GameState, dt: number): void => {
+  if (s.nextLevyIn <= 0) return
+  s.nextLevyIn -= dt
+  if (s.nextLevyIn <= 0) {
+    s.nextLevyIn = 0
+    sendLevy(s)
   }
+}
 
-  // --- hulls that wait ------------------------------------------------
-  // One at a time. This is a sequence with three visible steps, not a swarm.
-  if (worthLeaningOn(s)) {
-    s.nextLoiterIn -= dt
-    if (s.nextLoiterIn <= 0) {
-      s.nextLoiterIn = LOITER_GAP + roll(s) * LOITER_GAP
-      if (!s.visitors.some((v) => v.intent && v.intent !== 'conquest')) sendLoiter(s)
-    }
+/**
+ * Hulls that wait. One at a time. This is a sequence with three visible
+ * steps, not a swarm.
+ */
+const stepLoiterers = (s: GameState, dt: number): void => {
+  if (!worthLeaningOn(s)) return
+  s.nextLoiterIn -= dt
+  if (s.nextLoiterIn <= 0) {
+    s.nextLoiterIn = LOITER_GAP + roll(s) * LOITER_GAP
+    if (!s.visitors.some((v) => v.intent && v.intent !== 'conquest')) sendLoiter(s)
   }
+}
 
-  // --- the quiet word -------------------------------------------------
-  // Somebody sounds the station out from time to time. It rides in on ordinary
-  // traffic, so if nothing suitable is alongside it simply waits for a hull.
-  if (worthSounding(s)) {
-    s.nextApproachIn -= dt
-    if (s.nextApproachIn <= 0) {
-      s.nextApproachIn = sendApproach(s) ? APPROACH_GAP + roll(s) * APPROACH_GAP : 45
-    }
+/**
+ * The quiet word: somebody sounds the station out from time to time. It rides
+ * in on ordinary traffic, so if nothing suitable is alongside it simply waits
+ * for a hull.
+ */
+const stepApproaches = (s: GameState, dt: number): void => {
+  if (!worthSounding(s)) return
+  s.nextApproachIn -= dt
+  if (s.nextApproachIn <= 0) {
+    s.nextApproachIn = sendApproach(s) ? APPROACH_GAP + roll(s) * APPROACH_GAP : 45
   }
+}
 
-  // --- the clamps -----------------------------------------------------
+/**
+ * The clamps: new traffic arrives, and every hull already on the board moves
+ * through inbound, hailing, docked and departing — or, for the ones with an
+ * intent, through the loiter/demand/raid sequence.
+ */
+const stepTraffic = (s: GameState, dt: number): void => {
   s.nextVisitorIn -= dt
   if (s.nextVisitorIn <= 0) {
     // A hub is a reason to stop here rather than pass by.
@@ -471,8 +537,14 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       s.visitors = s.visitors.filter((x) => x.id !== v.id)
     }
   }
+}
 
-  // --- the fleet ------------------------------------------------------
+/**
+ * The fleet: contracts spawn on the board, and every launched mission moves —
+ * open jobs accrue haul and strain, unfolding jobs hail partway through, and
+ * anything whose clock ran out gets resolved.
+ */
+const stepFleet = (s: GameState, dt: number): void => {
   s.nextContractIn -= dt
   if (s.nextContractIn <= 0) {
     s.nextContractIn = 70 + roll(s) * 80
@@ -579,9 +651,13 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
 
     if (m.remaining <= 0) resolveMission(s, m)
   }
+}
 
-  // Applicants HQ has dispatched: first they fly out, then they wait — and
-  // they do not wait forever.
+/**
+ * Applicants HQ has dispatched: first they fly out, then they wait — and they
+ * do not wait forever.
+ */
+const stepCandidates = (s: GameState, dt: number): void => {
   for (const cand of [...s.candidates]) {
     if (cand.arrivesIn > 0) {
       cand.arrivesIn -= dt
@@ -597,16 +673,65 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
       log(s, `${cand.name} got tired of waiting and undocked.`, 'warn')
     }
   }
+}
+
+/** Random incidents: fire, vermin, breach and pirates start somewhere new. */
+const stepIncidentSchedule = (s: GameState, dt: number): void => {
   s.nextIncidentIn -= dt
   if (s.nextIncidentIn <= 0) {
     s.nextIncidentIn = 90 + roll(s) * 150
     rollIncident(s)
   }
+}
 
+/** The end of the run: nobody left aboard to run it. */
+const checkGameOver = (s: GameState): void => {
   if (s.crew.length > 0 && s.crew.every((c) => c.dead) && !s.gameOver) {
     s.gameOver = true
     log(s, 'The last of the crew is gone. Spaceport-99 drifts dark and silent.', 'bad')
   }
+}
+
+/**
+ * Advances the simulation by `dt` seconds. `dt` should stay at or below 1.
+ * While catching up on offline time nobody dies — the player comes back to a
+ * station in crisis rather than to a tomb they had no chance to prevent.
+ */
+export const step = (s: GameState, dt: number, offline: boolean): void => {
+  const ctx: TickCtx = {
+    crewById: new Map(s.crew.map((c) => [c.id, c])),
+    derived: derive(s),
+    alive: s.crew.filter((c) => !c.dead),
+    grid: 1,
+    brownout: false,
+    starving: false,
+    suffocating: false,
+    healRate: 0,
+  }
+  s.elapsed += dt
+
+  stepPowerGrid(s, dt, ctx)
+  stepProduction(s, dt, ctx)
+  stepLifeSupport(s, dt, ctx)
+  stepMedBay(s, ctx)
+  stepEngineeringBay(s, dt, ctx)
+  stepResearchLab(s, dt, ctx)
+  stepFabShop(s, dt, ctx)
+  stepIncidents(s, dt, ctx)
+  stepCrewWellbeing(s, dt, ctx, offline)
+  stepDockingFees(s, dt)
+  stepCooldowns(s, dt)
+  stepCells(s, dt)
+  stepTakeover(s, dt, offline)
+  stepQuestline(s, dt)
+  stepLevy(s, dt)
+  stepLoiterers(s, dt)
+  stepApproaches(s, dt)
+  stepTraffic(s, dt)
+  stepFleet(s, dt)
+  stepCandidates(s, dt)
+  stepIncidentSchedule(s, dt)
+  checkGameOver(s)
 }
 
 export const completeCycle = (

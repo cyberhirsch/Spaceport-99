@@ -252,7 +252,11 @@ export const FleetPanel = ({
                 >
                   <span className="mission__name">
                     {m.name}
-                    {!heard && <em className="mission__silent">out of contact</em>}
+                    {!heard && (
+                      <em className="mission__silent">
+                        {m.far ? 'past the envelope' : 'out of contact'}
+                      </em>
+                    )}
                   </span>
                   <span className="mission__meta">
                     {state.ships.find((x) => x.id === m.shipId)?.name ?? 'ship lost'} ·{' '}
@@ -367,6 +371,12 @@ export const FleetPanel = ({
                   ' They stay out until you call them home, and the longer they stay the more they bring and the worse the odds.'}
                 {m.shape === 'unfolding' && ' Expect them to hail before it is over.'}
               </span>
+              {m.far && (
+                <span className="mission__duty mission__duty--far">
+                  Past the comms envelope. Nobody here can reach them once they go, so whatever
+                  they are asked out there, they answer themselves.
+                </span>
+              )}
               {m.obligation && m.standing && (
                 <span className="mission__duty">
                   Tasked by {factionDef(m.standing[0]).name}. There is no fee — passing it is what

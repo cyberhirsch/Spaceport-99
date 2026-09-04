@@ -47,6 +47,11 @@ export type ModuleKind =
   | 'observatory'
   | 'lounge'
   | 'vault'
+  | 'brig'
+  | 'reclaimer'
+  | 'sensor'
+  | 'market'
+  | 'dso'
 
 /** Static definition of a buildable module. */
 export interface ModuleDef {
@@ -75,7 +80,6 @@ export interface ModuleDef {
   powerDraw: number
   /** Extra crew capacity granted per segment per level. */
   crewCapacity?: number
-  /** Extra storage cap granted per segment per level, applied to every resource. */
   /**
    * How much more of its own resource the station can bank because this room
    * exists. A reactor buys capacitor space, an air plant buys tankage. Only
@@ -102,6 +106,21 @@ export interface ModuleDef {
   guns?: number
   /** Damage absorbed per segment per level, for the shield projector. */
   shield?: number
+  /** Holding cells per segment per level, for the brig. */
+  cells?: number
+  /** Fraction cut off what the crew burn, per segment per level. */
+  recycles?: number
+  /** How much of the scan's uncertainty this resolves, per segment per level. */
+  sensors?: number
+  /** Bonded cargo lots the station may hold, per segment per level. */
+  lots?: number
+  /**
+   * Pull on passing traffic and the margin you trade at, per segment per level.
+   * The Trading Hub is the only room with any.
+   */
+  commerce?: number
+  /** Reach for far contracts, per segment per level. Deep Space Operations only. */
+  reach?: number
 }
 
 /** A built (possibly merged) room occupying contiguous slots on one deck. */
@@ -209,7 +228,7 @@ export type ItemSlot = 'sidearm' | 'armour'
 export type ItemId = 'sidearm' | 'lance' | 'torch' | 'plate'
 
 /** Things that have to be found and worked out before they exist for you. */
-export type SpecId = 'shield' | 'vault' | 'torch'
+export type SpecId = 'shield' | 'vault' | 'torch' | 'astro' | 'filter'
 
 /** The powers whose space the traffic comes from, plus everyone off their books. */
 export type FactionId = 'terran' | 'concern' | 'compact' | 'unlisted'
@@ -232,6 +251,41 @@ export type DialogueEffect =
   | { type: 'cheapShip'; cls: ShipClass; price: number }
   | { type: 'repair' }
   | { type: 'leadMission' }
+
+/**
+ * Somebody in the cells. They arrived off a hull you would not clear, or out of
+ * a boarding action that went your way, and they are now a decision rather than
+ * a number: hand them over, let them go, or talk to them.
+ */
+export interface Prisoner {
+  id: string
+  name: string
+  /** Whose paper they were flying when you took them. */
+  faction: FactionId
+  /** What they were taken for, in words. */
+  charge: string
+  /** The hull they came off, for the record. */
+  hull: string
+  stats: Stats
+  seed: number
+  portrait?: number
+  /** Seconds they have been aboard. Long stays are noticed. */
+  held: number
+}
+
+/**
+ * A lot of cargo the station bought to sell on rather than to use. It is not
+ * yours until somebody pays for it, which is the whole risk.
+ */
+export interface BondedLot {
+  id: string
+  resource: ResourceKey
+  units: number
+  /** What it cost, so the readout can show whether you are up or down. */
+  paid: number
+  /** Who sold it to you. */
+  from: FactionId
+}
 
 /**
  * Someone off a berthed ship, walking your decks while their hull is clamped.
@@ -439,6 +493,12 @@ export interface Mission {
    * beyond not being the kind of station that says no.
    */
   obligation: boolean
+  /**
+   * Work past the comms envelope. It pays far better and takes far longer, and
+   * nobody at the station can reach the team while they are out there — so
+   * every hail on the way is answered by the crew, not by you.
+   */
+  far: boolean
   outcome: MissionOutcome | null
   /** Written when the mission resolves, read in the after-action report. */
   report: string | null
@@ -513,6 +573,10 @@ export interface GameState {
    * themselves live in code and would not survive a round trip through JSON.
    */
   talk: Talk | null
+  /** People in the cells, and how they got there. */
+  prisoners: Prisoner[]
+  /** Cargo bought to sell on, sitting in the bonded cage. */
+  bonded: BondedLot[]
   /** Seconds until somebody might come for the station. */
   nextTakeoverIn: number
   /** Ids of crew that arrived but have not been greeted yet (for the toast). */

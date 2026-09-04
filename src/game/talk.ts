@@ -1,4 +1,4 @@
-import type { Candidate, Crew, GameState, Guest, Prospect, Visitor } from './types.ts'
+import type { Candidate, Crew, GameState, Guest, Prisoner, Prospect, Visitor } from './types.ts'
 
 /**
  * Conversations.
@@ -18,8 +18,9 @@ export type SpeakerRef =
   | { kind: 'guest'; id: string }
   | { kind: 'candidate'; id: string }
   | { kind: 'visitor'; id: string }
+  | { kind: 'prisoner'; id: string }
 
-export type ScriptId = 'crew' | 'hire' | 'captain' | 'conquest'
+export type ScriptId = 'crew' | 'hire' | 'captain' | 'conquest' | 'prisoner'
 
 /** One exchanged line, kept so the conversation reads as a conversation. */
 export interface TalkLine {
@@ -57,6 +58,8 @@ export interface TalkCtx {
   candidate?: Candidate
   /** The hull in question: the visitor themselves, or the one a guest came on. */
   ship?: Visitor
+  /** Somebody in the cells. */
+  prisoner?: Prisoner
   /** The persuasion subject, for the scripts that are about talking someone round. */
   prospect?: Prospect
   has: (flag: string) => boolean
@@ -147,6 +150,11 @@ export const speaker = (s: GameState, ref: SpeakerRef): TalkCtx | null => {
       }
     }
     return gone()
+  }
+  if (ref.kind === 'prisoner') {
+    const prisoner = s.prisoners.find((p) => p.id === ref.id)
+    if (!prisoner) return gone()
+    return { ...base, name: prisoner.name, prisoner }
   }
   const ship = s.visitors.find((v) => v.id === ref.id)
   if (!ship) return gone()

@@ -5,10 +5,13 @@ import {
   derive,
   dockOfficers,
   heldItems,
+  lotsAboard,
+  scanOf,
+  sellMargin,
   visitorPhase,
 } from '../game/engine.ts'
 import { shipDef } from '../game/fleet.ts'
-import { SELL_MARGIN, TRADE_LOT, scanReading, visitorDef } from '../game/visitors.ts'
+import { TRADE_LOT, scanReading, visitorDef } from '../game/visitors.ts'
 import { factionDef } from '../game/factions.ts'
 import { itemDef, stock } from '../game/gear.ts'
 import { RESOURCE_INFO, type GameState, type ItemId, type ResourceKey } from '../game/types.ts'
@@ -23,6 +26,8 @@ interface Props {
   onRefuse: () => void
   onTrade: (resource: ResourceKey, buy: boolean) => void
   onBuyGear: (item: ItemId) => void
+  onBond: (resource: ResourceKey) => void
+  onSellLot: (lotId: string) => void
   onSelectGuest: (guestId: string) => void
   onAutoAccept: (on: boolean) => void
   onTalk: () => void
@@ -36,12 +41,15 @@ export const VisitorModal = ({
   onRefuse,
   onTrade,
   onBuyGear,
+  onBond,
+  onSellLot,
   onSelectGuest,
   onAutoAccept,
   onTalk,
 }: Props) => {
   const v = state.visitors.find((x) => x.id === visitorId)
   const derived = derive(state)
+  const lots = lotsAboard(state)
   const held = heldItems(state)
   const room = derived.holdCap - held
   if (!v) return null
@@ -92,7 +100,7 @@ export const VisitorModal = ({
 
         <div className={`scan scan--${v.suspicion > 0.6 ? 'bad' : v.suspicion > 0.35 ? 'warn' : 'ok'}`}>
           <span>Scan</span>
-          <b>{scanReading(v.suspicion)}</b>
+          <b>{scanReading(scanOf(state, v))}</b>
         </div>
         <p className="panel-note">
           They will hold for {Math.ceil(v.timer)}s. A clean manifest is not a promise, and turning
@@ -185,7 +193,7 @@ export const VisitorModal = ({
         {(['power', 'air', 'food'] as ResourceKey[]).map((key) => {
           const info = RESOURCE_INFO[key]
           const buyCost = Math.round(TRADE_LOT * v.prices[key])
-          const sellGain = Math.round(TRADE_LOT * v.prices[key] * SELL_MARGIN)
+          const sellGain = Math.round(TRADE_LOT * v.prices[key] * sellMargin(state))
           return (
             <li key={key}>
               <span className="trade__what">
@@ -210,6 +218,60 @@ export const VisitorModal = ({
           )
         })}
       </ul>
+
+      {lots > 0 && (
+        <>
+          <h3 className="modal__sub">
+            Bonded cage ({state.bonded.length}/{lots})
+          </h3>
+          <p className="panel-note">
+            Cargo bought to sell on rather than to use. It never touches the station's own tanks,
+            and it is worth whatever the next hull to dock will pay — which is the whole risk.
+          </p>
+
+          {state.bonded.length > 0 && (
+            <ul className="trade trade--bonded">
+              {state.bonded.map((lot) => {
+                const take = Math.round(lot.units * v.prices[lot.resource] * sellMargin(state))
+                const swing = take - lot.paid
+                return (
+                  <li key={lot.id}>
+                    <span className="trade__what">
+                      {RESOURCE_INFO[lot.resource].icon} {lot.units}{' '}
+                      {RESOURCE_INFO[lot.resource].name}
+                      <em>
+                        Cost {lot.paid}c off {factionDef(lot.from).short} ·{' '}
+                        {swing >= 0 ? `up ${swing}c` : `down ${-swing}c`} at this hull's price
+                      </em>
+                    </span>
+                    <button className="btn btn--tiny" onClick={() => onSellLot(lot.id)}>
+                      Sell {take}c
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          <div className="modal__actions">
+            {(['power', 'air', 'food'] as ResourceKey[]).map((key) => {
+              const cost = Math.round(TRADE_LOT * v.prices[key])
+              const full = state.bonded.length >= lots
+              return (
+                <button
+                  key={key}
+                  className="btn btn--tiny"
+                  disabled={full || state.credits < cost}
+                  onClick={() => onBond(key)}
+                  title={full ? 'The cage is full' : undefined}
+                >
+                  Bond {TRADE_LOT} {RESOURCE_INFO[key].name} — {cost}c
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
 
       {stock(v.faction).length > 0 && (
         <>

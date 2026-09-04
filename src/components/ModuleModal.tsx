@@ -25,7 +25,7 @@ import {
 } from '../game/types.ts'
 import type { DragState } from '../hooks/useDragAssign.ts'
 import { ConfirmModal } from './ConfirmModal.tsx'
-import { FabPanel, LabPanel } from './Workbench.tsx'
+import { BrigPanel, FabPanel, LabPanel } from './Workbench.tsx'
 import { CrewAvatar } from './CrewAvatar.tsx'
 import { Modal } from './Modal.tsx'
 
@@ -45,6 +45,7 @@ interface Props {
   onMove: () => void
   onResearch: (spec: SpecId | null) => void
   onFabricate: (item: ItemId | null) => void
+  onTalkPrisoner: (prisonerId: string) => void
 }
 
 export const ModuleModal = ({
@@ -63,6 +64,7 @@ export const ModuleModal = ({
   onMove,
   onResearch,
   onFabricate,
+  onTalkPrisoner,
 }: Props) => {
   const [scrapping, setScrapping] = useState(false)
   const m = state.modules.find((x) => x.id === moduleId)
@@ -219,6 +221,7 @@ export const ModuleModal = ({
 
       {m.kind === 'library' && <LabPanel state={state} onResearch={onResearch} />}
       {m.kind === 'fabricator' && <FabPanel state={state} onFabricate={onFabricate} />}
+      {m.kind === 'brig' && <BrigPanel state={state} onTalk={onTalkPrisoner} />}
 
       {d.slotsPerSegment > 0 && (
         <p className="panel-note">

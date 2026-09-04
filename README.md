@@ -116,7 +116,7 @@ threat bigger and the odds better at the same time.
 ## Talking to people
 
 Every person on the station or at its clamps can be talked to, and the conversation is the
-mechanism rather than a wrapper around one. Four scripts, in `src/game/talks/`:
+mechanism rather than a wrapper around one. Five scripts, in `src/game/talks/`:
 
 - **Your crew** tell you what is actually wrong with the place, worst thing first, in the order
   a person would say it. They will ask for the posting they are built for, and being thanked for
@@ -132,12 +132,70 @@ mechanism rather than a wrapper around one. Four scripts, in `src/game/talks/`:
   it out there if it is worth mentioning. You can press one on what they are really carrying,
   and let a dirty hull go or send it away. Leaning on a hull is cheap from behind a staffed
   battery and expensive from behind nothing.
+- **Somebody in the cells** — four doors: what were you carrying, hand them over,
+  let them go, or offer them a berth. What they say depends on how long they have
+  been in there and whether their own people would have come back for them.
 - **A takeover**, above.
 
 Under the hood: `src/game/talk.ts` is the engine and holds no content. Only the pointer is saved
 — which script, which line, and what has been established — so a reply can carry a closure and
 still survive a reload. A node marked `sticky` cannot be walked away from; one marked `final`
 still renders after the person has left, which is how a signed contract gets its closing line.
+
+## Twenty-five rooms, from nothing to sixty
+
+Every room names a headcount, and the curve runs from the four you start with to a
+Deep Space Operations suite that wants **sixty people aboard**. That is the whole
+progression: bunks are the bottleneck, so the roster is what you are really
+building. HQ sends roughly a dozen people an hour once there is somewhere to put
+them, which puts the far end of the curve about four and a half hours out.
+
+Five of those rooms do something no other room does:
+
+| Room | Crew | Gate | What only it can do |
+| --- | --- | --- | --- |
+| **Water Reclamation** | 24 | — | Cuts what the crew burn instead of producing more. The first room whose worth depends on how many people you have rather than how much you make — and the moment it goes dark the burn snaps back. |
+| **Brig** | 28 | — | Somewhere to put a person. Cells only hold while somebody is standing in the room. |
+| **Sensor Array** | 39 | spec | Pulls the docking scan towards what a hull actually is. Never all the way. |
+| **Trading Hub** | 52 | — | Traffic stops here more often and pays nearer what it asks — and the bonded cage holds cargo that is not yours yet. |
+| **Deep Space Operations** | 60 | spec | Contracts past the comms envelope. |
+
+### The Brig
+
+A dishonest hull can now be *arrested* rather than only waved off. Whoever comes
+down the gangway goes in the cells, their power minds and yours does not, and the
+hull leaves without them.
+
+After that a prisoner is a decision, not a timer. Hand them to the flag you fly
+for standing and 240c. Let them go, and the Drift keeps its own books about
+stations that do. Or leave them a few minutes and offer them a berth — asked
+through the bars they will tell you to try again with the door open, and asked
+with the door open they mostly sign, because the people who end up in a cell out
+here rarely have somewhere better.
+
+Take the watch off the Brig and whoever is inside is gone by the next shift.
+
+### The Trading Hub
+
+Two things at once. As a **market** it shortens the gap between hulls and lifts
+what they will pay for your surplus from 55% of their asking price towards 92%,
+which is the only thing in the game that improves a trade you were always going
+to lose on.
+
+As a **bonded cage** it holds cargo you bought to sell on. A lot never touches
+the station's own tanks — it is not yours until somebody pays for it. Buy cheap
+off a Drift hull, hold it, and sell it to the Concern when one docks; sell it
+back to the hull you bought from and you will be down on the deal, which is the
+whole point of waiting.
+
+### Far work
+
+Deep Space Operations unlocks a class of contract that pays about three and a
+half times as much and takes about three times as long — and that **nobody at the
+station can reach**. The mission-hail system already handles a team deciding for
+itself when no controller is holding the channel; on far work that is not a
+mistake you made by understaffing Command, it is the deal. You find out what they
+chose when they get back.
 
 ## Three shapes of work
 
@@ -200,12 +258,12 @@ than shipped as a glyph, so the four that remain are the four you can see.
 
 ## Things nobody will sell you
 
-Three things on this station cannot be bought, bribed for, or unlocked by getting big enough.
+Five things on this station cannot be bought, bribed for, or unlocked by getting big enough.
 They have to be **found**, then **worked out**, and for two of them **made**.
 
 A working drawing turns up on a job — a survey hull that never filed its own design, a Drift
 salvor who wrote down what everything is worth, a boarding party that no longer needs its kit.
-The chance rises with how dangerous the contract was, and there are only three in the game.
+The chance rises with how dangerous the contract was, and there are only five in the game.
 
 A drawing on its own is a stack of somebody else's paper. The **Research Lab** works one out at
 a time, at a rate set by its crew's Intellect, its size and its level — and because the lab
@@ -217,6 +275,8 @@ another; paper keeps, and the shelved one holds the progress it already had.
 | Field Projector Geometry | Shield Projector | build it |
 | Reclamation Sorting Tables | Reclamation Bay | build it |
 | Breaching Torch Pattern | Breaching Torch | run it off, 380c a unit |
+| Phased Return Filtering | Sensor Array | build it |
+| Long-Baseline Astrogation | Deep Space Operations | build it |
 
 Rooms stop there: building one *is* the manufacture. Kit does not — a worked-out pattern goes to
 the **Fab Shop**, which charges the materials up front and runs one item at a time into the hold.

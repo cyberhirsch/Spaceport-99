@@ -20,7 +20,9 @@ import {
   moduleShield,
   shipBerths,
   staffSlots,
+  cellCount,
   holdBonus,
+  lotCount,
   storageBonus,
   touchesLift,
   upgradeCost,
@@ -34,6 +36,7 @@ import {
   effectiveness,
   grantXp,
   makeCrew,
+  randomName,
   rollStats,
   uid,
 } from './crew.ts'
@@ -44,6 +47,7 @@ import { rollCall, unattended } from './calls.ts'
 import './talks/crew.ts'
 import './talks/hire.ts'
 import './talks/captain.ts'
+import './talks/prisoner.ts'
 import { resolveFight } from './talks/conquest.ts'
 import { ITEM_SPEC, MODULE_SPEC, SPEC_IDS, specDef } from './specs.ts'
 import { beginTalk, labelOf, nodeOf, offered, speaker } from './talk.ts'
@@ -73,7 +77,7 @@ import {
   teamSize,
   tradeInValue,
 } from './fleet.ts'
-import { SELL_MARGIN, TRADE_LOT, makeGuests, makeVisitor } from './visitors.ts'
+import { SELL_MARGIN, TRADE_LOT, makeGuests, makeVisitor, visitorDef } from './visitors.ts'
 import type {
   Candidate,
   Crew,
@@ -81,6 +85,7 @@ import type {
   ItemId,
   ItemSlot,
   SpecId,
+  Prisoner,
   Prospect,
   Mission,
   Ship,
@@ -268,8 +273,11 @@ export const derive = (s: GameState): Derived => {
     }
   }
 
-  airRate -= crewAlive.length * AIR_PER_CREW
-  foodRate -= crewAlive.length * FOOD_PER_CREW
+  // A reclaimer does not make anything; it stops the crew getting through as
+  // much, which on a big roster is worth more than another farm.
+  const kept = 1 - recycled(s)
+  airRate -= crewAlive.length * AIR_PER_CREW * kept
+  foodRate -= crewAlive.length * FOOD_PER_CREW * kept
   creditRate += dockingFees(s)
 
   return {
@@ -342,6 +350,8 @@ export const newGame = (name = 'Spaceport-99'): GameState => {
     researching: null,
     fabricating: null,
     talk: null,
+    prisoners: [],
+    bonded: [],
     nextTakeoverIn: 20 * 60 + Math.random() * 20 * 60,
     seenIntro: false,
     gameOver: false,
@@ -536,7 +546,7 @@ const unassign = (s: GameState, crewId: string, remember = false): void => {
   c.assignment = null
 }
 
-const assign = (s: GameState, crewId: string, moduleId: string): boolean => {
+export const assign = (s: GameState, crewId: string, moduleId: string): boolean => {
   const c = s.crew.find((x) => x.id === crewId)
   const m = s.modules.find((x) => x.id === moduleId)
   if (!c || !m || c.dead) return false
@@ -608,6 +618,142 @@ export const clamp = (v: number, lo: number, hi: number): number => Math.min(hi,
 export const scrapValue = (s: GameState, m: StationModule): number =>
   Math.round(buildCost(m.kind, Math.max(0, countOfKind(s, m.kind) - 1)) * 0.5 * m.width)
 
+
+/** Cells across every staffed, powered Brig. Unstaffed, they do not hold. */
+export const cellsAboard = (s: GameState): number => {
+  const crewById = new Map(s.crew.map((c) => [c.id, c]))
+  let n = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'brig' || m.standby) continue
+    if (workRate(m, crewById) <= 0) continue
+    n += cellCount(m)
+  }
+  return n
+}
+
+/** Bonded lots the cage can hold. */
+export const lotsAboard = (s: GameState): number => {
+  let n = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'market' || m.standby) continue
+    n += lotCount(m)
+  }
+  return n
+}
+
+/**
+ * What a Trading Hub is worth, 0 upwards. It pulls traffic in and narrows the
+ * gap between what a hull charges you and what it will pay you.
+ */
+export const commerce = (s: GameState): number => {
+  const crewById = new Map(s.crew.map((c) => [c.id, c]))
+  let n = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'market' || m.standby) continue
+    n += (def(m.kind).commerce ?? 0) * m.width * m.level * mergeBonus(m) * workRate(m, crewById)
+  }
+  return n
+}
+
+/** How much of what the crew burn is recovered, capped short of free. */
+export const recycled = (s: GameState): number => {
+  const crewById = new Map(s.crew.map((c) => [c.id, c]))
+  let n = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'reclaimer' || m.standby) continue
+    n += (def(m.kind).recycles ?? 0) * m.width * m.level * mergeBonus(m) * workRate(m, crewById)
+  }
+  return Math.min(0.55, n)
+}
+
+/** How much of the scan's uncertainty a Sensor Array resolves, 0..0.9. */
+export const sensorEdge = (s: GameState): number => {
+  const crewById = new Map(s.crew.map((c) => [c.id, c]))
+  let n = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'sensor' || m.standby) continue
+    n += (def(m.kind).sensors ?? 0) * m.width * m.level * mergeBonus(m) * workRate(m, crewById)
+  }
+  return Math.min(0.9, n)
+}
+
+/** Whether the station can send teams past the comms envelope, and how far. */
+export const reach = (s: GameState): number => {
+  const crewById = new Map(s.crew.map((c) => [c.id, c]))
+  let n = 0
+  for (const m of s.modules) {
+    if (m.kind !== 'dso' || m.standby) continue
+    n += (def(m.kind).reach ?? 0) * m.width * m.level * mergeBonus(m) * workRate(m, crewById)
+  }
+  return n
+}
+
+/**
+ * What a hull will pay for your surplus, as a fraction of what it charges.
+ * Without a floor to trade on you take what you are given; a Trading Hub
+ * closes most of that gap, and never all of it.
+ */
+export const sellMargin = (s: GameState): number =>
+  Math.min(0.92, SELL_MARGIN + commerce(s) * 0.14)
+
+/**
+ * The suspicion figure the desk actually sees.
+ *
+ * The raw number is deliberately unreliable — trouble mostly scans dirty and
+ * honest ships mostly scan clean, and the overlap in the middle is the point of
+ * the docking desk. A Sensor Array pulls the reading towards the truth of what
+ * the hull *is*, without ever making it certain.
+ */
+export const scanOf = (s: GameState, v: Visitor): number => {
+  const edge = sensorEdge(s)
+  if (edge <= 0) return v.suspicion
+  const truth = visitorDef(v.kind).trouble ? 1 : 0
+  return clamp(v.suspicion + (truth - v.suspicion) * edge, 0, 1)
+}
+
+/**
+ * Take somebody off a hull and put them in the cells.
+ *
+ * They keep their name, their face and whose paper they were flying, because
+ * all three matter later: a prisoner is somebody you hand over, let go, or talk
+ * into staying, and every one of those is a different conversation.
+ */
+export const arrest = (s: GameState, v: Visitor, charge: string): boolean => {
+  if (s.prisoners.length >= cellsAboard(s)) {
+    log(s, `Nowhere to put them. Every cell is full.`, 'warn')
+    return false
+  }
+  // Whoever came down the gangway first is who your people get hold of.
+  const taken = v.aboard[0]
+  const seed = taken?.seed ?? Math.floor(Math.random() * 1e9)
+  s.prisoners.push({
+    id: uid('p'),
+    name: taken?.name ?? randomName(),
+    faction: v.faction,
+    charge,
+    hull: v.name,
+    stats: taken?.stats ?? rollStats(6),
+    seed,
+    portrait: taken?.portrait ?? allocatePortrait(s),
+    held: 0,
+  })
+  if (taken) v.aboard = v.aboard.filter((g) => g.id !== taken.id)
+  return true
+}
+
+/** Somebody in the cells, or null if they are no longer there. */
+export const prisonerById = (s: GameState, id: string): Prisoner | null =>
+  s.prisoners.find((p) => p.id === id) ?? null
+
+/**
+ * Whether the next contract on the wire is far work. Nothing offers it until
+ * somebody aboard can plot a fix without a beacon, and even then it stays the
+ * minority of what comes in.
+ */
+const rollFar = (s: GameState): boolean => {
+  const r = reach(s)
+  return r > 0 && Math.random() < Math.min(0.45, 0.18 + r * 0.12)
+}
 
 /** Every hull name currently in play, so a new one never collides. */
 const namesInPlay = (s: GameState): string[] => [
@@ -707,8 +853,13 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
 
   // --- life support ---------------------------------------------------
   s.resources.power = clamp(s.resources.power, 0, d.caps.power)
-  s.resources.air = clamp(s.resources.air - alive.length * AIR_PER_CREW * dt, 0, d.caps.air)
-  s.resources.food = clamp(s.resources.food - alive.length * FOOD_PER_CREW * dt, 0, d.caps.food)
+  const kept = 1 - recycled(s)
+  s.resources.air = clamp(s.resources.air - alive.length * AIR_PER_CREW * kept * dt, 0, d.caps.air)
+  s.resources.food = clamp(
+    s.resources.food - alive.length * FOOD_PER_CREW * kept * dt,
+    0,
+    d.caps.food,
+  )
 
   const starving = s.resources.food <= 0
   const suffocating = s.resources.air <= 0
@@ -926,6 +1077,19 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
 
   // --- random events --------------------------------------------------
   s.broadcastCooldown = Math.max(0, s.broadcastCooldown - dt)
+  // --- the cells --------------------------------------------------------
+  // A brig that is dark, or that nobody is standing in, does not hold anybody.
+  if (s.prisoners.length > 0) {
+    for (const p of s.prisoners) p.held += dt
+    const cells = cellsAboard(s)
+    while (s.prisoners.length > cells) {
+      const gone = s.prisoners.pop()
+      if (!gone) break
+      log(s, `${gone.name} is out of the cells and off the station.`, 'bad')
+      shift(s, gone.faction, 0.02)
+    }
+  }
+
   // --- somebody coming for the station --------------------------------
   // Only while nothing else is being said, and never to a station nobody
   // would bother with.
@@ -941,7 +1105,9 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
   // --- the clamps -----------------------------------------------------
   s.nextVisitorIn -= dt
   if (s.nextVisitorIn <= 0) {
-    s.nextVisitorIn = 80 + Math.random() * 120
+    // A hub is a reason to stop here rather than pass by.
+    const pull = 1 / (1 + commerce(s) * 0.55)
+    s.nextVisitorIn = (80 + Math.random() * 120) * pull
     if (s.visitors.length < visitorBerths(s)) {
       const hail = makeVisitor(namesInPlay(s))
       s.visitors.push(hail)
@@ -993,11 +1159,12 @@ const step = (s: GameState, dt: number, offline: boolean): void => {
       s.missions.push(
         patron && duty
           ? makeMission(appeal(s), {
+              far: rollFar(s),
               obligation: true,
               standing: [patron, 0.05],
               name: `${factionDef(patron).short} tasking`,
             })
-          : makeMission(appeal(s)),
+          : makeMission(appeal(s), { far: rollFar(s) }),
       )
       if (patron && duty) log(s, `${factionDef(patron).name} has tasked the station.`, 'warn')
     }
@@ -1126,7 +1293,7 @@ const admitVisitor = (s: GameState, v: Visitor): void => {
       s.credits += paid
       // Couriers carry paper, which sometimes means work.
       if (s.missions.filter((m) => m.status === 'offered').length < 3) {
-        s.missions.push(makeMission(appeal(s)))
+        s.missions.push(makeMission(appeal(s), { far: rollFar(s) }))
         log(s, `${v.name} dropped a contract and a bill. +${paid}c.`, 'good')
       } else {
         log(s, `${v.name} dropped the mail. +${paid}c.`, 'good')
@@ -1420,6 +1587,8 @@ export type Action =
   | { type: 'refuseVisitor'; visitorId: string }
   | { type: 'setAutoAccept'; moduleId: string; autoAccept: boolean }
   | { type: 'tradeVisitor'; visitorId: string; resource: ResourceKey; buy: boolean }
+  | { type: 'bondLot'; visitorId: string; resource: ResourceKey }
+  | { type: 'sellLot'; visitorId: string; lotId: string }
   | { type: 'answerGuest'; guestId: string; yes: boolean }
   | { type: 'recall'; missionId: string }
   | { type: 'answerCall'; missionId: string; choice: number }
@@ -1613,7 +1782,9 @@ export const missionBerths = (s: GameState): number =>
  * bring anybody home — it just stops you being able to tell them anything.
  */
 export const inContact = (s: GameState): Set<string> => {
-  const flying = s.missions.filter((m) => m.status === 'flying' || m.status === 'calling')
+  const flying = s.missions.filter(
+    (m) => (m.status === 'flying' || m.status === 'calling') && !m.far,
+  )
   return new Set(flying.slice(0, missionCapacity(s)).map((m) => m.id))
 }
 
@@ -2194,10 +2365,55 @@ export const reducer = (state: GameState, action: Action): GameState => {
         const lot = Math.min(TRADE_LOT, Math.floor(s.resources[action.resource]))
         if (lot <= 0) return state
         s.resources[action.resource] -= lot
-        s.credits += Math.round(lot * unit * SELL_MARGIN)
+        s.credits += Math.round(lot * unit * sellMargin(s))
       }
       // Commerce is how a station ends up with friends it did not plan on.
       shift(s, v.faction, 0.002)
+      break
+    }
+    case 'bondLot': {
+      const v = s.visitors.find((x) => x.id === action.visitorId)
+      if (!v || v.status !== 'docked') return state
+      if (s.bonded.length >= lotsAboard(s)) {
+        log(s, 'The bonded cage is full. Sell something on first.', 'warn')
+        break
+      }
+      // Bonded cargo never touches the station's own tanks — it is not yours.
+      const unit = v.prices[action.resource]
+      const paid = Math.round(TRADE_LOT * unit)
+      if (s.credits < paid) return state
+      s.credits -= paid
+      s.bonded.push({
+        id: uid('lot'),
+        resource: action.resource,
+        units: TRADE_LOT,
+        paid,
+        from: v.faction,
+      })
+      shift(s, v.faction, 0.004)
+      log(
+        s,
+        `Bonded ${TRADE_LOT} ${RESOURCE_INFO[action.resource].name.toLowerCase()} off ${v.name}. −${paid}c.`,
+        'info',
+      )
+      break
+    }
+    case 'sellLot': {
+      const v = s.visitors.find((x) => x.id === action.visitorId)
+      const lot = s.bonded.find((x) => x.id === action.lotId)
+      if (!v || v.status !== 'docked' || !lot) return state
+      // They pay their own price, not the one you bought at — which is the
+      // entire point of holding it until the right hull turns up.
+      const take = Math.round(lot.units * v.prices[lot.resource] * sellMargin(s))
+      s.credits += take
+      s.bonded = s.bonded.filter((x) => x.id !== lot.id)
+      const swing = take - lot.paid
+      log(
+        s,
+        `Sold a bonded lot to ${v.name} for ${take}c — ${swing >= 0 ? 'up' : 'down'} ${Math.abs(swing)}c on what it cost.`,
+        swing >= 0 ? 'good' : 'warn',
+      )
+      shift(s, v.faction, 0.004)
       break
     }
     case 'answerGuest': {
@@ -2209,7 +2425,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       if (!action.yes) break
 
       if (offer.kind === 'mission') {
-        s.missions.push(makeMission(appeal(s)))
+        s.missions.push(makeMission(appeal(s), { far: rollFar(s) }))
         log(s, `${g.name} handed over a contract off ${v.name}.`, 'good')
         break
       }

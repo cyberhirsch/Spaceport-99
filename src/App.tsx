@@ -365,6 +365,10 @@ export default function App() {
           onUpgrade={() => act({ type: 'upgrade', moduleId })}
           onResearch={(spec) => act({ type: 'research', spec })}
           onFabricate={(item) => act({ type: 'fabricate', item })}
+          onTalkPrisoner={(id) => {
+            act({ type: 'talk', script: 'prisoner', with: { kind: 'prisoner', id } })
+            setModuleId(null)
+          }}
           canMove={(() => {
             const m = state.modules.find((x) => x.id === moduleId)
             return Boolean(m && canMove(state, m))
@@ -396,6 +400,8 @@ export default function App() {
           }}
           onTrade={(resource, buy) => act({ type: 'tradeVisitor', visitorId, resource, buy })}
           onBuyGear={(item) => act({ type: 'buyGear', visitorId, item })}
+          onBond={(resource) => act({ type: 'bondLot', visitorId, resource })}
+          onSellLot={(lotId) => act({ type: 'sellLot', visitorId, lotId })}
           onSelectGuest={(id) => {
             setVisitorId(null)
             setGuestId(id)

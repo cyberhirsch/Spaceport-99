@@ -201,5 +201,5 @@ test('every spec unlocks something real, and nothing twice', () => {
     if (u.kind === 'item') assert.ok(specDef(id).build, `${id} has no build`)
     else assert.equal(specDef(id).build, undefined)
   }
-  assert.equal(SPEC_IDS.length, 3)
+  assert.equal(SPEC_IDS.length, 5)
 })

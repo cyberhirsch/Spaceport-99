@@ -3432,3 +3432,8 @@ input.rename:focus {
 .kit__label b {
   overflow-wrap: anywhere;
 }
+
+/* Far work is a different kind of risk from a dangerous contract. */
+.mission__duty--far {
+  color: var(--violet);
+}

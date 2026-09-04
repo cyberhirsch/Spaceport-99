@@ -41,6 +41,25 @@ export const SPEC_DEFS: Record<SpecId, SpecDef> = {
       'Somebody spent a lifetime learning which scrap is treasure. They wrote it down and then died.',
     effort: 780,
   },
+  astro: {
+    id: 'astro',
+    name: 'Long-Baseline Astrogation',
+    unlocks: { kind: 'module', module: 'dso' },
+    found:
+      'a survey hull that had been plotting fixes nobody asked for, on bearings nobody had charted',
+    blurb:
+      'How to know where you are when there is nothing near enough to take a bearing from. Four pages of it are corrections to the other two.',
+    effort: 1150,
+  },
+  filter: {
+    id: 'filter',
+    name: 'Phased Return Filtering',
+    unlocks: { kind: 'module', module: 'sensor' },
+    found: 'a patrol boat that had stopped caring who was lying to it',
+    blurb:
+      'Pulls the shape of a hull out of a return that was meant to look like rock. It does not make the scan certain. It makes it less of a guess.',
+    effort: 820,
+  },
   torch: {
     id: 'torch',
     name: 'Breaching Torch Pattern',

@@ -147,7 +147,16 @@ const PLACES = [
   'Mendel Station', 'the Scrapline', 'Kessler Deep', 'Barrow Point', 'the Long Dark',
 ]
 
-/** Rolls a contract sized to what the station can plausibly take on. */
+/**
+ * Where far work goes. Nothing here has a berth, a beacon or a name anybody
+ * agrees on — they are bearings that somebody wrote down once.
+ */
+const FAR_PLACES = [
+  'the Sable Gap', 'Bearing 4-1-9', 'the Quiet Shelf', 'Halloran Deep',
+  'the Unlit Chain', 'Nine Bells', 'the Coldest Bearing', 'Marrow Reach',
+  'the Silent Fifty', 'past the last beacon',
+]
+
 /** Which shapes each kind of work naturally comes in. */
 const SHAPES: Record<MissionKind, MissionShape[]> = {
   // A dead hull can be stripped for as long as you dare stay alongside it.
@@ -173,6 +182,8 @@ interface MissionOpts {
   standing?: [FactionId, number]
   obligation?: boolean
   name?: string
+  /** Offer work past the comms envelope, which only Deep Space Ops unlocks. */
+  far?: boolean
 }
 
 export const makeMission = (standing: number, opts: MissionOpts = {}): Mission => {
@@ -184,11 +195,19 @@ export const makeMission = (standing: number, opts: MissionOpts = {}): Mission =
   // A better-run station gets offered better, nastier work.
   const danger = Math.min(1, Math.max(0.1, standing * 0.8 + Math.random() * 0.35 - 0.1))
   // An open job has no clock of its own; `seconds` is only its trip home.
-  const seconds = shape === 'open' ? Math.round(40 + danger * 60) : Math.round(90 + danger * 240)
-  const scale = 90 + danger * 420
+  // Far work is a different order of job: weeks out instead of hours, paid to
+  // match, and out of reach the whole time.
+  const far = Boolean(opts.far)
+  const trip = far ? 3.2 : 1
+  const seconds = Math.round(
+    (shape === 'open' ? 40 + danger * 60 : 90 + danger * 240) * trip,
+  )
+  const scale = (90 + danger * 420) * (far ? 3.4 : 1)
   return {
     id: uid('m'),
-    name: opts.name ?? `${d.label} — ${PLACES[Math.floor(Math.random() * PLACES.length)]}`,
+    name:
+      opts.name ??
+      `${far ? 'Far ' : ''}${d.label} — ${(far ? FAR_PLACES : PLACES)[Math.floor(Math.random() * (far ? FAR_PLACES : PLACES).length)]}`,
     kind,
     shape,
     danger,
@@ -217,6 +236,7 @@ export const makeMission = (standing: number, opts: MissionOpts = {}): Mission =
     nextCall: shape === 'unfolding' ? Math.round(seconds * (0.25 + Math.random() * 0.2)) : 0,
     standing: opts.standing ?? null,
     obligation: Boolean(opts.obligation),
+    far,
     outcome: null,
     report: null,
     find: null,

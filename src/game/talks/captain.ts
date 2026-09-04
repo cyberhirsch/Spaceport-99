@@ -1,4 +1,4 @@
-import { ARMED_ENOUGH, defence, derive, shift } from '../engine.ts'
+import { ARMED_ENOUGH, arrest, cellsAboard, defence, derive, log, scanOf, shift } from '../engine.ts'
 import { factionDef } from '../factions.ts'
 import { shipDef } from '../fleet.ts'
 import { scanReading, visitorDef } from '../visitors.ts'
@@ -31,13 +31,13 @@ const script: TalkScript = {
       if (!v) return ''
       const claim = visitorDef(v.claim)
       if (v.status !== 'docked')
-        return `"${v.name}, ${claim.label.toLowerCase()}, asking for a berth. Scan reads ${scanReading(v.suspicion).toLowerCase()}, if you were wondering — I know you have one."`
+        return `"${v.name}, ${claim.label.toLowerCase()}, asking for a berth. Scan reads ${scanReading(scanOf(c.s, v)).toLowerCase()}, if you were wondering — I know you have one."`
       return `"Commander. ${claim.hail}"`
     },
     beat: (c) => {
       const v = c.ship
       if (!v) return null
-      return `${shipDef(v.cls).name} · ${factionDef(v.faction).short} · ${scanReading(v.suspicion)}`
+      return `${shipDef(v.cls).name} · ${factionDef(v.faction).short} · ${scanReading(scanOf(c.s, v))}`
     },
     replies: [
       { label: 'What is the news out there?', goto: 'news' },
@@ -149,6 +149,27 @@ const script: TalkScript = {
         goto: null,
       },
       {
+        label: 'Arrest them.',
+        note: (c) =>
+          cellsAboard(c.s) - c.s.prisoners.length <= 0
+            ? 'No cell free.'
+            : 'Off the hull and into the cells. Their people will hear about it.',
+        when: (c) => !honest(c) && cellsAboard(c.s) > 0,
+        barred: (c) =>
+          cellsAboard(c.s) - c.s.prisoners.length <= 0 ? 'Every cell is full' : null,
+        effect: (c) => {
+          const v = c.ship
+          if (!v) return
+          if (!arrest(c.s, v, 'a hold they would not account for')) return
+          v.status = 'requesting'
+          v.timer = 0
+          shift(c.s, v.faction, -0.07)
+          shift(c.s, 'terran', 0.04)
+          log(c.s, `Somebody off the ${v.name} is in the cells.`, 'warn')
+        },
+        goto: 'arrested',
+      },
+      {
         label: 'Tell them to undock.',
         note: () => 'Send them away over it.',
         when: (c) => !honest(c),
@@ -163,6 +184,14 @@ const script: TalkScript = {
         goto: 'sent-off',
       },
     ],
+  },
+
+  arrested: {
+    final: true,
+    text: (c) =>
+      `They do not resist, which is somehow worse. "You have made a note of this, then." The ${c.talk.who} is already backing off the clamps without her crewman.`,
+    beat: () => 'Somebody is in the cells now. That is a decision you have not made yet.',
+    replies: [{ label: 'Close', goto: null }],
   },
 
   'sent-off': {

@@ -428,7 +428,9 @@ src/
     crew.ts        name and stat generation, xp curve, effectiveness, portraits
     incidents.ts   the four emergency types and their numbers
     fleet.ts       ship classes, contract generation, mission resolution
-    engine.ts      the simulation: derive(), the per-second step, and the reducer
+    engine.ts      the simulation, as one import — a barrel over twelve layered modules:
+                   core → staffing → rooms → state → hazards → station → standing
+                   → recruit → missions → traffic → tick → reducer
     save.ts        localStorage round-trip
     __tests__/     station geometry, recruiting, and the mission lifecycle
   hooks/
@@ -463,6 +465,10 @@ itself — creating a Pages site needs `administration: write`, which is not a
 permission `permissions:` can grant. Until it is on, the deploy job fails with
 `Get Pages site failed … Not Found` while the build job stays green.
 
-`engine.ts` is the whole game. `reducer(state, action)` is the only way state
-changes, `advance(state, seconds)` splits any elapsed span into one-second steps,
-and `derive(state)` computes everything the UI displays but never stores.
+`engine.ts` is the whole game as far as anything outside `src/game/` knows: it
+re-exports twelve modules, layered so that each one only imports from the layers
+below it (constants and helpers at the bottom, the reducer at the top). Within
+them, `reducer(state, action)` in `reducer.ts` is the only way state changes,
+`advance(state, seconds)` in `tick.ts` splits any elapsed span into one-second
+steps, and `derive(state)` in `state.ts` computes everything the UI displays but
+never stores.

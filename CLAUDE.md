@@ -22,7 +22,7 @@ Only the reducer is exported to the UI; everything else stays inside the barrel.
 ## Verification
 
 Run these before pushing:
-- `npm test` — 277 tests, all seeded. Takes ~5s.
+- `npm test` — the whole suite, all seeded. Takes ~5s.
 - `npx tsc -b` — typecheck, ~2s.
 - `npx oxlint src` — lint, ~1s.
 - `npm run build` — bundle and check for tree-shake gaps, ~10s.

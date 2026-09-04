@@ -176,8 +176,9 @@ test('refusing brings them in, and being ready is worth something', () => {
   const after = talk.visitors[0]
   assert.equal(after.intent, 'raid', 'they are coming')
   assert.ok((after.force ?? 99) < 40, 'meeting it on your timing costs them')
-  // And it lands.
-  const done = advance(talk, 20)
+  // And it lands — once the channel is actually closed. Nothing moves while
+  // the closing line is still on screen.
+  const done = advance(say(talk, 'Close'), 20)
   assert.equal(done.visitors[0]?.intent, undefined, 'the raid resolved')
 })
 

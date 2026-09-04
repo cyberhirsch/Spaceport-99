@@ -794,11 +794,20 @@ export const completeCycle = (
   awardXp(s, m, 6 + m.width * 2)
 }
 
-/** Public tick: splits an arbitrary elapsed span into stable sub-steps. */
+/**
+ * Public tick: splits an arbitrary elapsed span into stable sub-steps.
+ *
+ * A conversation holds the station still. Nothing departs, spawns, burns down
+ * or starves while the commander is reading a line they cannot act around —
+ * and a hull that undocked mid-sentence is the worst of those. Catching up is
+ * exempt: a conversation left open overnight would otherwise be a pause button
+ * for the entire game.
+ */
 export const advance = (state: GameState, seconds: number, offline = false): GameState => {
   const s: GameState = structuredClone(state)
   let remaining = Math.min(seconds, MAX_CATCHUP_SECONDS)
   while (remaining > 0) {
+    if (s.talk && !offline) break
     const dt = Math.min(1, remaining)
     step(s, dt, offline)
     remaining -= dt

@@ -369,6 +369,29 @@ export default function App() {
             act({ type: 'talk', script: 'prisoner', with: { kind: 'prisoner', id } })
             setModuleId(null)
           }}
+          onReadFile={() => {
+            // The letter is a conversation, and a conversation needs somebody
+            // in it: whoever is on the array, or whoever is nearest.
+            const array = state.modules.find((x) => x.kind === 'comms')
+            const who =
+              derived.crewAlive.find((c) => c.assignment === array?.id) ?? derived.crewAlive[0]
+            if (!who) return
+            act({ type: 'talk', script: 'letter', with: { kind: 'crew', id: who.id }, node: 'list' })
+            setModuleId(null)
+          }}
+          onDecideFile={() => {
+            const array = state.modules.find((x) => x.kind === 'comms')
+            const who =
+              derived.crewAlive.find((c) => c.assignment === array?.id) ?? derived.crewAlive[0]
+            if (!who) return
+            act({
+              type: 'talk',
+              script: 'letter',
+              with: { kind: 'crew', id: who.id },
+              node: 'decide',
+            })
+            setModuleId(null)
+          }}
           canMove={(() => {
             const m = state.modules.find((x) => x.id === moduleId)
             return Boolean(m && canMove(state, m))

@@ -4,6 +4,7 @@ import { SPEC_IDS, specDef } from './specs.ts'
 import { OUTCOME_INFO, makeShip, rollOutcome, shipCargo, shipHull } from './fleet.ts'
 import type { Crew, Mission, Ship, GameState } from './types.ts'
 import { clamp, log, namesInPlay, pickOne, roll, roller } from './core.ts'
+import { lostHull, openBearings } from './quest.ts'
 import { unassign, awardXpTo, allocatePortrait } from './staffing.ts'
 import { reach, fleetCapacity } from './rooms.ts'
 import { derive } from './state.ts'
@@ -16,6 +17,38 @@ import { shift } from './standing.ts'
  * somebody aboard can plot a fix without a beacon, and even then it stays the
  * minority of what comes in.
  */
+/**
+ * A bearing worth putting on the board.
+ *
+ * Checking the letter's names is not a separate system — it is a far contract
+ * with a hull name on it, offered among the ordinary work, and it only appears
+ * once the station can reach that far in the first place.
+ */
+export const questBearing = (s: GameState): string | undefined => {
+  const q = s.quest
+  if (q.stage !== 'letter' && q.stage !== 'checking' && q.stage !== 'watched') return undefined
+  if (reach(s) <= 0) return undefined
+  // Never two on the board at once: this is a thing you do deliberately.
+  if (s.missions.some((m) => m.bearing && m.status !== 'report')) return undefined
+  const open = openBearings(q)
+  if (open.length === 0) return undefined
+  return roll(s) < 0.45 ? open[0].name : undefined
+}
+
+/** What a team brings home from one of the seven, and what it costs to know. */
+export const recordFinding = (s: GameState, name: string): void => {
+  const q = s.quest
+  if (q.checked.includes(name)) return
+  const hull = lostHull(name)
+  q.checked.push(name)
+  if (q.stage === 'letter') q.stage = 'checking'
+  if (hull) {
+    // Every bearing checked is one more place that knows to look back.
+    q.attention = clamp(q.attention + hull.weight, 0, 1)
+    log(s, `${name} was not where the record says. The file has the rest of it.`, 'warn')
+  }
+}
+
 export const rollFar = (s: GameState): boolean => {
   const r = reach(s)
   return r > 0 && roll(s) < Math.min(0.45, 0.18 + r * 0.12)
@@ -58,6 +91,10 @@ export const resolveMission = (s: GameState, m: Mission): void => {
   m.status = 'report'
   m.outcome = outcome
   m.remaining = 0
+
+  // A run out to one of the seven brings something home whatever else happened,
+  // so long as anybody came home at all.
+  if (m.bearing && outcome !== 'disaster') recordFinding(s, m.bearing)
 
   // An open job brings home what it gathered; everything else is judged on
   // the work rather than the hours.

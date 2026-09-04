@@ -181,7 +181,7 @@ const SHAPES: Record<MissionKind, MissionShape[]> = {
 export const OPEN_HAUL_PER_MINUTE = 0.55
 export const OPEN_STRAIN_PER_MINUTE = 0.4
 
-interface MissionOpts {
+export interface MissionOpts {
   /** Force a shape, for obligations and questline work. */
   shape?: MissionShape
   /** A power's standing this job pays, or costs to refuse. */
@@ -190,6 +190,8 @@ interface MissionOpts {
   name?: string
   /** Offer work past the comms envelope, which only Deep Space Ops unlocks. */
   far?: boolean
+  /** Name a lost hull and the contract becomes a run out to look at it. */
+  bearing?: string
 }
 
 export const makeMission = (rng: Rng, standing: number, opts: MissionOpts = {}): Mission => {
@@ -243,6 +245,7 @@ export const makeMission = (rng: Rng, standing: number, opts: MissionOpts = {}):
     standing: opts.standing ?? null,
     obligation: Boolean(opts.obligation),
     far,
+    bearing: opts.bearing,
     outcome: null,
     report: null,
     find: null,

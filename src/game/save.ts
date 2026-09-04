@@ -1,5 +1,6 @@
 import { SAVE_VERSION, newGame, newSeed } from './engine.ts'
 import { blankStanding } from './factions.ts'
+import { blankQuest } from './quest.ts'
 import type { GameState } from './types.ts'
 
 const KEY = 'spaceport99.save'
@@ -40,6 +41,15 @@ const STEPS: { from: number; up: (raw: Record<string, unknown>) => void }[] = [
     up: (raw) => {
       raw.nextLevyIn = 0
       raw.nextClaimIn = 0
+    },
+  },
+  // 11 → 12: somebody started writing to stations about seven hulls. An older
+  // station has not had the letter yet.
+  {
+    from: 11,
+    up: (raw) => {
+      raw.quest = blankQuest()
+      raw.nextQuestIn = 0
     },
   },
 ]

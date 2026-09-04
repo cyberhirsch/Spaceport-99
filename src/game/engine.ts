@@ -22,6 +22,8 @@ import './talks/loiter.ts'
 import './talks/demand.ts'
 import './talks/claim.ts'
 import './talks/levy.ts'
+import './talks/letter.ts'
+import './talks/siege.ts'
 
 export * from './core.ts'
 export * from './staffing.ts'

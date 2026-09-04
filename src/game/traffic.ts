@@ -1,5 +1,5 @@
 import { randomName, rollStats, uid } from './crew.ts'
-import { beginTalk } from './talk.ts'
+import { beginTalk, type SpeakerRef } from './talk.ts'
 import { PATRONS, factionDef } from './factions.ts'
 import { makeMission } from './fleet.ts'
 import { makeGuests, makeVisitor } from './visitors.ts'
@@ -11,6 +11,7 @@ import { derive } from './state.ts'
 import { startIncident } from './hazards.ts'
 import { shift, appeal, covertShift } from './standing.ts'
 import { rollFar } from './missions.ts'
+import { LOST, SIEGE_AT, WATCHED_AT } from './quest.ts'
 
 // Hulls at the clamps: admitting them, arresting off them, and the one that is not asking.
 
@@ -309,6 +310,106 @@ export const wouldCome = (s: GameState): FactionId | null => {
     if (r <= 0) return pool[i]
   }
   return pool[0]
+}
+
+// ---------------------------------------------------------- seven hulls --
+
+/**
+ * The questline, one beat at a time.
+ *
+ * Everything it does, it does through machinery that already exists: a
+ * conversation with somebody who is already aboard, a contract on the board, a
+ * Sensor Array reading something wrong. The only thing it adds is a reason.
+ */
+export const questBeat = (s: GameState): void => {
+  const q = s.quest
+  if (q.stage === 'over') {
+    s.nextQuestIn = Number.MAX_SAFE_INTEGER
+    return
+  }
+
+  // Nobody has told this station anything yet.
+  if (q.stage === 'none') {
+    if (!deliverLetter(s)) {
+      s.nextQuestIn = 60
+      return
+    }
+    q.stage = 'letter'
+    s.nextQuestIn = 3 * 60
+    return
+  }
+
+  // It arrives, then it is watched, then it is here. Attention only ever rises,
+  // and only checking a bearing raises it.
+  if (q.attention >= SIEGE_AT && q.stage !== 'siege') {
+    q.stage = 'siege'
+    const watch = derive(s).crewAlive[0]
+    if (watch) {
+      s.talk = beginTalk('siege', { kind: 'crew', id: watch.id }, watch.name)
+      log(s, `Four returns on the board and none of them are answering.`, 'bad')
+    }
+    s.nextQuestIn = 5 * 60
+    return
+  }
+  if (q.attention >= WATCHED_AT && q.stage === 'checking') {
+    q.stage = 'watched'
+    log(
+      s,
+      `Traffic is down and the array is busy. Something is asking about this station now.`,
+      'warn',
+    )
+  }
+
+  // The Sensor Array is the first thing to notice, because it is the only thing
+  // aboard precise enough to be wrong in an interesting way.
+  const array = s.modules.find((m) => m.kind === 'sensor' && !m.standby && m.staff.length > 0)
+  if (array && q.checked.length > 0 && roll(s) < 0.5) {
+    const hull = pickOne(roller(s), LOST.slice(0, 6))
+    log(
+      s,
+      `The array logged a contact and resolved it as the ${hull.name}, silent since ${hull.silent}. It held the reading for nine seconds.`,
+      'warn',
+    )
+  } else if (q.stage === 'watched' && roll(s) < 0.5) {
+    log(s, `Every fix taken this watch is out by the same amount, in the same direction.`, 'warn')
+  }
+  s.nextQuestIn = 3 * 60 + roll(s) * 4 * 60
+}
+
+/**
+ * How the letter reaches you: the array picks it up, a hull hands it over, or
+ * somebody aboard has been carrying it around deciding whether to.
+ */
+export const deliverLetter = (s: GameState): boolean => {
+  const crew = derive(s).crewAlive
+  if (crew.length === 0) return false
+  const array = s.modules.find((m) => m.kind === 'comms' && !m.standby && m.staff.length > 0)
+  const hull = s.visitors.find((v) => v.status === 'docked' && !v.intent && !v.covert)
+
+  let ref: SpeakerRef
+  let who: string
+  let from: string
+  if (array) {
+    const onDuty = crew.find((c) => c.assignment === array.id) ?? crew[0]
+    ref = { kind: 'crew', id: onDuty.id }
+    who = onDuty.name
+    from = 'from:comms'
+  } else if (hull) {
+    ref = { kind: 'visitor', id: hull.id }
+    who = hull.name
+    from = 'from:hull'
+  } else {
+    const bearer = pickOne(roller(s), crew)
+    ref = { kind: 'crew', id: bearer.id }
+    who = bearer.name
+    from = 'from:crew'
+  }
+
+  const talk = beginTalk('letter', ref, who, 'arrived')
+  talk.flags.push(from)
+  s.talk = talk
+  log(s, `A list of seven ship names reached the station. Nobody will say from where.`, 'warn')
+  return true
 }
 
 // --------------------------------------------------------- second acts --

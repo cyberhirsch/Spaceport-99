@@ -237,6 +237,21 @@ export type ItemId = 'sidearm' | 'lance' | 'torch' | 'plate'
 export type SpecId = 'shield' | 'vault' | 'torch' | 'astro' | 'filter'
 
 /** The powers whose space the traffic comes from, plus everyone off their books. */
+/**
+ * How far the business of the seven hulls has got, and what it has cost.
+ *
+ * `attention` is the one number that only ever goes up: every bearing a team
+ * checks is one more place that knows to look back at this station.
+ */
+export interface Quest {
+  stage: 'none' | 'letter' | 'checking' | 'watched' | 'siege' | 'over'
+  /** Hull names a team has actually been out to. */
+  checked: string[]
+  /** 0 to 1. At 1 it is at the clamps. */
+  attention: number
+  ending: 'published' | 'sold' | 'buried' | 'met' | 'lost' | null
+}
+
 export type FactionId = 'terran' | 'concern' | 'compact' | 'unlisted'
 
 /**
@@ -549,6 +564,8 @@ export interface Mission {
    * every hail on the way is answered by the crew, not by you.
    */
   far: boolean
+  /** The lost hull this run is out to look at, if it is one of those. */
+  bearing?: string
   outcome: MissionOutcome | null
   /** Written when the mission resolves, read in the after-action report. */
   report: string | null
@@ -659,6 +676,10 @@ export interface GameState {
   nextLevyIn: number
   /** How long a prisoner may sit before their people come asking. */
   nextClaimIn: number
+  /** The seven hulls, and how much of it this station has found out. */
+  quest: Quest
+  /** Seconds until the next thing the questline does on its own. */
+  nextQuestIn: number
   /** How many arrangements have come out. Nobody forgets the second one. */
   burned: number
   seenIntro: boolean

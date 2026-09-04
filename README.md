@@ -62,6 +62,34 @@ than killed unless the station had nothing to fight with and ignored every step
 that led there — and even then somebody is always left to shut the door. Meeting
 it on your own timing, rather than theirs, measurably reduces what they bring.
 
+## The seven hulls
+
+Somebody sends the station a list: seven ship names, seven dates they stopped
+transmitting, and one line. *None of these were lost where the record says.
+Check the bearings.* It arrives three different ways depending on what the
+station has — through a staffed Comms Array, off a hull at the clamps, or from
+somebody aboard who has been carrying it around deciding whether to hand it
+over. The commander before you got the same letter, took the second name, and
+did not come back.
+
+Checking a bearing is an ordinary far contract with a hull name on it, so the
+whole questline runs on machinery that already exists: Deep Space Operations to
+reach that far, the contract board to go, the Sensor Array to start reading
+things wrong, the station's own guns for the last act. Nothing in it is a new
+mechanic.
+
+Every bearing checked is one more place that knows to look back. Three of them
+is the point where the positions stop being merely wrong and start being wrong
+*in a direction*, and the file can be closed four ways: publish it and lose
+every friend you had in an office, sell it to whoever will bury it, burn it and
+have nothing ever come of it, or take a hull out to the seventh name — which is
+not a hull, and never was. Keep asking and deciding nothing, and it comes here
+instead, and that conversation has no option to pay, report, or reason with
+anything.
+
+The file lives in the Comms Array, where the letter was logged as traffic before
+anybody read it properly.
+
 ## Second acts
 
 Three systems used to end where they started, and now do not.

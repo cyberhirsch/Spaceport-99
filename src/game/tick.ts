@@ -5,7 +5,7 @@ import { SLOTS, itemDef } from './gear.ts'
 import { rollCall, unattended } from './calls.ts'
 import { ITEM_SPEC, specDef } from './specs.ts'
 import { factionDef } from './factions.ts'
-import { OPEN_HAUL_PER_MINUTE, OPEN_STRAIN_PER_MINUTE, makeMission } from './fleet.ts'
+import { makeMission, type MissionOpts, OPEN_HAUL_PER_MINUTE, OPEN_STRAIN_PER_MINUTE } from './fleet.ts'
 import { makeVisitor } from './visitors.ts'
 import type { ModuleDef, GameState, ResourceKey, StationModule } from './types.ts'
 import {
@@ -37,11 +37,12 @@ import {
 import { derive } from './state.ts'
 import { adjacentModules, incidentCap, startIncident, rollIncident } from './hazards.ts'
 import { shift, appeal } from './standing.ts'
-import { answerCall, inContact, resolveMission, rollFar } from './missions.ts'
+import { answerCall, inContact, questBearing, resolveMission, rollFar } from './missions.ts'
 import {
   admitVisitor,
   CONQUEST_EARLIEST,
   CONQUEST_GAP,
+  questBeat,
   raiseDemand,
   resolveRaid,
   sendApproach,
@@ -374,6 +375,14 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
     }
   }
 
+  // --- the seven hulls ------------------------------------------------
+  // Only while nothing else is being said: none of this is urgent enough to
+  // interrupt a conversation already on screen.
+  if (!s.talk) {
+    s.nextQuestIn -= dt
+    if (s.nextQuestIn <= 0) questBeat(s)
+  }
+
   // --- what follows a takeover ----------------------------------------
   if (s.nextLevyIn > 0) {
     s.nextLevyIn -= dt
@@ -470,6 +479,16 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
     // A command module has to be crewed for anyone to be listening to the wire.
     const listening = s.modules.some((m) => m.kind === 'command' && m.staff.length > 0)
     const offers = s.missions.filter((m) => m.status === 'offered').length
+    // A run out to one of the letter's seven is an ordinary far contract with a
+    // hull name on it, offered among the ordinary work.
+    const bearingOpts = (): MissionOpts => {
+      const bearing = questBearing(s)
+      // A run out to a filed position is a fixed job with a fixed clock. It is
+      // not open-ended work: there is one place to go and one thing to look at.
+      return bearing
+        ? { far: true, bearing, shape: 'contract', name: `Bearing — the ${bearing}` }
+        : { far: rollFar(s) }
+    }
     if (listening && offers < 3) {
       // A power you fly for does not only offer work. Sometimes it assigns it,
       // and the only reward is not being the station that said no.
@@ -483,7 +502,7 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
               standing: [patron, 0.05],
               name: `${factionDef(patron).short} tasking`,
             })
-          : makeMission(roller(s), appeal(s), { far: rollFar(s) }),
+          : makeMission(roller(s), appeal(s), bearingOpts()),
       )
       if (patron && duty) log(s, `${factionDef(patron).name} has tasked the station.`, 'warn')
     }

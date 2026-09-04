@@ -132,38 +132,24 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
   that already exists — the `turn` ask is only offered by a power that used to
   hold the station.
 
+- **Built the questline.** Seven hull names and seven dates, delivered three
+  ways — a staffed Comms Array, a hull at the clamps, or somebody aboard who
+  has been carrying it. Checking a bearing is an ordinary far contract with a
+  hull name on it, so the whole thing runs on Deep Space Operations, the
+  contract board, the Sensor Array reading wrong, and the station's guns. What
+  is out there is alive, cannot be plotted, and pays attention to whoever is
+  asking: every bearing checked raises `quest.attention`, which only ever goes
+  up. Three checked is enough to make the argument, and the file closes four
+  ways — publish, sell, burn, or take a hull out to the seventh name, which is
+  not a hull. Keep asking and decide nothing and it arrives instead, in a
+  conversation with no option to pay, report or reason with it. The file lives
+  in the Comms Array panel.
+
 ---
 
 ## Opus
 
-### 1. The questline
-
-**Why.** The game is a very good sandbox with nothing pulling you through it.
-Factions, dialogue, conquest, specs, the Brig, far work — each is a system
-without a story. The anonymous letter (seven hull names and the dates they
-stopped transmitting; *"None of these were lost where the record says. Check
-the bearings."*) is the spine, and it is unbuilt.
-
-**What is out there** is decided: something alive, that cannot be reasoned
-with, that the charts cannot hold, and that eventually comes here. The
-previous commander got the same letter, flew out to check the second name, and
-did not come back. The letter arrives from three sources — the Comms Array, a
-ship or a visitor, or a crew member — and the station itself is not special;
-the adventure is out there until the last act, when it is here.
-
-**Where.** New `src/game/talks/letter.ts` for the beats; a `quest` field on
-`GameState` in `src/game/types.ts` (which name you are on, what you know, what
-knows about you); far contracts in `src/game/missions.ts` are how you check a
-bearing; the Sensor Array reads one of them wrong, and that wrongness is the
-first evidence; the Brig can hold somebody who came back from one. Reuse every
-existing system rather than adding one — the last act is a siege resolved
-through defence, and the endings are conversations.
-
-**Done when.** A player can receive the letter three different ways, check at
-least three of the seven bearings through existing contract machinery, and
-reach one of four endings. Nothing in the questline is a new mechanic.
-
-### 2. Play it, then fix what drags
+### 1. Play it, then fix what drags
 
 **Why.** Nobody has. Every balance claim — "4½ hours to 60 crew", "one spec
 every five runs", "9 wipes in 40 idle runs" — is from a headless harness, not
@@ -181,7 +167,7 @@ are separate tasks; this one is the list.
 
 ## Sonnet
 
-### 3. Save migrations instead of save wipes
+### 2. Save migrations instead of save wipes
 
 **Why.** `SAVE_VERSION` is 7 and has been bumped every session. Each bump makes
 every existing save unloadable. Fine while nobody is playing; the day someone
@@ -194,7 +180,7 @@ newer than this one). The 7 → 8 step is written and tested, and the chain does
 not back-port 5 or 6.
 
 **What is left.** Every bump from here adds a step — that is the whole
-discipline, and it is worth a line in `CLAUDE.md` (task 8) so it is not
+discipline, and it is worth a line in `CLAUDE.md` (task 7) so it is not
 forgotten. The remaining gap is coverage: `migrate` is tested through
 `luck.test.ts`, not through `loadGame`/`readSlot`, which are the functions that
 actually touch `localStorage`.
@@ -203,7 +189,7 @@ actually touch `localStorage`.
 fixture through `loadGame` with a stubbed `localStorage`, and the next feature
 to change the save shape adds its step rather than bumping and wiping.
 
-### 4. Split the tick
+### 3. Split the tick
 
 **Why.** `src/game/tick.ts` is 516 lines and `step()` is most of it: the power
 grid, production, life support, the med bay, the engineering bay, the lab, the
@@ -218,7 +204,7 @@ already commented as a section. They should be functions.
 **Done when.** `step()` is under 40 lines, every section is a named function
 with its doc comment, and the tests are untouched and green.
 
-### 5. Something other than bunks moves the roster
+### 4. Something other than bunks moves the roster
 
 **Why.** Reaching 60 crew is a matter of building Crew Quarters and waiting.
 The Comms Array, the Docking Port, standing with your patron and the station's
@@ -244,7 +230,7 @@ roll), `src/game/reducer.ts` (`requestCrew`), `src/game/core.ts`
 supposed to — count, faction mix, mean stat, unasked arrivals — and quarters
 remain the ceiling rather than the only lever.
 
-### 6. Break up the two long modals
+### 5. Break up the two long modals
 
 **Why.** `src/components/VisitorModal.tsx` is resource trade, the bonded cage,
 kit, the boarding party, the auto-accept toggle and a talk button.
@@ -259,7 +245,7 @@ adds a file, not a branch.
 **Done when.** Neither modal file is over 200 lines, and adding a room-specific
 panel touches one new file plus one line in the lookup.
 
-### 7. Luck does something
+### 6. Luck does something
 
 **Why.** Three rooms run on Luck — the Comms Array, the Trading Hub and the
 Reclamation Bay — and two are at the far end of the curve. Every other stat has
@@ -277,7 +263,7 @@ suffers incidents measurably less, and a seeded test says so.
 
 ## Haiku
 
-### 8. A `CLAUDE.md`
+### 7. A `CLAUDE.md`
 
 **Why.** There is none. Every session re-learns the reducer discipline, the
 `.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
@@ -292,7 +278,7 @@ extension.
 **Done when.** The file exists and a new session can find the layer order and
 the test commands without reading `engine.ts`.
 
-### 9. Re-deal portraits on load
+### 8. Re-deal portraits on load
 
 **Why.** A save from before portraits were dealt has crew with no `portrait`
 field, so they draw from the seed and can share a face.
@@ -303,7 +289,7 @@ field, so they draw from the seed and can share a face.
 **Done when.** Loading such a save gives every crew member a distinct portrait
 where the pool allows, and a test loads a fixture without portraits and checks.
 
-### 10. Tests for the parts of the split that changed visibility
+### 9. Tests for the parts of the split that changed visibility
 
 **Why.** The refactor exported about two dozen previously private helpers
 (`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
@@ -318,7 +304,7 @@ use it as the pattern.
 **Done when.** Each newly exported helper with a branch in it has at least one
 test that exercises the branch.
 
-### 11. PWA manifest and service worker
+### 10. PWA manifest and service worker
 
 **Why.** The web build is not installable and does not run offline, though
 nothing in it needs a network. An idle station you check on through the day
@@ -332,7 +318,7 @@ app icon can come from an existing asset until there is a proper one.
 **Done when.** The deployed page passes the browser's install check and loads
 with the network off after one visit.
 
-### 12. Rename the branch to `main`
+### 11. Rename the branch to `main`
 
 **Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
 and the deployment is tied to it.
@@ -350,7 +336,7 @@ is gone.
 Both of these are specified and neither ships with placeholder art. They move
 into the tiers the day the renders arrive.
 
-### 13. New kit for the Research Lab
+### 12. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -368,7 +354,7 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 14. Art for the rooms and the ships
+### 13. Art for the rooms and the ships
 
 **Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.

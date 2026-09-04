@@ -25,7 +25,7 @@ import {
 } from '../game/types.ts'
 import type { DragState } from '../hooks/useDragAssign.ts'
 import { ConfirmModal } from './ConfirmModal.tsx'
-import { BrigPanel, CovertPanel, FabPanel, LabPanel } from './Workbench.tsx'
+import { BrigPanel, CovertPanel, FabPanel, FilePanel, LabPanel } from './Workbench.tsx'
 import { CrewAvatar } from './CrewAvatar.tsx'
 import { Modal } from './Modal.tsx'
 
@@ -46,6 +46,9 @@ interface Props {
   onResearch: (spec: SpecId | null) => void
   onFabricate: (item: ItemId | null) => void
   onTalkPrisoner: (prisonerId: string) => void
+  /** Opens the letter, and the decision about it. */
+  onReadFile: () => void
+  onDecideFile: () => void
 }
 
 export const ModuleModal = ({
@@ -65,6 +68,8 @@ export const ModuleModal = ({
   onResearch,
   onFabricate,
   onTalkPrisoner,
+  onReadFile,
+  onDecideFile,
 }: Props) => {
   const [scrapping, setScrapping] = useState(false)
   const m = state.modules.find((x) => x.id === moduleId)
@@ -223,6 +228,9 @@ export const ModuleModal = ({
       {m.kind === 'fabricator' && <FabPanel state={state} onFabricate={onFabricate} />}
       {m.kind === 'brig' && <BrigPanel state={state} onTalk={onTalkPrisoner} />}
       {m.kind === 'covertops' && <CovertPanel state={state} />}
+      {m.kind === 'comms' && (
+        <FilePanel state={state} onRead={onReadFile} onDecide={onDecideFile} />
+      )}
 
       {d.slotsPerSegment > 0 && (
         <p className="panel-note">

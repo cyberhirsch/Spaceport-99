@@ -66,6 +66,7 @@ import { rollFar, answerCall, missionCapacity, inContact } from './missions.ts'
 import { admitVisitor } from './traffic.ts'
 import { completeCycle, advance } from './tick.ts'
 import { resolveFight } from './talks/conquest.ts'
+import { resolveSiege } from './talks/siege.ts'
 
 // Every action a player can take, applied to a copy of the state.
 
@@ -106,7 +107,7 @@ export type Action =
   | { type: 'issueGear'; crewId: string; item: ItemId }
   | { type: 'stowGear'; crewId: string; slot: ItemSlot }
   | { type: 'research'; spec: SpecId | null }
-  | { type: 'talk'; script: ScriptId; with: SpeakerRef }
+  | { type: 'talk'; script: ScriptId; with: SpeakerRef; node?: string }
   | { type: 'say'; reply: number }
   | { type: 'endTalk' }
   | { type: 'fabricate'; item: ItemId | null }
@@ -127,6 +128,7 @@ const onEnter = (s: GameState, talk: Talk): void => {
   if (!c) return
   if (talk.script === 'hire' && talk.node === 'done') closeHire(s, talk, c)
   if (talk.script === 'conquest' && talk.node === 'fight') resolveFight(c)
+  if (talk.script === 'siege' && talk.node === 'through') resolveSiege(c)
 }
 
 export const reducer = (state: GameState, action: Action): GameState => {
@@ -666,7 +668,7 @@ export const reducer = (state: GameState, action: Action): GameState => {
       const probe: GameState = { ...s, talk: beginTalk(action.script, ref, '') }
       const found = speaker(probe, ref)
       if (!found) return state
-      s.talk = beginTalk(action.script, ref, found.name)
+      s.talk = beginTalk(action.script, ref, found.name, action.node)
       break
     }
     case 'endTalk': {

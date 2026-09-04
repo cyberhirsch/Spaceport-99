@@ -1,33 +1,24 @@
-import { useState } from 'react'
 import {
-  MAX_MERGE,
   availableCrew,
   canDemolish,
   def,
   maxLevel,
   mergeBonus,
-  moveCost,
   scrapValue,
   staffSlots,
   upgradeCost,
   workRate,
 } from '../game/engine.ts'
 import { effectiveness } from '../game/crew.ts'
-import { cycleCredits, cycleYield, powerDraw } from '../game/modules.ts'
 import { incidentDef } from '../game/incidents.ts'
-import {
-  RESOURCE_INFO,
-  STAT_INFO,
-  type Crew,
-  type GameState,
-  type ItemId,
-  type SpecId,
-} from '../game/types.ts'
+import { STAT_INFO, type Crew, type GameState, type ItemId, type SpecId } from '../game/types.ts'
 import type { DragState } from '../hooks/useDragAssign.ts'
-import { ConfirmModal } from './ConfirmModal.tsx'
-import { BrigPanel, CovertPanel, FabPanel, FilePanel, LabPanel } from './Workbench.tsx'
-import { CrewAvatar } from './CrewAvatar.tsx'
+import { ROOM_PANELS } from './room/index.ts'
 import { Modal } from './Modal.tsx'
+import { ModuleStats } from './ModuleStats.tsx'
+import { ModuleCrewGrid } from './ModuleCrewGrid.tsx'
+import { ModuleFootnotes } from './ModuleFootnotes.tsx'
+import { ModuleActions } from './ModuleActions.tsx'
 
 interface Props {
   state: GameState
@@ -71,10 +62,10 @@ export const ModuleModal = ({
   onReadFile,
   onDecideFile,
 }: Props) => {
-  const [scrapping, setScrapping] = useState(false)
   const m = state.modules.find((x) => x.id === moduleId)
   if (!m) return null
   const d = def(m.kind)
+  const RoomPanel = ROOM_PANELS[m.kind]
   const crewById = new Map(state.crew.map((c) => [c.id, c]))
   const slots = staffSlots(m)
   const rate = workRate(m, crewById)
@@ -129,221 +120,58 @@ export const ModuleModal = ({
         </div>
       )}
 
-      <dl className="kv">
-        <div>
-          <dt>Driven by</dt>
-          <dd>
-            {d.stat} · {STAT_INFO[d.stat].name}
-          </dd>
-        </div>
-        <div>
-          <dt>Output</dt>
-          <dd>
-            {d.produces
-              ? `${Math.round(cycleYield(m))} ${RESOURCE_INFO[d.produces].name} / cycle`
-              : d.credits
-                ? `${Math.round(cycleCredits(m))}c / cycle`
-                : d.trains
-                  ? `+1 ${d.trains} per cycle`
-                  : d.heals
-                    ? 'Heals crew station-wide'
-                    : '—'}
-          </dd>
-        </div>
-        <div>
-          <dt>Speed</dt>
-          <dd>{rate <= 0 ? 'stalled' : `${Math.round(rate * 100)}%`}</dd>
-        </div>
-        <div>
-          <dt>Power draw</dt>
-          <dd>
-            {powerDraw(m).toFixed(1)} /s{m.standby ? ' · standby' : ''}
-          </dd>
-        </div>
-        <div>
-          <dt>Run</dt>
-          <dd>
-            {m.width} wide{bonus > 0 ? ` · +${bonus}% output` : ''}
-          </dd>
-        </div>
-        <div>
-          <dt>Condition</dt>
-          <dd>{Math.round(m.condition * 100)}%</dd>
-        </div>
-        <div>
-          <dt>Cycle</dt>
-          <dd>{secondsLeft === null ? '—' : `${secondsLeft.toFixed(0)}s left`}</dd>
-        </div>
-      </dl>
+      <ModuleStats m={m} d={d} rate={rate} secondsLeft={secondsLeft} bonus={bonus} />
 
-      <h3 className="modal__sub">
-        Crew ({staffed.length}/{slots})
-      </h3>
-      <div className="staff-grid">
-        {staffed.map((c) => (
-          <div key={c.id} className={`staff-chip${drag?.crewId === c.id ? ' is-lifted' : ''}`}>
-            <span className="grip" onPointerDown={(e) => onDragStart(c.id, e)} title="Drag to another room">
-              <CrewAvatar who={c} size={30} dead={c.dead} />
-            </span>
-            <span>
-              {c.name}
-              <em>
-                {focus} {c.stats[focus]} · eff {effectiveness(c, focus).toFixed(1)}
-              </em>
-            </span>
-            <button className="staff-chip__act" onClick={() => onAssign(c.id, null)} title="Send off duty">
-              ✕
-            </button>
-          </div>
-        ))}
-        {staffed.length === 0 && <p className="panel-note">Empty. Nothing gets made without hands.</p>}
-      </div>
+      <ModuleCrewGrid
+        m={m}
+        slots={slots}
+        staffed={staffed}
+        bench={bench}
+        focus={focus}
+        idef={idef}
+        drag={drag}
+        onDragStart={onDragStart}
+        onAssign={onAssign}
+      />
 
-      {slots > staffed.length && bench.length > 0 && (
-        <>
-          <h3 className="modal__sub">{idef ? `Send someone — best ${idef.counter} first` : 'Assign someone'}</h3>
-          <div className="staff-grid">
-            {bench.slice(0, 12).map((c) => (
-              <button
-                key={c.id}
-                className="staff-chip staff-chip--add"
-                onClick={() => onAssign(c.id, m.id)}
-              >
-                <CrewAvatar who={c} size={30} />
-                <span>
-                  {c.name}
-                  <em>
-                    {focus} {c.stats[focus]} · eff {effectiveness(c, focus).toFixed(1)}
-                    {c.assignment ? ' · reassign' : ''}
-                  </em>
-                </span>
-                <i>＋</i>
-              </button>
-            ))}
-          </div>
-        </>
+      {RoomPanel && (
+        <RoomPanel
+          state={state}
+          onResearch={onResearch}
+          onFabricate={onFabricate}
+          onTalkPrisoner={onTalkPrisoner}
+          onReadFile={onReadFile}
+          onDecideFile={onDecideFile}
+        />
       )}
 
-      {m.kind === 'library' && <LabPanel state={state} onResearch={onResearch} />}
-      {m.kind === 'fabricator' && <FabPanel state={state} onFabricate={onFabricate} />}
-      {m.kind === 'brig' && <BrigPanel state={state} onTalk={onTalkPrisoner} />}
-      {m.kind === 'covertops' && <CovertPanel state={state} />}
-      {m.kind === 'comms' && (
-        <FilePanel state={state} onRead={onReadFile} onDecide={onDecideFile} />
-      )}
+      <ModuleFootnotes
+        m={m}
+        d={d}
+        top={top}
+        bonus={bonus}
+        nextSlots={nextSlots}
+        onAutoAccept={onAutoAccept}
+      />
 
-      {d.slotsPerSegment > 0 && (
-        <p className="panel-note">
-          {m.width < MAX_MERGE
-            ? `Put another level-${m.level} ${d.name} against this one and they weld into a single run — up to ${MAX_MERGE} wide, worth 15% more output per extra segment. Upgrading a neighbour to match does it too.`
-            : `A ${m.width}-wide run: +${bonus}% output over the same floor apart, and two upgrades instead of one.`}
-          {m.level < top
-            ? ` Level ${m.level + 1} works ${nextSlots}.`
-            : m.width === 1
-              ? ' A room on its own stops here; weld it into a run for the second upgrade.'
-              : ''}
-        </p>
-      )}
-
-      {d.repairs && (
-        <p className="panel-note">
-          While staffed, its damage-control party works the station's worst-damaged rooms back
-          towards sound. It will not touch a room that is currently on fire.
-        </p>
-      )}
-
-      {m.kind === 'dock' && (
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={Boolean(m.autoAccept)}
-            onChange={(e) => onAutoAccept(e.target.checked)}
-          />
-          <span>
-            Standing order to the desk: clear anything that hails. Convenient, and nobody reads
-            the scan before a hull is alongside. The desk still has to be manned either way.
-          </span>
-        </label>
-      )}
-
-      {m.standby && (
-        <p className="panel-note">
-          Powered down. It draws a tenth of its usual load and does nothing at all until you bring
-          it back.
-        </p>
-      )}
-
-      <div className="modal__actions">
-        <button
-          className="btn"
-          disabled={!canMove || state.credits < moveCost(m)}
-          onClick={onMove}
-          title={
-            canMove
-              ? 'Cut it loose and set it down somewhere else'
-              : 'Nowhere to put it — free a slot at the end of a wing first'
-          }
-        >
-          Move — {moveCost(m)}c
-        </button>
-        <button className="btn" onClick={() => onStandby(!m.standby)} disabled={Boolean(incident)}>
-          {m.standby ? 'Bring online' : 'Power down'}
-        </button>
-        {cycle && (
-          <button
-            className="btn"
-            disabled={m.staff.length === 0 || Boolean(incident) || m.standby}
-            onClick={onRush}
-            title="Finish this cycle instantly — but something might go badly wrong"
-          >
-            Rush · {Math.round(m.rushRisk * 100)}% risk
-          </button>
-        )}
-        <button
-          className="btn"
-          disabled={m.level >= top || state.credits < upCost || m.standby}
-          onClick={onUpgrade}
-          title={m.level >= top && m.width === 1 ? 'Merge it into a run to go further' : undefined}
-        >
-          {m.level >= top ? (m.width === 1 ? 'Max — merge to go on' : 'Max level') : `Upgrade — ${upCost}c`}
-        </button>
-        <button
-          className="btn btn--danger"
-          disabled={!scrappable}
-          onClick={() => setScrapping(true)}
-          title={
-            incident
-              ? 'Deal with the emergency first'
-              : scrappable
-                ? 'Reclaim half the build cost'
-                : 'Scrap the room at the end of this wing first'
-          }
-        >
-          Scrap
-        </button>
-      </div>
-
-      {scrapping && (
-        <ConfirmModal
-          title={`Scrap the ${d.name}?`}
-          confirmLabel={`Scrap it — +${refund}c`}
-          onCancel={() => setScrapping(false)}
-          onConfirm={() => {
-            setScrapping(false)
-            onDemolish()
-          }}
-        >
-          It comes apart for <b>{refund}c</b>, half what it cost to put up.
-          {staffed.length > 0 && (
-            <>
-              {' '}
-              The {staffed.length === 1 ? 'one person' : `${staffed.length} people`} working it
-              {staffed.length === 1 ? ' goes' : ' go'} off duty.
-            </>
-          )}{' '}
-          There is no putting it back without paying for it again.
-        </ConfirmModal>
-      )}
+      <ModuleActions
+        m={m}
+        d={d}
+        credits={state.credits}
+        top={top}
+        upCost={upCost}
+        refund={refund}
+        scrappable={scrappable}
+        staffedCount={staffed.length}
+        incident={incident}
+        cycle={cycle}
+        canMove={canMove}
+        onMove={onMove}
+        onStandby={onStandby}
+        onRush={onRush}
+        onUpgrade={onUpgrade}
+        onDemolish={onDemolish}
+      />
     </Modal>
   )
 }

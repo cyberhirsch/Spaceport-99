@@ -243,6 +243,28 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
 
 ---
 
+
+- **Broke up the two long modals.** `VisitorModal.tsx` was 364 lines;
+  `ModuleModal.tsx` was 349. VisitorModal is now 190: `TradePanel`, `CagePanel`
+  and `KitPanel` came out as named in the task, plus two more the 200-line
+  ceiling needed — `HailPanel` (the docking request: scan, claim, auto-accept)
+  and `HoldingPanel` (a hull standing off) — all five under
+  `src/components/visitor/`. ModuleModal is now 177: the five room-specific
+  panels (`LabPanel`, `FabPanel`, `BrigPanel`, `CovertPanel`, and `FilePanel`
+  for the questline file the Comms Array carries) moved off `Workbench.tsx`
+  into `src/components/room/`, keyed by `ModuleKind` through a `ROOM_PANELS`
+  lookup so a new room adds a file and a line rather than a branch; the
+  generic sections every room shares came out too, as `ModuleStats`,
+  `ModuleCrewGrid`, `ModuleFootnotes` and `ModuleActions` alongside the modal
+  itself. `Workbench.tsx` is gone — nothing else imported it. Zero game-logic
+  changes: 273 tests unchanged, `tsc -b`/`oxlint`/`build` all clean. Checked
+  live in the browser — every visitor status (holding, requesting, docked with
+  trade/cage/kit all present) and all five room kinds open to the right panel,
+  a plain room shows the generic sections with no room-specific content
+  leaking in, and the scrap confirm dialog opens, cancels and closes cleanly.
+
+---
+
 ## Opus
 
 Nothing outstanding. The five that were here are in **Done** above; what is
@@ -253,22 +275,7 @@ can be handed.
 
 ## Sonnet
 
-### 1. Break up the two long modals
-
-**Why.** `src/components/VisitorModal.tsx` is resource trade, the bonded cage,
-kit, the boarding party, the auto-accept toggle and a talk button.
-`src/components/ModuleModal.tsx` has three room-specific panels bolted onto a
-generic one, and the Covert Ops room will want a fourth.
-
-**Where.** VisitorModal: extract `TradePanel`, `CagePanel`, `KitPanel` into
-`src/components/visitor/`. ModuleModal already has `Workbench.tsx`; move the
-per-room branches into a `RoomPanel` lookup keyed by `ModuleKind` so a new room
-adds a file, not a branch.
-
-**Done when.** Neither modal file is over 200 lines, and adding a room-specific
-panel touches one new file plus one line in the lookup.
-
-### 2. Luck does something
+### 1. Luck does something
 
 **Why.** Three rooms run on Luck — the Comms Array, the Trading Hub and the
 Reclamation Bay — and two are at the far end of the curve. Every other stat has
@@ -286,7 +293,7 @@ suffers incidents measurably less, and a seeded test says so.
 
 ## Haiku
 
-### 3. A `CLAUDE.md`
+### 2. A `CLAUDE.md`
 
 **Why.** There is none. Every session re-learns the reducer discipline, the
 `.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
@@ -301,7 +308,7 @@ extension.
 **Done when.** The file exists and a new session can find the layer order and
 the test commands without reading `engine.ts`.
 
-### 4. Re-deal portraits on load
+### 3. Re-deal portraits on load
 
 **Why.** A save from before portraits were dealt has crew with no `portrait`
 field, so they draw from the seed and can share a face.
@@ -312,7 +319,7 @@ field, so they draw from the seed and can share a face.
 **Done when.** Loading such a save gives every crew member a distinct portrait
 where the pool allows, and a test loads a fixture without portraits and checks.
 
-### 5. Tests for the parts of the split that changed visibility
+### 4. Tests for the parts of the split that changed visibility
 
 **Why.** The refactor exported about two dozen previously private helpers
 (`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
@@ -327,7 +334,7 @@ use it as the pattern.
 **Done when.** Each newly exported helper with a branch in it has at least one
 test that exercises the branch.
 
-### 6. PWA manifest and service worker
+### 5. PWA manifest and service worker
 
 **Why.** The web build is not installable and does not run offline, though
 nothing in it needs a network. An idle station you check on through the day
@@ -341,7 +348,7 @@ app icon can come from an existing asset until there is a proper one.
 **Done when.** The deployed page passes the browser's install check and loads
 with the network off after one visit.
 
-### 7. Rename the branch to `main`
+### 6. Rename the branch to `main`
 
 **Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
 and the deployment is tied to it.
@@ -359,7 +366,7 @@ is gone.
 Both of these are specified and neither ships with placeholder art. They move
 into the tiers the day the renders arrive.
 
-### 8. New kit for the Research Lab
+### 7. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -377,7 +384,7 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 9. Art for the rooms and the ships
+### 8. Art for the rooms and the ships
 
 **Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.

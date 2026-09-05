@@ -17,14 +17,8 @@ import { TitleScreen } from './components/TitleScreen.tsx'
 import { agoOf, spanOf } from './components/saveText.ts'
 import { slotInfo } from './game/save.ts'
 import { TopBar } from './components/TopBar.tsx'
-import {
-  canMove,
-  dockOfficers,
-  guestsAboard,
-  isAway,
-  relocateAnchor,
-  staffSlots,
-} from './game/engine.ts'
+import { canMove, isAway, relocateAnchor, staffSlots } from './game/engine.ts'
+import { alertsFor } from './components/alerts.ts'
 import { useDragAssign } from './hooks/useDragAssign.ts'
 import { useGame } from './hooks/useGame.ts'
 import { useMediaQuery } from './hooks/useMediaQuery.ts'
@@ -131,45 +125,7 @@ export default function App() {
     setTab(next)
   }
 
-  // Flag a deficit only once it will actually empty the tanks within ten
-  // minutes — a room going briefly unstaffed is not worth an alarm.
-  const draining = (value: number, rate: number) => rate < 0 && value / -rate < 600
-
-  const alerts = [
-    state.resources.air <= 0 && 'No oxygen — the crew is suffocating',
-    state.resources.food <= 0 && 'No rations — the crew is starving',
-    state.incidents.length > 0 && `${state.incidents.length} emergency in progress`,
-    derived.brownout && 'Grid brownout — rooms are running slow',
-    draining(state.resources.power, derived.powerRate) && 'Power deficit — add a Fusion Reactor',
-    draining(state.resources.air, derived.airRate) && 'Oxygen deficit — add an Atmospherics Plant',
-    draining(state.resources.food, derived.foodRate) && 'Ration deficit — add a Hydroponics Bay',
-    derived.crewAlive.length >= derived.crewCap && 'No free bunks — build Crew Quarters',
-    (() => {
-      const docked = state.candidates.filter((c) => c.arrivesIn <= 0).length
-      return docked > 0 && `${docked} applicant${docked === 1 ? '' : 's'} waiting at the dock`
-    })(),
-    (() => {
-      const hailing = state.visitors.filter((v) => v.status === 'requesting').length
-      return hailing > 0 && `${hailing} ship${hailing === 1 ? '' : 's'} requesting permission to dock`
-    })(),
-    (() => {
-      const waiting = guestsAboard(state).filter((x) => x.guest.offer)
-      if (waiting.length === 0) return false
-      return waiting.length === 1
-        ? `${waiting[0].guest.name} is aboard and wants a word`
-        : `${waiting.length} visitors aboard want a word`
-    })(),
-    (() => {
-      const filed = state.missions.filter((m) => m.status === 'report').length
-      return filed > 0 && `${filed} mission report${filed === 1 ? '' : 's'} to read`
-    })(),
-    state.modules.some((m) => m.kind === 'command') &&
-      !state.modules.some((m) => m.kind === 'command' && m.staff.length > 0) &&
-      'Command Module unstaffed — no contracts are coming in',
-    state.modules.some((m) => m.kind === 'dock') &&
-      dockOfficers(state) === 0 &&
-      'Docking Port unstaffed — nothing can come alongside',
-  ].filter(Boolean) as string[]
+  const alerts = alertsFor(state, derived)
 
   // Whatever raised it, the question renders the same way and over everything.
   const question = asking && (

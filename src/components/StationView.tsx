@@ -189,6 +189,10 @@ export const StationView = ({
   const flightOf = (crewId: string) =>
     state.missions.find((m) => m.status === 'flying' && m.crewIds.includes(crewId))
   const nextDeck = deckCost(state.decks)
+  // Another deck is no use while the last one is still bare. The offer is for
+  // a station that has run out of room, not one that has not filled what it
+  // already paid to pressurise.
+  const bottomDeckUsed = state.modules.some((m) => m.deck === state.decks - 1)
   const aboard = guestsAboard(state)
   // A room is in hand either because it is being dragged or because its Move
   // button was tapped; both light up the same landing spots.
@@ -326,11 +330,13 @@ export const StationView = ({
 
         </div>
 
-        <div className="deck--new">
-          <button className="deck__buy" onClick={onBuyDeck} disabled={state.credits < nextDeck}>
-            ＋ Pressurise deck {state.decks + 1} — {nextDeck}c
-          </button>
-        </div>
+        {bottomDeckUsed && (
+          <div className="deck--new">
+            <button className="deck__buy" onClick={onBuyDeck} disabled={state.credits < nextDeck}>
+              ＋ Pressurise deck {state.decks + 1} — {nextDeck}c
+            </button>
+          </div>
+        )}
       </section>
 
       <div className="dock-row">

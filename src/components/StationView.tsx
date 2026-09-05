@@ -51,6 +51,7 @@ const Room = ({
   crewById,
   incident,
   boarders,
+  responders,
   drag,
   lifted,
   onOpen,
@@ -62,6 +63,8 @@ const Room = ({
   incident: GameState['incidents'][number] | undefined
   /** How many boarders are standing in this room, when there is a boarding on. */
   boarders: number
+  /** And how many of the security watch have come to it. */
+  responders: number
   drag: DragState | null
   lifted: boolean
   onOpen: () => void
@@ -155,7 +158,7 @@ const Room = ({
 
       {boarders > 0 && (
         <span className="room__incident room__incident--boarders" title="Boarding party">
-          ☠ {boarders} aboard
+          ☠ {boarders} aboard{responders > 0 && ` · ⛨ ${responders} responding`}
         </span>
       )}
       {incident && (
@@ -247,6 +250,7 @@ export const StationView = ({
             crewById={crewById}
             incident={state.incidents.find((i) => i.moduleId === m.id)}
             boarders={state.boarding?.moduleId === m.id ? state.boarding.boarders.length : 0}
+            responders={state.boarding?.moduleId === m.id ? state.boarding.responders.length : 0}
             drag={drag}
             lifted={held?.id === m.id}
             onOpen={() => onSelectModule(m.id)}

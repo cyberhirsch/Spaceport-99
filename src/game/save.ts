@@ -90,6 +90,14 @@ const STEPS: { from: number; up: (raw: Record<string, unknown>) => void }[] = [
       s.boarding = null
     },
   },
+  // 15 → 16: the Security Office, and a boarding that knows who has turned out to it.
+  {
+    from: 15,
+    up: (raw) => {
+      const s = raw as unknown as GameState
+      if (s.boarding && !s.boarding.responders) s.boarding.responders = []
+    },
+  },
 ]
 
 export const migrate = (raw: GameState): GameState | null => {

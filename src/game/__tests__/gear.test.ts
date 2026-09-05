@@ -176,6 +176,7 @@ test('small arms tell against boarders and nothing else', () => {
         shipId: 'nope',
         moduleId: room.id,
         boarders: [{ id: 'b1', name: 'Rook', hp: 500, maxHp: 500, kit: null }],
+        responders: [],
         size: 1,
         moveIn: 40,
         looted: 0,

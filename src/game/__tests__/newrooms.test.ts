@@ -71,7 +71,7 @@ test('the unlock curve runs from nothing to sixty', () => {
   const gates = BUILDABLE.map((d) => d.unlockAtCrew)
   assert.equal(Math.min(...gates), 0, 'the founding rooms need nobody')
   assert.equal(Math.max(...gates), 60, 'and the last one needs a full station')
-  assert.equal(BUILDABLE.length, 26)
+  assert.equal(BUILDABLE.length, 27)
 
   // Nothing is unreachable: a maxed run of quarters has to clear the top gate.
   const perSegment = def('quarters').crewCapacity ?? 0

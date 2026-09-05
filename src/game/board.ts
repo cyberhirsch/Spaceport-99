@@ -60,7 +60,9 @@ export const openThreads = (s: GameState): Thread[] => {
   if (s.boarding) {
     const b = s.boarding
     const room = s.modules.find((m) => m.id === b.moduleId)
-    const door = s.crew.filter((c) => !c.dead && c.assignment === b.moduleId).length
+    const door = s.crew.filter(
+      (c) => !c.dead && (c.assignment === b.moduleId || b.responders.includes(c.id)),
+    ).length
     out.push({
       id: 'boarding',
       title: `Boarders in the ${room ? def(room.kind).name : 'station'}`,

@@ -81,6 +81,7 @@ export const beginBoarding = (s: GameState, v: Visitor): void => {
     shipId: v.id,
     moduleId: room.id,
     boarders,
+    responders: [],
     size: count,
     moveIn: PUSH_ON_AFTER,
     looted: 0,
@@ -97,9 +98,38 @@ export const beginBoarding = (s: GameState, v: Visitor): void => {
   )
 }
 
-/** Whoever is standing in the room, alive, and not on a hull somewhere else. */
-const defendersOf = (s: GameState, room: StationModule) =>
-  s.crew.filter((c) => !c.dead && c.assignment === room.id && !isAway(s, c.id))
+/**
+ * Whoever is standing in the room, alive and not on a hull somewhere else —
+ * plus the security watch that has come to it.
+ */
+export const defendersOf = (s: GameState, room: StationModule) => {
+  const responding = new Set(s.boarding?.responders ?? [])
+  return s.crew.filter(
+    (c) => !c.dead && !isAway(s, c.id) && (c.assignment === room.id || responding.has(c.id)),
+  )
+}
+
+/**
+ * The watch turns out. Anyone posted to a working Security Office who is fit
+ * to fight joins the party's room, and rejoins it once patched up after
+ * falling back. They never leave their post on paper, so nothing has to put
+ * them back afterwards.
+ */
+const muster = (s: GameState): void => {
+  const b = s.boarding
+  if (!b) return
+  const offices = s.modules.filter((m) => m.kind === 'security' && !m.standby)
+  for (const office of offices) {
+    for (const id of office.staff) {
+      if (b.responders.includes(id)) continue
+      const c = s.crew.find((x) => x.id === id)
+      if (!c || c.dead || isAway(s, id) || c.hp < c.maxHp * 0.5) continue
+      b.responders.push(id)
+      const room = s.modules.find((m) => m.id === b.moduleId)
+      log(s, `${c.name} went to the ${room ? def(room.kind).name : 'fight'} from Security.`, 'info')
+    }
+  }
+}
 
 /** How it finished, in the log, and what it left behind. */
 const endBoarding = (s: GameState, how: 'wiped' | 'escaped'): void => {
@@ -197,6 +227,7 @@ export const stepBoarding = (s: GameState, dt: number, offline = false): void =>
     if (!room) return endBoarding(s, 'escaped')
     b.moduleId = room.id
   }
+  muster(s)
   const defenders = defendersOf(s, room)
 
   if (defenders.length === 0) {
@@ -242,19 +273,24 @@ export const stepBoarding = (s: GameState, dt: number, offline = false): void =>
       // anywhere else — they come back to a wounded defender, not a grave.
       if (offline || s.crew.filter((x) => !x.dead).length <= 1) {
         c.hp = 1
-        unassign(s, c.id, true)
+        if (b.responders.includes(c.id)) b.responders = b.responders.filter((id) => id !== c.id)
+        else unassign(s, c.id, true)
         log(s, `${c.name} was dragged clear of the ${def(room.kind).name}.`, 'bad')
         continue
       }
       // Otherwise not pulled out for them: the door was theirs and they kept it.
       b.lost += 1
+      b.responders = b.responders.filter((id) => id !== c.id)
       log(s, `${c.name} went down on the door of the ${def(room.kind).name}.`, 'bad')
       killCrew(s, c)
       continue
     }
     // Hurt enough to step back — if somebody else is still standing there.
     if (c.hp < c.maxHp * FALL_BACK_AT && defenders.filter((x) => x.hp > 0).length > 1) {
-      unassign(s, c.id, true)
+      // The watch falls back to the office it never left; anyone else is
+      // pulled off the room and remembers where they were.
+      if (b.responders.includes(c.id)) b.responders = b.responders.filter((id) => id !== c.id)
+      else unassign(s, c.id, true)
       log(s, `${c.name} fell back from the ${def(room.kind).name}, bleeding.`, 'warn')
     }
   }

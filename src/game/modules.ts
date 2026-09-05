@@ -302,6 +302,20 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     guns: 6,
     powerDraw: 3.5,
   },
+  security: {
+    kind: 'security',
+    name: 'Security Office',
+    short: 'Security',
+    blurb:
+      'A standing watch. Whoever is posted here goes wherever the boarders are, fights alongside the room, and comes back when it is over.',
+    glyph: '⛨',
+    hue: 350,
+    cost: 480,
+    unlockAtCrew: 20,
+    slotsPerSegment: 2,
+    stat: 'R',
+    powerDraw: 2,
+  },
   shield: {
     kind: 'shield',
     name: 'Shield Projector',

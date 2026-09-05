@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   BOARDING_PATIENCE,
   beginBoarding,
+  defendersOf,
   ARMED_ENOUGH,
   advance,
   defence,
@@ -16,6 +17,7 @@ import {
   worthLeaningOn,
 } from '../engine.ts'
 import { makeCrew } from '../crew.ts'
+import { def } from '../modules.ts'
 import { makeVisitor } from '../visitors.ts'
 import { labels, line, open, say } from './talkHelp.ts'
 import type { GameState, ModuleKind, Visitor } from '../types.ts'
@@ -286,6 +288,7 @@ test('a wiped party leaves its hull on the clamps, and the hull is yours', () =>
         { id: 'b1', name: 'Oona Odell', hp: 4, maxHp: 20, kit: 'sidearm' },
         { id: 'b2', name: 'Halcyon Quint', hp: 4, maxHp: 20, kit: null },
       ],
+      responders: [],
       size: 3,
       moveIn: 40,
       looted: 0,
@@ -385,4 +388,115 @@ test('raising the demand is what puts it in front of you', () => {
   assert.equal(after.visitors[0].intent, 'demand')
   assert.equal(after.talk?.script, 'demand')
   assert.equal(after.talk?.with.id, v.id)
+})
+
+// ------------------------------------------------------------ the watch --
+
+/** A boarding built by hand: `n` boarders of a given hp in `room`, off a hull on the clamps. */
+const boarded = (s: GameState, room: string, n: number, hp: number): GameState => {
+  const [board, hull] = standingOff(s, { intent: 'boarding', status: 'docked', timer: 0 })
+  return {
+    ...board,
+    boarding: {
+      shipId: hull.id,
+      moduleId: room,
+      boarders: Array.from({ length: n }, (_, i) => ({
+        id: `b${i}`,
+        name: `Boarder ${i}`,
+        hp,
+        maxHp: hp,
+        kit: null,
+      })),
+      responders: [],
+      size: n,
+      moveIn: 40,
+      looted: 0,
+      killed: 0,
+      lost: 0,
+      startedAt: board.elapsed,
+    },
+  }
+}
+
+/** A station with a Security Office and two people on watch in it. */
+const watched = (): [GameState, string[]] => {
+  let s = place(grown(), 'security')
+  const office = s.modules.find((m) => m.kind === 'security')!
+  const watch = s.crew.filter((c) => !c.dead).slice(-2)
+  for (const c of watch) s = reducer(s, { type: 'assign', crewId: c.id, moduleId: office.id })
+  return [s, watch.map((c) => c.id)]
+}
+
+test('the security watch turns out to wherever the boarders are', () => {
+  const [s, watch] = watched()
+  // An empty storage room: nobody in it but the party.
+  const store = s.modules.find((m) => m.kind === 'storage')!
+  const quiet: GameState = {
+    ...s,
+    modules: s.modules.map((m) => (m.id === store.id ? { ...m, staff: [] } : m)),
+    crew: s.crew.map((c) => (c.assignment === store.id ? { ...c, assignment: null } : c)),
+  }
+  const start = boarded(quiet, store.id, 2, 30)
+  const after = advance(start, 2)
+  assert.deepEqual([...after.boarding!.responders].sort(), [...watch].sort(), 'both went')
+  assert.ok(
+    after.log.some((l) => /from Security/.test(l.text)),
+    'and the log says so',
+  )
+  // They fight it without being posted to it: the storeroom still has nobody on its roster.
+  const room = after.modules.find((m) => m.id === store.id)!
+  assert.equal(room.staff.length, 0)
+  assert.equal(defendersOf(after, room).length, 2)
+  const hurt = after.boarding!.boarders.some((b) => b.hp < 30)
+  assert.ok(hurt, 'and the boarders felt it')
+  for (const id of watch) {
+    assert.equal(after.crew.find((c) => c.id === id)?.assignment, s.modules.find((m) => m.kind === 'security')!.id, 'still posted to the office')
+  }
+})
+
+test('the watch stands down when it is over, without anybody moving them', () => {
+  const [s, watch] = watched()
+  const store = s.modules.find((m) => m.kind === 'storage')!
+  const start = boarded(s, store.id, 1, 3)
+  const after = advance(start, 20)
+  assert.equal(after.boarding, null, 'a boarder on 3 hp does not last')
+  const office = s.modules.find((m) => m.kind === 'security')!
+  for (const id of watch) {
+    assert.equal(after.crew.find((c) => c.id === id)?.assignment, office.id)
+  }
+})
+
+test('a hurt watch officer falls back to the office and rejoins once patched up', () => {
+  const [s, watch] = watched()
+  const store = s.modules.find((m) => m.kind === 'storage')!
+  const [first] = watch
+  // One of them arrives already bleeding, the other is fine.
+  const bleeding: GameState = {
+    ...s,
+    crew: s.crew.map((c) => (c.id === first ? { ...c, hp: c.maxHp * 0.15 } : c)),
+  }
+  const start = boarded(bleeding, store.id, 3, 400)
+  const after = advance(start, 3)
+  assert.ok(!after.boarding!.responders.includes(first), 'too hurt to turn out')
+  assert.ok(after.boarding!.responders.includes(watch[1]), 'the other one did')
+  // Patched up, they go.
+  const healed: GameState = {
+    ...after,
+    crew: after.crew.map((c) => (c.id === first ? { ...c, hp: c.maxHp } : c)),
+  }
+  const back = advance(healed, 1)
+  assert.ok(back.boarding!.responders.includes(first), 'fit again, and at the fight')
+})
+
+test('the office unlocks when boardings are a thing, and turns out nobody when dark', () => {
+  const [s] = watched()
+  const office = s.modules.find((m) => m.kind === 'security')!
+  assert.equal(def('security').unlockAtCrew, 20)
+  const dark: GameState = {
+    ...s,
+    modules: s.modules.map((m) => (m.id === office.id ? { ...m, standby: true } : m)),
+  }
+  const store = s.modules.find((m) => m.kind === 'storage')!
+  const after = advance(boarded(dark, store.id, 2, 400), 2)
+  assert.deepEqual(after.boarding!.responders, [], 'a powered-down office is nobody on watch')
 })

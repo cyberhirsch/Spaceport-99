@@ -39,6 +39,7 @@ export type ModuleKind =
   | 'hangar'
   | 'command'
   | 'battery'
+  | 'security'
   | 'shield'
   | 'storage'
   | 'gym'
@@ -213,6 +214,12 @@ export interface Boarding {
   /** The room they are in right now. */
   moduleId: string
   boarders: Boarder[]
+  /**
+   * Security posted crew who have gone to the fight. They keep their post —
+   * the office is where they are from, not where they are — and they follow
+   * the party from room to room without taking a slot in any of them.
+   */
+  responders: string[]
   /** How many came aboard, so the survivors know when they are beaten. */
   size: number
   /** Seconds until they push on to the next room if nobody stops them. */

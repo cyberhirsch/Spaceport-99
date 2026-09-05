@@ -79,6 +79,21 @@ test('the unlock curve runs from nothing to sixty', () => {
   assert.ok(BASE_CREW_CAP + maxRun * 2 >= 60, 'two maxed quarters runs hold the whole curve')
 })
 
+test('the only room that undoes damage is an early one', () => {
+  const fixers = BUILDABLE.filter((d) => d.repairs)
+  assert.equal(fixers.length, 1, 'exactly one room puts structural damage right')
+  const [shop] = fixers
+  // Upgrading a room resets its condition and a passing engineer occasionally
+  // fixes one, but neither is something to plan around. Incidents start
+  // chewing rooms up in the first hour, so the cure cannot sit behind a
+  // late-game roster: 24 is where this file draws the line on "not early".
+  assert.ok(
+    shop.unlockAtCrew < 24,
+    `${shop.name} unlocks at ${shop.unlockAtCrew}, long after rooms start taking damage`,
+  )
+  assert.ok(shop.cost >= 500, 'the price is what paces it, not the roster')
+})
+
 test('the five new rooms are on the curve and cost what they should', () => {
   for (const kind of ['reclaimer', 'brig', 'sensor', 'market', 'dso'] as ModuleKind[]) {
     const d = def(kind)

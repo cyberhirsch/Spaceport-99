@@ -6,7 +6,7 @@
  * simulation is split up. The split itself is layered, bottom to top:
  *
  *   core → staffing → rooms → state → hazards → station → standing
- *        → recruit → missions → traffic → tick → reducer
+ *        → recruit → missions → traffic → board → tick → reducer
  *
  * A module only ever imports from the layers below it.
  */
@@ -36,6 +36,7 @@ export * from './standing.ts'
 export * from './recruit.ts'
 export * from './missions.ts'
 export * from './traffic.ts'
+export * from './board.ts'
 export * from './tick.ts'
 export * from './reducer.ts'
 

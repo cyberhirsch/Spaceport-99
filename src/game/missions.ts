@@ -27,12 +27,39 @@ import { shift } from './standing.ts'
 export const questBearing = (s: GameState): string | undefined => {
   const q = s.quest
   if (q.stage !== 'letter' && q.stage !== 'checking' && q.stage !== 'watched') return undefined
-  if (reach(s) <= 0) return undefined
   // Never two on the board at once: this is a thing you do deliberately.
   if (s.missions.some((m) => m.bearing && m.status !== 'report')) return undefined
-  const open = openBearings(q)
-  if (open.length === 0) return undefined
-  return roll(s) < 0.45 ? open[0].name : undefined
+  const next = openBearings(q)[0]
+  if (!next) return undefined
+  // The first names are filed in near space and any hull can go and look. The
+  // later ones are past the envelope, and stay off the board until the
+  // station can reach that far.
+  if (next.far && reach(s) <= 0) return undefined
+  return roll(s) < 0.45 ? next.name : undefined
+}
+
+/**
+ * What stands between this station and the next name on the list, in the
+ * order a commander would fix them. Empty once the next one can be flown.
+ */
+export const bearingPrerequisites = (s: GameState): { text: string; done: boolean }[] => {
+  const next = openBearings(s.quest)[0]
+  if (!next) return []
+  const command = s.modules.filter((m) => m.kind === 'command')
+  const steps = [
+    { done: command.length > 0, text: 'A Command Module, to put the run on the board' },
+    { done: command.some((m) => m.staff.length > 0), text: 'Somebody posted to it' },
+    { done: fleetCapacity(s) > 0, text: 'A Hangar Bay' },
+    { done: berthedShips(s).some((h) => h.hull > 0), text: 'A hull in it, sound enough to fly' },
+  ]
+  if (next.far) {
+    const dso = s.modules.filter((m) => m.kind === 'dso' && !m.standby)
+    steps.push(
+      { done: dso.length > 0, text: `Deep Space Operations — the ${next.name} is past the envelope` },
+      { done: reach(s) > 0, text: 'Somebody posted to it, so it reaches anything' },
+    )
+  }
+  return steps
 }
 
 /** What a team brings home from one of the seven, and what it costs to know. */

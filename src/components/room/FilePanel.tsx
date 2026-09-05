@@ -35,7 +35,11 @@ export const FilePanel = ({ state, onReadFile, onDecideFile }: RoomPanelProps) =
               <span className="spec__blurb">{done ? h.found : `Filed: ${h.filed}`}</span>
               {!done && (
                 <span className="spec__foot">
-                  <em>not checked — it takes a far contract to go and look</em>
+                  <em>
+                    {h.far
+                      ? 'not checked — past the envelope, it takes Deep Space Operations to reach'
+                      : 'not checked — a mission out to look, for any hull with a crew'}
+                  </em>
                 </span>
               )}
             </li>

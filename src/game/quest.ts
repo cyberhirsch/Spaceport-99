@@ -27,6 +27,12 @@ export interface LostHull {
   found: string
   /** How much closer this brings the thing to your clamps. */
   weight: number
+  /**
+   * Past the comms envelope, which only Deep Space Operations reaches. The
+   * first two are filed in Ridley Reach and can be checked by any station
+   * with a hull and somebody at the Command Module; the rest are not.
+   */
+  far: boolean
 }
 
 export const LOST: LostHull[] = [
@@ -37,6 +43,7 @@ export const LOST: LostHull[] = [
     found:
       'Nothing at the filed position but clean vacuum and a beacon that had been switched off by hand. The wreck was eleven thousand kilometres coreward, cold, and sitting at the wrong angle to everything.',
     weight: 0.18,
+    far: false,
   },
   {
     name: 'Corbel Nine',
@@ -45,6 +52,7 @@ export const LOST: LostHull[] = [
     found:
       'A survey shuttle out of Spaceport-99, registered to the previous commander, on station at the filed position with its recorder still running. The recorder covers four days. Nothing happens in it until the last ninety seconds, and then the picture is of a stretch of empty sky that the instruments insist is not empty.',
     weight: 0.3,
+    far: false,
   },
   {
     name: 'Long Meridian',
@@ -53,6 +61,7 @@ export const LOST: LostHull[] = [
     found:
       'The hull is intact and open to space. Every internal door is standing open, in sequence, from the outer lock inward. Nothing aboard is broken. Nothing aboard is aboard.',
     weight: 0.2,
+    far: true,
   },
   {
     name: 'Ordinary Hours',
@@ -61,6 +70,7 @@ export const LOST: LostHull[] = [
     found:
       'She is not where the record says and not where the drift says either. She is nine days ahead of her own last transmission, on a heading nobody plotted, still under way, with nobody at any station.',
     weight: 0.22,
+    far: true,
   },
   {
     name: 'Sixteen Winters',
@@ -69,6 +79,7 @@ export const LOST: LostHull[] = [
     found:
       'A debris field, and in it a second debris field, older, of a hull that was never reported missing because it was never reported at all. The register has no entry. Somebody out here has been losing ships for longer than the Confederation has been counting.',
     weight: 0.25,
+    far: true,
   },
   {
     name: 'Patience Fell',
@@ -77,6 +88,7 @@ export const LOST: LostHull[] = [
     found:
       'The team found her, logged her, and departed. Forty minutes later the fix they took no longer matched the sky. They took it again. It did not match the second time either, and the error was in the same direction and larger.',
     weight: 0.28,
+    far: true,
   },
   {
     name: 'Absolute Zero Hour',
@@ -85,6 +97,7 @@ export const LOST: LostHull[] = [
     found:
       'There is no such hull. There has never been such a hull. It is the seventh line on a list of six, written in the same hand as the rest, and whatever put it there was answering a question nobody asked out loud.',
     weight: 0.35,
+    far: true,
   },
 ]
 

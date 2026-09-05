@@ -6,6 +6,7 @@ import { DragGhost } from './components/DragGhost.tsx'
 import { FleetPanel } from './components/FleetPanel.tsx'
 import { LaunchModal } from './components/LaunchModal.tsx'
 import { LogPanel } from './components/LogPanel.tsx'
+import { MissionsPanel } from './components/MissionsPanel.tsx'
 import { ConfirmModal } from './components/ConfirmModal.tsx'
 import { TalkModal } from './components/TalkModal.tsx'
 import { VisitorModal } from './components/VisitorModal.tsx'
@@ -24,12 +25,13 @@ import { useGame } from './hooks/useGame.ts'
 import { useMediaQuery } from './hooks/useMediaQuery.ts'
 import type { ModuleKind } from './game/types.ts'
 
-type Tab = 'build' | 'crew' | 'fleet' | 'log'
+type Tab = 'build' | 'crew' | 'fleet' | 'missions' | 'log'
 
 const TABS: { id: Tab; label: string; glyph: string }[] = [
   { id: 'build', label: 'Build', glyph: '⊞' },
   { id: 'crew', label: 'Crew', glyph: '☺' },
   { id: 'fleet', label: 'Fleet', glyph: '⬢' },
+  { id: 'missions', label: 'Missions', glyph: '◎' },
   { id: 'log', label: 'Log', glyph: '≡' },
 ]
 
@@ -286,6 +288,9 @@ export default function App() {
               onTradeIn={(id) => act({ type: 'tradeInShip', shipId: id })}
               onRenameShip={(id, name) => act({ type: 'renameShip', shipId: id, name })}
             />
+          )}
+          {tab === 'missions' && (
+            <MissionsPanel state={state} onOpenMission={(id) => setMissionId(id)} />
           )}
           {tab === 'log' && <LogPanel state={state} />}
         </aside>

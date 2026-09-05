@@ -3452,3 +3452,82 @@ input.rename:focus {
 .mission__duty--far {
   color: var(--violet);
 }
+
+/* ---------------------------------------------------------- the board -- */
+
+.quest-meters {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.quest-meter {
+  display: grid;
+  grid-template-columns: 5.5em 1fr 3em;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.quest-meter em {
+  font-style: normal;
+  color: var(--ink-dim, #8a97a8);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+}
+
+.quest-meter b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.quest-meter .spec__bar.is-hot i {
+  background: #ff5470;
+}
+
+.checklist--tight {
+  margin: 8px 0 2px;
+  font-size: 0.78rem;
+}
+
+.thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.thread {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #0a1119;
+  border-left: 3px solid #4a5a6e;
+}
+
+.thread--good { border-left-color: #38e8b0; }
+.thread--warn { border-left-color: #ffc45a; }
+.thread--bad { border-left-color: #ff5470; }
+
+.thread__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.thread__clock {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.74rem;
+  color: var(--ink-dim, #8a97a8);
+  white-space: nowrap;
+}
+
+.thread__detail {
+  font-size: 0.78rem;
+  color: var(--ink-dim, #8a97a8);
+}

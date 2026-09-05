@@ -8,6 +8,7 @@ import { factionDef } from './factions.ts'
 import { makeMission, type MissionOpts, OPEN_HAUL_PER_MINUTE, OPEN_STRAIN_PER_MINUTE } from './fleet.ts'
 import { makeVisitor } from './visitors.ts'
 import { makeWalkIn } from './recruit.ts'
+import { lostHull } from './quest.ts'
 import type { Crew, ModuleDef, GameState, ResourceKey, StationModule } from './types.ts'
 import {
   AIR_PER_CREW,
@@ -593,7 +594,12 @@ const stepFleet = (s: GameState, dt: number): void => {
       // A run out to a filed position is a fixed job with a fixed clock. It is
       // not open-ended work: there is one place to go and one thing to look at.
       return bearing
-        ? { far: true, bearing, shape: 'contract', name: `Bearing — the ${bearing}` }
+        ? {
+            far: lostHull(bearing)?.far ?? true,
+            bearing,
+            shape: 'contract',
+            name: `Bearing — the ${bearing}`,
+          }
         : { far: rollFar(s) }
     }
     if (listening && offers < 3) {

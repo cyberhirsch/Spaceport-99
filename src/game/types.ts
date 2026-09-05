@@ -179,7 +179,7 @@ export interface Crew {
   dead: boolean
 }
 
-export type IncidentKind = 'fire' | 'breach' | 'pirates' | 'vermin'
+export type IncidentKind = 'fire' | 'breach' | 'vermin'
 
 export interface Incident {
   id: string
@@ -190,6 +190,39 @@ export interface Incident {
   maxHp: number
   /** Seconds until the incident spreads to a neighbouring module. */
   spreadIn: number
+  startedAt: number
+}
+
+/** One of them. They have a name because they can die, and a face is not far off. */
+export interface Boarder {
+  id: string
+  name: string
+  hp: number
+  maxHp: number
+  /** What they came through the lock with — and what they drop. */
+  kit: ItemId | null
+}
+
+/**
+ * A boarding in progress. Pirates are not an incident: they come on a hull,
+ * they are in a particular room, and they leave one way or another.
+ */
+export interface Boarding {
+  /** The hull they came off, still on the clamps. */
+  shipId: string
+  /** The room they are in right now. */
+  moduleId: string
+  boarders: Boarder[]
+  /** How many came aboard, so the survivors know when they are beaten. */
+  size: number
+  /** Seconds until they push on to the next room if nobody stops them. */
+  moveIn: number
+  /** Credits they have got hold of — theirs if they get away. */
+  looted: number
+  /** Boarders down. */
+  killed: number
+  /** Crew dead. */
+  lost: number
   startedAt: number
 }
 
@@ -422,7 +455,7 @@ export interface Visitor {
    * about it, it `demand`s, and if that is refused it comes in as a `raid`.
    * Every raid is therefore something you watched arrive.
    */
-  intent?: 'conquest' | 'loiter' | 'demand' | 'raid'
+  intent?: 'conquest' | 'loiter' | 'demand' | 'raid' | 'boarding'
   /** What a hull with an intent brought with it, against the station's guns. */
   force?: number
   /**
@@ -614,6 +647,8 @@ export interface GameState {
   modules: StationModule[]
   crew: Crew[]
   incidents: Incident[]
+  /** The party off a hull that is standing in one of your rooms, if one is. */
+  boarding: Boarding | null
   log: LogEntry[]
   /** Decks unlocked so far (deck 0 is always unlocked). */
   decks: number

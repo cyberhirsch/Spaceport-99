@@ -21,7 +21,7 @@ test('startIncident refuses a module that already has an incident', () => {
 test('startIncident refuses to start an incident when the cap is reached', () => {
   const s = fresh()
   const cap = incidentCap(s)
-  const kinds: IncidentKind[] = ['fire', 'breach', 'pirates', 'vermin']
+  const kinds: IncidentKind[] = ['fire', 'breach', 'vermin']
   for (let i = 0; i < cap; i += 1) {
     const module = s.modules[i % s.modules.length]
     const kind = kinds[i % kinds.length]

@@ -78,6 +78,18 @@ const STEPS: { from: number; up: (raw: Record<string, unknown>) => void }[] = [
       }
     },
   },
+  // 14 → 15: pirates stopped being weather. A boarding party that was burning
+  // like a fire on an older station has no hull to have come off, so it is
+  // simply gone when the station comes back up.
+  {
+    from: 14,
+    up: (raw) => {
+      const s = raw as unknown as GameState
+      const burning = raw.incidents as { kind: string }[]
+      raw.incidents = burning.filter((i) => i.kind !== 'pirates')
+      s.boarding = null
+    },
+  },
 ]
 
 export const migrate = (raw: GameState): GameState | null => {

@@ -6,7 +6,7 @@ Game logic lives in `src/game/`, organized as a barrel of layered modules. Each 
 
 ```
 core → staffing → rooms → state → hazards → station → standing → recruit → 
-missions → traffic → board → tick → reducer
+boarding → missions → traffic → board → tick → reducer
 ```
 
 Only the reducer is exported to the UI; everything else stays inside the barrel. New game logic goes into the layer that needs it, or a new layer between two existing ones if behaviour spans two without fitting either.

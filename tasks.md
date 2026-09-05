@@ -42,10 +42,17 @@ what stand between it and the station, which is what they were built for.
 bury it, or fly out and meet it. Each ends differently and leaves the station
 in a different position.
 
-**Raids are costly and survivable.** Scarred rooms, stolen cargo, crew in the
-Med Bay. Deaths only when a station has no defence at all and has ignored every
-warning. A raid is a setback, not the end of a run. The thing at the bearings
-is not bound by this: the siege can kill.
+**Pirates come on a hull, and a boarding is a fight.** They are not an
+incident. A raider stands off and demands, or lies its way to a berth, and
+then a party comes through the lock: the battery and shield decide how many,
+and whoever is standing in the room they land in — kit counting for as much
+as Reflex — decides the rest. A defender who keeps the door at low hp can die
+on it; nobody is pulled out for them. What a beaten party leaves is yours:
+kit and credits off the dead, survivors in the cells if there is a Brig, and
+the hull on the clamps with nobody left to fly her. A boarding is still a
+setback and not the end of a run — the last living crew member is dragged
+clear rather than killed — and the thing at the bearings is not bound by any
+of this: the siege can kill.
 
 **Losing the station does not end the run.** New flag, same commander. The new
 owner's first demand arrives within the hour and the old owner's first visit

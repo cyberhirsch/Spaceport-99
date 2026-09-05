@@ -163,23 +163,33 @@ test('small arms tell against boarders and nothing else', () => {
   const armed = reducer(s, { type: 'issueGear', crewId: s.crew[0].id, item: 'plate' })
   assert.equal(defence(armed).smallArms, ITEM_DEFS.plate.guard)
 
-  // Same room, same crew, boarders versus a fire.
+  // The same person on the door of the same room, with and without the plate:
+  // how much of a boarder is left after five seconds of them.
   const room = armed.modules.find((m) => m.staff.length > 0) ?? armed.modules[1]
-  const fight = (kind: 'pirates' | 'fire') => {
-    const start = {
-      ...armed,
-      crew: armed.crew.map((c) => ({ ...c, assignment: room.id })),
-      modules: armed.modules.map((m) => (m.id === room.id ? { ...m, staff: [armed.crew[0].id] } : m)),
-      incidents: [
-        { id: 'i', kind, moduleId: room.id, hp: 500, maxHp: 500, spreadIn: 999, startedAt: 0 },
-      ],
+  const fight = (base: GameState) => {
+    const hand = base.crew[0]
+    const start: GameState = {
+      ...base,
+      crew: base.crew.map((c) => (c.id === hand.id ? { ...c, assignment: room.id } : { ...c, assignment: null })),
+      modules: base.modules.map((m) => (m.id === room.id ? { ...m, staff: [hand.id] } : { ...m, staff: [] })),
+      boarding: {
+        shipId: 'nope',
+        moduleId: room.id,
+        boarders: [{ id: 'b1', name: 'Rook', hp: 500, maxHp: 500, kit: null }],
+        size: 1,
+        moveIn: 40,
+        looted: 0,
+        killed: 0,
+        lost: 0,
+        startedAt: base.elapsed,
+      },
     }
     const after = reducer(start, { type: 'tick', seconds: 5 })
-    return 500 - (after.incidents[0]?.hp ?? 0)
+    return 500 - (after.boarding?.boarders[0]?.hp ?? 0)
   }
   const bare: GameState = { ...armed, crew: armed.crew.map((c) => ({ ...c, gear: {} })) }
-  void bare
-  assert.ok(fight('pirates') > 0 && fight('fire') > 0, 'both get fought')
+  assert.ok(fight(armed) > fight(bare), 'the plate is worth wearing on the door')
+  assert.ok(fight(bare) > 0, 'and an unarmed hand still fights')
 })
 
 test('a dead crew member leaves their kit behind', () => {

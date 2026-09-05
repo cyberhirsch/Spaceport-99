@@ -56,8 +56,8 @@ export const rollIncident = (s: GameState): void => {
       luckiest(onWatch) * 0.012,
   )
   if (roll(s) > risk) return
+  // Pirates are not on this list. They come on a hull.
   const r = roll(s)
-  const kind: IncidentKind =
-    r < 0.34 ? 'fire' : r < 0.6 ? 'vermin' : r < 0.85 ? 'breach' : 'pirates'
+  const kind: IncidentKind = r < 0.4 ? 'fire' : r < 0.7 ? 'vermin' : 'breach'
   startIncident(s, kind, target)
 }

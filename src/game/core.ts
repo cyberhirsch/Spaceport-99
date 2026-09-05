@@ -3,7 +3,7 @@ import type { GameState, LogEntry, Rng } from './types.ts'
 
 // Constants and the two helpers everything else leans on.
 
-export const SAVE_VERSION = 14
+export const SAVE_VERSION = 15
 
 /**
  * The station's luck.

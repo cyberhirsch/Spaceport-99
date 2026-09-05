@@ -50,6 +50,7 @@ const Room = ({
   module,
   crewById,
   incident,
+  boarders,
   drag,
   lifted,
   onOpen,
@@ -59,6 +60,8 @@ const Room = ({
   module: StationModule
   crewById: Map<string, Crew>
   incident: GameState['incidents'][number] | undefined
+  /** How many boarders are standing in this room, when there is a boarding on. */
+  boarders: number
   drag: DragState | null
   lifted: boolean
   onOpen: () => void
@@ -76,7 +79,7 @@ const Room = ({
     <div
       className={[
         'room',
-        incident ? 'room--alarm' : '',
+        incident || boarders > 0 ? 'room--alarm' : '',
         running ? '' : 'room--idle',
         module.standby ? 'room--standby' : '',
         module.width > 1 ? 'room--merged' : '',
@@ -150,6 +153,11 @@ const Room = ({
         </span>
       )}
 
+      {boarders > 0 && (
+        <span className="room__incident room__incident--boarders" title="Boarding party">
+          ☠ {boarders} aboard
+        </span>
+      )}
       {incident && (
         <span className="room__incident" title={incidentDef(incident.kind).name}>
           {incidentDef(incident.kind).glyph}
@@ -238,6 +246,7 @@ export const StationView = ({
             module={m}
             crewById={crewById}
             incident={state.incidents.find((i) => i.moduleId === m.id)}
+            boarders={state.boarding?.moduleId === m.id ? state.boarding.boarders.length : 0}
             drag={drag}
             lifted={held?.id === m.id}
             onOpen={() => onSelectModule(m.id)}

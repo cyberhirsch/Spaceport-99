@@ -3531,3 +3531,9 @@ input.rename:focus {
   font-size: 0.78rem;
   color: var(--ink-dim, #8a97a8);
 }
+
+.room__incident--boarders {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #ff5470;
+}

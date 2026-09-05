@@ -187,6 +187,25 @@ test('a save without portraits gets all crew dealt distinct faces on load', () =
   assert.equal(unique.size, portraits.length, 'all portraits are distinct where the pool allows')
 })
 
+test('a boarding party burning like a fire on an old save is simply gone', () => {
+  const old = newGame('Old Weather', 1001) as unknown as Record<string, unknown>
+  old.version = 14
+  const room = (old.modules as { id: string }[])[1]
+  old.incidents = [
+    { id: 'i1', kind: 'pirates', moduleId: room.id, hp: 40, maxHp: 66, spreadIn: 10, startedAt: 0 },
+    { id: 'i2', kind: 'fire', moduleId: room.id, hp: 20, maxHp: 42, spreadIn: 10, startedAt: 0 },
+  ]
+  delete old.boarding
+  storage.setItem('spaceport99.save', JSON.stringify(old))
+  const loaded = loadGame()!
+  assert.deepEqual(
+    loaded.incidents.map((i) => i.kind),
+    ['fire'],
+    'pirates are not an incident any more, and the fire is still a fire',
+  )
+  assert.equal(loaded.boarding, null)
+})
+
 test('a save from before recruits had a reason for being here reads them as posted', () => {
   const old = newGame('No Reasons', 909) as unknown as Record<string, unknown>
   old.version = 13

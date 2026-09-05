@@ -1,5 +1,6 @@
 import { CLAIM_AFTER } from './core.ts'
 import { factionDef } from './factions.ts'
+import { def } from './modules.ts'
 import { guestsAboard } from './traffic.ts'
 import type { GameState, Quest } from './types.ts'
 
@@ -56,7 +57,23 @@ export const openThreads = (s: GameState): Thread[] => {
   const out: Thread[] = []
   const prisonerName = (id: string) => s.prisoners.find((p) => p.id === id)?.name ?? 'somebody'
 
+  if (s.boarding) {
+    const b = s.boarding
+    const room = s.modules.find((m) => m.id === b.moduleId)
+    const door = s.crew.filter((c) => !c.dead && c.assignment === b.moduleId).length
+    out.push({
+      id: 'boarding',
+      title: `Boarders in the ${room ? def(room.kind).name : 'station'}`,
+      detail:
+        door === 0
+          ? `${b.boarders.length} of them, looting. Put somebody armed in that room.`
+          : `${b.boarders.length} of them against ${door} of yours. Kit counts.`,
+      tone: 'bad',
+    })
+  }
+
   for (const v of s.visitors) {
+    if (v.intent === 'boarding') continue
     if (v.intent === 'loiter') {
       out.push({
         id: `hull:${v.id}`,

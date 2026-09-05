@@ -1,7 +1,7 @@
 import { cycleCredits, cycleYield, def, mergeBonus, staffSlots } from './modules.ts'
 import { MAX_STAT, effectiveness } from './crew.ts'
 import { incidentDef } from './incidents.ts'
-import { SLOTS, itemDef } from './gear.ts'
+import { itemDef } from './gear.ts'
 import { rollCall, unattended } from './calls.ts'
 import { ITEM_SPEC, specDef } from './specs.ts'
 import { factionDef } from './factions.ts'
@@ -9,6 +9,7 @@ import { makeMission, type MissionOpts, OPEN_HAUL_PER_MINUTE, OPEN_STRAIN_PER_MI
 import { makeVisitor } from './visitors.ts'
 import { makeWalkIn } from './recruit.ts'
 import { lostHull } from './quest.ts'
+import { beginBoarding, rejoinBoarding, stepBoarding } from './boarding.ts'
 import type { Crew, ModuleDef, GameState, ResourceKey, StationModule } from './types.ts'
 import {
   AIR_PER_CREW,
@@ -26,7 +27,7 @@ import {
 } from './core.ts'
 import {
   autoAssignInto,
-  crewGuard,
+  killCrew,
   workRate,
   unassign,
   assign,
@@ -55,7 +56,6 @@ import {
   CONQUEST_GAP,
   questBeat,
   raiseDemand,
-  resolveRaid,
   sendApproach,
   sendClaimant,
   sendConqueror,
@@ -249,7 +249,7 @@ const stepFabShop = (s: GameState, dt: number, ctx: TickCtx): void => {
   }
 }
 
-/** Incidents: fire, vermin, breach and pirates burn down, spread, and get fought. */
+/** Incidents: fire, vermin and breach burn down, spread, and get fought. */
 const stepIncidents = (s: GameState, dt: number, ctx: TickCtx): void => {
   // Whether anything got contained this tick — and so whether it is worth
   // checking that the room it happened in got its operator back.
@@ -267,9 +267,6 @@ const stepIncidents = (s: GameState, dt: number, ctx: TickCtx): void => {
       const c = ctx.crewById.get(id)
       if (!c || c.dead) continue
       firepower += effectiveness(c, idef.counter) * 0.55
-      // Kit tells most against people. A hull breach does not care what you
-      // are carrying; a boarding party very much does.
-      if (inc.kind === 'pirates') firepower += crewGuard(c) * 0.18
     }
     inc.hp -= firepower * dt
     m.condition = clamp(m.condition - idef.structureDps * dt, 0.2, 1)
@@ -287,7 +284,6 @@ const stepIncidents = (s: GameState, dt: number, ctx: TickCtx): void => {
     if (inc.kind === 'breach') s.resources.air = Math.max(0, s.resources.air - 0.55 * dt)
     if (inc.kind === 'fire') s.resources.power = Math.max(0, s.resources.power - 0.8 * dt)
     if (inc.kind === 'vermin') s.resources.food = Math.max(0, s.resources.food - 0.7 * dt)
-    if (inc.kind === 'pirates') s.credits = Math.max(0, s.credits - 1.5 * dt)
 
     if (inc.hp <= 0) {
       cleared = true
@@ -382,17 +378,7 @@ const stepCrewWellbeing = (s: GameState, dt: number, ctx: TickCtx, offline: bool
         c.hp = 1
         continue
       }
-      c.hp = 0
-      c.dead = true
-      c.returnTo = null
-      // Their kit goes back in the hold. Somebody else will need it.
-      for (const slot of SLOTS) {
-        const worn = c.gear?.[slot]
-        if (worn) s.stores[worn] = (s.stores[worn] ?? 0) + 1
-      }
-      c.gear = {}
-      unassign(s, c.id)
-      log(s, `${c.name} has died. The station observes a minute of silence.`, 'bad')
+      killCrew(s, c)
     }
   }
 }
@@ -528,8 +514,9 @@ const stepTraffic = (s: GameState, dt: number): void => {
   }
 
   for (const v of [...s.visitors]) {
-    // A hull that came to take the station waits as long as it likes.
-    if (v.intent === 'conquest') continue
+    // A hull that came to take the station waits as long as it likes, and one
+    // with a party aboard is the boarding's business until it is over.
+    if (v.intent === 'conquest' || v.intent === 'boarding') continue
     // The three-step sequence runs on its own clock, and every step of it has
     // already been on the board long enough to answer.
     if (v.intent) {
@@ -542,7 +529,7 @@ const stepTraffic = (s: GameState, dt: number): void => {
         v.intent = 'raid'
         v.timer = 8
       } else {
-        resolveRaid(s, v)
+        beginBoarding(s, v)
         // Whatever was on screen about it is finished now.
         if (s.talk && s.talk.with.kind === 'visitor' && s.talk.with.id === v.id) s.talk = null
       }
@@ -716,7 +703,7 @@ const stepCandidates = (s: GameState, dt: number): void => {
   }
 }
 
-/** Random incidents: fire, vermin, breach and pirates start somewhere new. */
+/** Random incidents: fire, vermin and breach start somewhere new. */
 const stepIncidentSchedule = (s: GameState, dt: number): void => {
   s.nextIncidentIn -= dt
   if (s.nextIncidentIn <= 0) {
@@ -759,6 +746,8 @@ export const step = (s: GameState, dt: number, offline: boolean): void => {
   stepResearchLab(s, dt, ctx)
   stepFabShop(s, dt, ctx)
   stepIncidents(s, dt, ctx)
+  stepBoarding(s, dt, offline)
+  rejoinBoarding(s)
   stepCrewWellbeing(s, dt, ctx, offline)
   stepDockingFees(s, dt)
   stepCooldowns(s, dt)

@@ -47,7 +47,19 @@ export const alertsFor = (state: GameState, derived: Derived): string[] => {
     return `${where(first)}, and ${rest.length} more emergencies`
   }
 
+  const boarding = (() => {
+    const b = state.boarding
+    if (!b) return false
+    const room = state.modules.find((m) => m.id === b.moduleId)
+    const door = state.crew.filter((c) => !c.dead && c.assignment === b.moduleId).length
+    const where = room ? def(room.kind).name : 'the station'
+    return `${b.boarders.length} boarder${b.boarders.length === 1 ? '' : 's'} in the ${where} — ${
+      door === 0 ? 'nobody is stopping them' : `${door} of yours on the door`
+    }`
+  })()
+
   return [
+    boarding,
     state.resources.air <= 0 && 'No oxygen — the crew is suffocating',
     state.resources.food <= 0 && 'No rations — the crew is starving',
     emergency(),

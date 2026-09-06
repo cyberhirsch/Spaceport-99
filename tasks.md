@@ -75,6 +75,12 @@ every future bump gets a step. Nothing back-ports to 5 or 6.
 **The boss plays it.** Pacing and balance changes come from a session played by
 hand, not from the headless harness.
 
+**The letter is not a sixty-crew feature.** The first two of the seven hulls
+are filed in near space and can be checked by any station with a hull and a
+staffed Command Module. The rest are past the comms envelope and wait for Deep
+Space Operations. A bearing is a mission, not a contract — every contract is a
+mission, and not every mission is a contract.
+
 **Two tasks wait on artwork** — researched kit, and room and ship art. Neither
 ships with placeholders. They are at the bottom of this file, out of the tiers.
 
@@ -309,86 +315,215 @@ ships with placeholders. They are at the bottom of this file, out of the tiers.
   reads "About 17% chance it comes out" on an ask that would run higher off a
   greener crew.
 
+- **A `CLAUDE.md`.** Architecture, conventions and verification on one page:
+  the layer order as a barrel diagram, the five conventions that bite (reducer-
+  only mutation, `.ts` on every internal import, pure generators taking an
+  `Rng`, seeded tests, `SAVE_VERSION` on shape changes), the four commands that
+  have to stay green, and the Playwright `addInitScript` pattern for loading a
+  save into a page. A session can find the layer order and the test commands
+  without reading `engine.ts`.
+
+- **Portraits re-dealt on load.** A save from before portraits were dealt had
+  crew with no `portrait` field, drawing from the seed and sharing faces.
+  `SAVE_VERSION` 13 gives every one of them a distinct face through
+  `allocatePortrait`, and a test loads a version-12 fixture and checks they all
+  come back different.
+
+- **Tests for what the split made public.** The refactor exported about two
+  dozen previously private helpers. `startIncident` (refuses a room that has
+  one, refuses past `incidentCap`) and `unassign` (remembers `returnTo` when
+  asked) now have tests on their branches, in the pattern `scrapValue` set.
+
+- **PWA manifest and service worker.** `public/manifest.webmanifest`, a
+  37-line `src/sw.ts` caching the built assets cache-first with a network
+  fallback, registration in `main.tsx`, and `rollupOptions` emitting the worker
+  to `dist/sw.js` unhashed. No plugin. The web build installs to a home screen
+  and loads with the network off after one visit.
+
+- **A conversation holds the station still.** A hull undocking mid-sentence
+  left the player reading a line about somebody who had already gone. The talk
+  modal is a blocking scrim, so nothing on the station can be acted on while it
+  is up — letting the clock run there only ever took things away from the
+  player. `advance` now breaks its loop while `s.talk` is set. Offline
+  catch-up is exempt, or a conversation left open overnight would be an
+  unlimited pause button, and frozen ticks still stamp `lastTick` so time spent
+  talking is discarded rather than banked and applied later.
+
+- **Recruits arrive for a reason, and posted ones are welcomed rather than
+  sold to.** Every HQ applicant used to open with the same line about a
+  courier. `Candidate.origin` is now `applied`, `posted` or `walkIn`, and which
+  one HQ sends depends on what its patron thinks of the station. Somebody who
+  put in for the berth keeps the hiring negotiation and arrives warmer, wanting
+  to be told what the station is for. Somebody posted here picked nothing and
+  is not being talked into anything: they are crew before the conversation
+  starts, and get their own `welcome` script — how they report in, the last
+  posting they came off, what they say about having been sent, and how they
+  take being welcomed, all varying by person, plus what they noticed on the way
+  in, which is the station's answer rather than theirs. Nothing rides on it.
+  The routing lives in the reducer, so the UI asks for one conversation with
+  somebody at the dock and gets whichever their arrival calls for. Walk-ins off
+  the Trading Hub stopped being described as sent over by HQ. `SAVE_VERSION`
+  14.
+
+- **Alerts say which room, how short, and what you have not got.** Four things
+  wrong at once on a station in a brownout. "1 emergency in progress" counted
+  disasters without saying where, leaving the player to search the station for
+  the room that was on fire; it now names the incident and the room, lists a
+  second, and only counts past that. "Power deficit — add a Fusion Reactor"
+  read as though the game had not noticed the reactor already running;
+  shortfalls now say how big the gap is and ask for *another* one when one is
+  built, with the right article either way. A brownout and a power deficit are
+  the same problem one step apart, so the brownout line carries the remedy and
+  the deficit line stands down. And the station stopped offering to pressurise
+  the next deck while the last one is still empty. The rules moved out of the
+  component into `src/components/alerts.ts`, which is what lets them be tested:
+  they are a pure read of state and derived, so the tests state a shortfall
+  rather than engineering a station into one.
+
+- **The Engineering Bay unlocks at 18 crew, not 42.** It is the only
+  dependable way to undo structural damage — upgrading a room resets its
+  condition and a passing engineer occasionally puts the worst one right, but
+  neither is something to plan around. Incidents start chewing rooms up in the
+  first hour, so a 42-crew gate left small stations watching condition fall
+  with nothing to do about it. Its 640c paces it now. One consequence left
+  standing for a hand-played session to judge: the trainers are one per stat at
+  26/30/33/45/48/56, and Tech is now first by eight crew.
+
+- **A missions board, and the first two bearings within reach of any hull.**
+  The questline used to be a sixty-crew feature: the letter arrives at nine
+  minutes and nothing could be done about it until Deep Space Operations, the
+  last room on the curve. `LostHull.far` now splits the list — the two filed in
+  Ridley Reach are near missions any station with a hull and a staffed Command
+  Module can fly, so Corbel Nine, the one that finds the previous commander's
+  shuttle, lands mid-game; the rest stay past the envelope. A bearing is a
+  mission and not a contract, and the new Missions tab keeps that straight: the
+  seven hulls with their stage, checked and attention meters, and a checklist
+  under the next name of exactly what is missing; the contracts off the wire;
+  and side quests, which are everything already running on its own clock — a
+  hull standing off, a demand waiting on an answer, somebody's people coming
+  for a prisoner, the new flag's first assessment, an applicant on the dock, a
+  team hailing. Nothing is invented for it; `src/game/board.ts` reads the state
+  the tick already drives, soonest first.
+
+- **Pirates come on a hull, and a boarding is a fight.** They used to be one of
+  four incidents, starting at random like a fire and fought like one: a
+  hit-point bar, nobody able to die, nothing taken and nothing left behind. A
+  raid, separately, was one dice roll that only ever subtracted. Now they
+  arrive only by ship — standing off and demanding, or lying their way to a
+  berth — and a party comes through the lock, with the battery and shield
+  deciding how many make it and a station that plainly outguns them not boarded
+  at all. After that it is people in a room: defenders concentrate on whoever
+  is closest to going down, a sidearm worth as much as a good Reflex score,
+  boarders spreading over whoever is in front of them. Left unopposed they
+  loot, wreck the room, push on, and leave with what they have after three
+  minutes. What a beaten party leaves is yours — kit and credits off the dead,
+  survivors in the cells if there is a Brig, which feeds the existing claim
+  mechanic, and the hull on the clamps with nobody left to fly her. Building it
+  surfaced a latent bug: the wellbeing pass healed before it checked for death,
+  so anything leaving a crew member at exactly zero got them a trickle and
+  immortality. Crew death is now one helper in `staffing.ts`. `SAVE_VERSION`
+  15.
+
+- **A Security Office.** Boarders are fought by whoever is standing in the room
+  they land in, which made the Docking Port the only room worth arming.
+  Anyone posted to the office who is fit to fight turns out to the party's
+  room, follows it, and stands down when it is over. They never leave their
+  post on paper — the office is where they are from, not where they are — so
+  they take no slot in the room they defend, nothing has to put them back, and
+  a one-berth Docking Port can still have four people on its door. 20 crew,
+  480c, Reflex. `SAVE_VERSION` 16.
+
 ---
 
 ## Opus
 
-Nothing outstanding. The five that were here are in **Done** above; what is
-left of the playtest is a session played by hand, which is not a task anybody
-can be handed.
+The five that were here are in **Done** above. What follows came out of a
+hand-played session and is open in the way that only playing it settles.
+
+### 1. Credits stop being a decision
+
+**Why.** A screenshot mid-session: 38,033c banked at +1.2/s. The dearest room
+is 1,040c and a deck 2,080c, so everything on the board is affordable thirty
+times over and no build is a trade-off. The economy has an income curve and no
+sink to match it.
+
+**Where.** Not a code change until the shape is decided. The candidates are
+upkeep that scales with the station, consumables the good rooms actually burn,
+kit and refits worth saving for, or prices that climb with what you already
+have. Each makes a different game.
+
+**Done when.** There is a point in a run where the player wants two things and
+can have one.
+
+### 2. Boarding balance
+
+**Why.** Boarders now fight, kill and get killed, and every number in it —
+their hit points, what they deal, how many come through the lock, the three
+minutes of patience before they leave with the till — is a first guess written
+alongside the mechanic. The rule here is that pacing comes from a session
+played by hand, not from the harness.
+
+**Where.** `src/game/boarding.ts`, all of it near the top.
+
+**Done when.** A station that built a Security Office and armed it comes
+through a boarding scarred and ahead; one that ignored every warning does not.
+
+### 3. Tech is now the first stat anybody can train
+
+**Why.** The trainers were one room per stat on a ladder — 26 Brawn, 30
+Intellect, 33 Reflex, 42 Tech, 45 Operations, 48 Adaptability, 56 Luck. Moving
+the Engineering Bay to 18 crew for its repairs took Tech training with it, and
+it now lands eight crew ahead of anything else.
+
+**Where.** Either leave it, or split the room: repairs early, Tech training
+back at 42 in something else.
+
+**Done when.** The ladder is deliberate, whichever way it ends up.
 
 ---
 
 ## Sonnet
 
-Nothing outstanding. The task that was here is in **Done** above.
+### 1. A browser test, and the first thing it should catch
+
+**Why.** `CLAUDE.md` documents a Playwright pattern and there is no Playwright:
+no config, no spec, nothing under `e2e/`. `App.tsx` is 663 lines and has never
+been rendered by a test. Five changes that touch the interface shipped in one
+session on reasoning alone — the alert bar, the deck prompt, the Missions tab,
+the boarding markers on a room, the Security Office responder count.
+
+**Where.** A config and one spec. `CLAUDE.md` already has the shape: stub
+`localStorage`, `addInitScript` a save with `lastTick` stamped to now, load the
+page. Then assert the things a unit test cannot: the alert bar renders its
+lines, the Missions tab opens and lists a bearing with its prerequisites, a
+room with boarders in it shows the marker.
+
+**Also worth one look while there.** The mobile tab bar is now six buttons —
+Build, Crew, Fleet, Missions, Log, More — and has never been seen on a narrow
+screen.
+
+**Done when.** `npm run e2e` starts the app, drives it, and fails if the panel
+does not render.
 
 ---
 
 ## Haiku
 
-### 1. A `CLAUDE.md`
+### 1. Finish the move to `main` on GitHub
 
-**Why.** There is none. Every session re-learns the reducer discipline, the
-`.ts` import extension rule, the `beforeunload` save-flush gotcha in browser
-tests, and where the headless sims live.
+**Why.** `claude/space-station-fallout-clone-ekzune` was a working branch name
+and the deployment was tied to it.
 
-**Where.** `/CLAUDE.md`. Ten lines on architecture (the barrel and the layer
-order), five on conventions, five on how to verify (`npm test`, `tsc -b`,
-`oxlint`, the Playwright pattern with `addInitScript`), and the two rules that
-bit hardest: only the reducer mutates, and every internal import names its
-extension.
+**Done already.** `main` is the branch all work happens on and everything is
+pushed to it. `build.yml` needs no change: its deploy job keys on
+`github.event.repository.default_branch` rather than a hardcoded name.
 
-**Done when.** The file exists and a new session can find the layer order and
-the test commands without reading `engine.ts`.
-
-### 2. Re-deal portraits on load
-
-**Why.** A save from before portraits were dealt has crew with no `portrait`
-field, so they draw from the seed and can share a face.
-
-**Where.** `src/game/save.ts`, after load: for every crew member without a
-`portrait`, assign one with `allocatePortrait` from `src/game/staffing.ts`.
-
-**Done when.** Loading such a save gives every crew member a distinct portrait
-where the pool allows, and a test loads a fixture without portraits and checks.
-
-### 3. Tests for the parts of the split that changed visibility
-
-**Why.** The refactor exported about two dozen previously private helpers
-(`unassign`, `startIncident`, `closeHire`, `resolveMission`, …) so sibling
-modules could reach them. They are now public API of the barrel with no direct
-tests.
-
-**Where.** `src/game/__tests__/`. One small test each for `startIncident`
-(refuses a room that already has one; refuses past `incidentCap`) and
-`unassign` (remembers `returnTo` when asked); `scrapValue` already has one —
-use it as the pattern.
-
-**Done when.** Each newly exported helper with a branch in it has at least one
-test that exercises the branch.
-
-### 4. PWA manifest and service worker
-
-**Why.** The web build is not installable and does not run offline, though
-nothing in it needs a network. An idle station you check on through the day
-belongs on a home screen.
-
-**Where.** `public/manifest.webmanifest`, a small `src/sw.ts` that caches the
-built assets, registration in `src/main.tsx`, and the Vite config so the
-service worker is emitted. Keep it under fifty lines; do not add a plugin. The
-app icon can come from an existing asset until there is a proper one.
-
-**Done when.** The deployed page passes the browser's install check and loads
-with the network off after one visit.
-
-### 5. Rename the branch to `main`
-
-**Why.** `claude/space-station-fallout-clone-ekzune` is a working branch name
-and the deployment is tied to it.
-
-**Where.** GitHub — the repository's default branch, the Pages source, and the
-workflow's branch filter in `.github/workflows/`.
+**What is left, and why it is stuck.** Three things, all of them GitHub
+repository settings rather than code: making `main` the default branch,
+pointing the Pages source at it, and deleting the old branch. None is reachable
+from here — the GitHub MCP tools do not expose repository settings or branch
+deletion, and `git push --delete` comes back 403. It needs a hand on the
+repository's settings pages.
 
 **Done when.** `main` is the default, Pages deploys from it, and the old name
 is gone.
@@ -398,9 +533,10 @@ is gone.
 ## Waiting on artwork
 
 Both of these are specified and neither ships with placeholder art. They move
-into the tiers the day the renders arrive.
+into the tiers the day the renders arrive. Numbered separately from the tiers
+above, because nothing about them is waiting on a decision.
 
-### 6. New kit for the Research Lab
+### 1. New kit for the Research Lab
 
 **Why.** The lab costs 600c, unlocks at 30 crew, and runs out of work after
 five specs. It is the only room in the game that goes permanently idle. What it
@@ -418,9 +554,9 @@ take.
 **Done when.** A station with all five specs known still has something on the
 lab's board, and every researched item has real art the day it ships.
 
-### 7. Art for the rooms and the ships
+### 2. Art for the rooms and the ships
 
-**Why.** Four pieces of kit have renders; 25 rooms and 4 ship classes have
+**Why.** Four pieces of kit have renders; 27 rooms and 4 ship classes have
 glyphs. The dossier shows how much a render changes a screen.
 
 **Blocked on.** Room and ship renders. The two ship images already sent (a grey

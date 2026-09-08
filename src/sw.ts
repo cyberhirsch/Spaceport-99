@@ -1,12 +1,17 @@
 declare const self: ServiceWorkerGlobalScope
 
-const CACHE = 'spaceport99-v1'
+const CACHE = 'spaceport99-v2'
 
-const assets = [
-  '/',
-  '/manifest.webmanifest',
-  '/favicon.svg',
-]
+/**
+ * Relative, so they resolve against wherever this worker is served from. The
+ * app sits at the origin root locally and under /<repo>/ on GitHub Pages, and
+ * an absolute '/' would cache the wrong page in the second case — or nothing
+ * at all, which is what it did.
+ */
+const assets = ['./', './manifest.webmanifest', './favicon.svg', './icon-192.png']
+
+/** The start page, as this worker's own base resolves it. */
+const START = new URL('./', self.registration.scope).href
 
 self.addEventListener('install', (event: ExtendableEvent) => {
   event.waitUntil(
@@ -34,7 +39,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
     caches.match(event.request).then((response) => {
       if (response) return response
       return fetch(event.request).catch(async () => {
-        const fallback = await caches.match('/')
+        const fallback = await caches.match(START)
         return fallback || new Response('offline', { status: 503 })
       })
     }),

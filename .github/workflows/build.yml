@@ -64,9 +64,13 @@ jobs:
     if: github.event_name == 'push' && github.ref_name == 'main'
     needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    # No `environment: github-pages` block. GitHub creates that environment
+    # with a deployment branch policy limited to the default branch, and the
+    # default here is still the old working branch — so declaring it made this
+    # job fail in under a second, before it was even given a runner, with no
+    # log to say why. The Pages API itself does not care which branch a
+    # deployment came from. The cost is that the run summary no longer links
+    # the deployed URL; `deploy-pages` still prints it.
     steps:
       # Pages must be switched on once by a repo admin, at
       # Settings -> Pages -> Source -> "GitHub Actions". The workflow token

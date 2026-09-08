@@ -67,8 +67,30 @@ test('the page links the manifest and an icon iOS will use', () => {
   assert.match(html, /name="apple-mobile-web-app-capable" content="yes"/)
 })
 
-test('the service worker caches its own base rather than the origin root', () => {
-  const list = worker.slice(worker.indexOf('const assets'), worker.indexOf(']', worker.indexOf('const assets')))
-  assert.ok(!/'\/[^']/.test(list), `absolute path in the precache list: ${list}`)
-  assert.match(worker, /new URL\('\.\/', self\.registration\.scope\)/, 'the offline fallback too')
+test('the service worker takes the whole site down, not a handful of files', () => {
+  // The list is written in at build time; what the source must carry is the
+  // placeholders for it. build/precache.ts fails the build if they are gone,
+  // and precache.test.ts covers what it writes.
+  assert.match(worker, /declare const __PRECACHE__: string\[\]/)
+  assert.match(worker, /declare const __CACHE_VERSION__: string/)
+  assert.match(worker, /cache\.add\(url\)/, 'every entry is fetched on install')
+  assert.match(worker, /event\.waitUntil\(/, 'and installing waits for them')
+})
+
+test('the worker resolves everything against its own scope, never the origin root', () => {
+  assert.match(worker, /new URL\('\.\/', self\.registration\.scope\)/)
+  const paths = worker.match(/'\/[^']*'/g) ?? []
+  assert.deepEqual(paths, [], `absolute path in the worker: ${paths.join(', ')}`)
+})
+
+test('a miss joins the cache, so nothing stays uncached after one visit', () => {
+  assert.match(worker, /cache\.put\(request, copy\)/)
+  // And a navigation with nothing cached still gets the app rather than a 404.
+  assert.match(worker, /request\.mode === 'navigate'/)
+})
+
+test('the build wires the generator in', () => {
+  const vite = readFileSync('vite.config.ts', 'utf8')
+  assert.match(vite, /injectPrecache/)
+  assert.match(vite, /plugins: \[react\(\), precache\(\)\]/)
 })

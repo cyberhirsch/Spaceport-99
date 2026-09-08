@@ -515,15 +515,21 @@ does not render.
 and the deployment was tied to it.
 
 **Done already.** `main` is the branch all work happens on and everything is
-pushed to it. `build.yml` needs no change: its deploy job keys on
-`github.event.repository.default_branch` rather than a hardcoded name.
+pushed to it, and `build.yml` now deploys from `main` by name.
 
-**What is left, and why it is stuck.** Three things, all of them GitHub
-repository settings rather than code: making `main` the default branch,
-pointing the Pages source at it, and deleting the old branch. None is reachable
-from here — the GitHub MCP tools do not expose repository settings or branch
-deletion, and `git push --delete` comes back 403. It needs a hand on the
-repository's settings pages.
+**Why that had to be hardcoded.** The deploy job used to key on
+`github.event.repository.default_branch`, which reads well and was false on
+every push: the repository's default is still
+`claude/space-station-fallout-clone-ekzune`, so the comparison never matched
+`main` and the job skipped without failing anything. Eight commits built green
+and published nothing.
+
+**What is left, and why it is stuck.** Making `main` the default branch, then
+deleting the old one — in that order, because GitHub will not delete a
+repository's default branch. Neither is reachable from here: no MCP tool
+exposes repository settings or branch deletion, and `git push --delete` comes
+back 403. It wants a hand on Settings → Branches. Once the default is `main`,
+the `if:` above can go back to reading it rather than naming it.
 
 **Done when.** `main` is the default, Pages deploys from it, and the old name
 is gone.

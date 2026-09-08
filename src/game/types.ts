@@ -39,6 +39,7 @@ export type ModuleKind =
   | 'hangar'
   | 'command'
   | 'battery'
+  | 'security'
   | 'shield'
   | 'storage'
   | 'gym'
@@ -179,7 +180,7 @@ export interface Crew {
   dead: boolean
 }
 
-export type IncidentKind = 'fire' | 'breach' | 'pirates' | 'vermin'
+export type IncidentKind = 'fire' | 'breach' | 'vermin'
 
 export interface Incident {
   id: string
@@ -193,6 +194,45 @@ export interface Incident {
   startedAt: number
 }
 
+/** One of them. They have a name because they can die, and a face is not far off. */
+export interface Boarder {
+  id: string
+  name: string
+  hp: number
+  maxHp: number
+  /** What they came through the lock with — and what they drop. */
+  kit: ItemId | null
+}
+
+/**
+ * A boarding in progress. Pirates are not an incident: they come on a hull,
+ * they are in a particular room, and they leave one way or another.
+ */
+export interface Boarding {
+  /** The hull they came off, still on the clamps. */
+  shipId: string
+  /** The room they are in right now. */
+  moduleId: string
+  boarders: Boarder[]
+  /**
+   * Security posted crew who have gone to the fight. They keep their post —
+   * the office is where they are from, not where they are — and they follow
+   * the party from room to room without taking a slot in any of them.
+   */
+  responders: string[]
+  /** How many came aboard, so the survivors know when they are beaten. */
+  size: number
+  /** Seconds until they push on to the next room if nobody stops them. */
+  moveIn: number
+  /** Credits they have got hold of — theirs if they get away. */
+  looted: number
+  /** Boarders down. */
+  killed: number
+  /** Crew dead. */
+  lost: number
+  startedAt: number
+}
+
 export interface LogEntry {
   id: string
   at: number
@@ -201,8 +241,16 @@ export interface LogEntry {
 }
 
 /**
- * Someone HQ has sent over, waiting at the docking port. They are not crew yet
- * and cost nothing until they sign.
+ * How somebody came to be standing on your dock. HQ either found a spacer who
+ * put in for the berth, or filled the slot with whoever was next on the list;
+ * a walk-in came off a hull at the Trading Hub under their own steam.
+ */
+export type CandidateOrigin = 'applied' | 'posted' | 'walkIn'
+
+/**
+ * Someone waiting at the docking port to be talked into signing — sent by HQ
+ * or off a hull of their own. They are not crew yet and cost nothing until
+ * they sign.
  */
 export interface Candidate {
   id: string
@@ -225,6 +273,8 @@ export interface Candidate {
   arrivesIn: number
   /** Who sent them, or who they last flew for. Shifts with patron standing. */
   faction: FactionId
+  /** Whether they asked to come, were posted here, or walked up on their own. */
+  origin: CandidateOrigin
 }
 
 // --------------------------------------------------------------- visitors --
@@ -382,6 +432,8 @@ export interface Prospect {
   grip?: number
   /** True for a ship's master. They want different things. */
   captain?: boolean
+  /** How they got here. Absent for a guest off a hull, who got here on it. */
+  origin?: CandidateOrigin
 }
 
 export interface Visitor {
@@ -410,7 +462,7 @@ export interface Visitor {
    * about it, it `demand`s, and if that is refused it comes in as a `raid`.
    * Every raid is therefore something you watched arrive.
    */
-  intent?: 'conquest' | 'loiter' | 'demand' | 'raid'
+  intent?: 'conquest' | 'loiter' | 'demand' | 'raid' | 'boarding'
   /** What a hull with an intent brought with it, against the station's guns. */
   force?: number
   /**
@@ -574,6 +626,12 @@ export interface Mission {
   /** Written when the mission resolves, read in the after-action report. */
   report: string | null
   find: MissionFind | null
+  /**
+   * Whether anybody has actually read what came back. A team lands and the
+   * report stays sealed until the commander opens it — the moment of finding
+   * out is worth having, and it is lost if the answer is already on screen.
+   */
+  read: boolean
 }
 
 export interface Resources {
@@ -602,6 +660,8 @@ export interface GameState {
   modules: StationModule[]
   crew: Crew[]
   incidents: Incident[]
+  /** The party off a hull that is standing in one of your rooms, if one is. */
+  boarding: Boarding | null
   log: LogEntry[]
   /** Decks unlocked so far (deck 0 is always unlocked). */
   decks: number

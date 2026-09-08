@@ -2,7 +2,15 @@ import { crewPortrait, effectiveness, makeCrew, rollStats, uid } from './crew.ts
 import { makeShip, tradeInValue } from './fleet.ts'
 import { FACTION_IDS, STANDING_CEILING, STANDING_FLOOR } from './factions.ts'
 import type { Talk, TalkCtx } from './talk.ts'
-import type { Candidate, FactionId, Prospect, GameState, Rng, Visitor } from './types.ts'
+import type {
+  Candidate,
+  CandidateOrigin,
+  FactionId,
+  Prospect,
+  GameState,
+  Rng,
+  Visitor,
+} from './types.ts'
 import { clamp, log, namesInPlay, PATIENCE_SECONDS, pickOne, roll, roller, SIGN_THRESHOLD } from './core.ts'
 import { assign, allocatePortrait, workRate } from './staffing.ts'
 import { fleetCapacity } from './rooms.ts'
@@ -59,6 +67,20 @@ export const candidateFaction = (s: GameState, rng: Rng): FactionId => {
   return rng() < sendsOwn ? patron : pickOne(rng, FACTION_IDS)
 }
 
+/**
+ * Whether HQ found somebody who wanted the berth or simply filled the slot. A
+ * patron that thinks well of the station has people asking to be sent to it; a
+ * cold one, or none at all, posts whoever came up next on the list. The
+ * difference is the whole conversation: one of them already wants to be here.
+ */
+export const candidateOrigin = (s: GameState, rng: Rng): CandidateOrigin => {
+  const patron = s.patron
+  const warmth = patron
+    ? (s.standing[patron] - STANDING_FLOOR) / (STANDING_CEILING - STANDING_FLOOR)
+    : 0.25
+  return rng() < clamp(0.2 + warmth * 0.55, 0.2, 0.75) ? 'applied' : 'posted'
+}
+
 /** The stats and standing an applicant is built from — shared by a request and a walk-in. */
 const rolledApplicant = (
   s: GameState,
@@ -81,6 +103,7 @@ export const makeCandidate = (s: GameState, luck: number): Candidate => {
   const rng = roller(s)
   const { stats, reach, faction } = rolledApplicant(s, rng, luck)
   const crew = makeCrew(rng, { stats })
+  const origin = candidateOrigin(s, rng)
   return {
     id: uid('a'),
     name: crew.name,
@@ -89,8 +112,12 @@ export const makeCandidate = (s: GameState, luck: number): Candidate => {
     stats,
     tier: reach,
     faction,
+    origin,
     // Someone HQ rates highly knows it, and starts colder on a modest station.
-    interest: Math.round(clamp(appeal(s) * 70 - reach * 25, 5, 60)),
+    // Somebody who put in for the berth arrives already wanting it. A posted
+    // recruit never negotiates at all, so this figure is only ever read for
+    // the ones who asked to come.
+    interest: Math.round(clamp(appeal(s) * 70 - reach * 25 + (origin === 'applied' ? 18 : 0), 5, 72)),
     askingBonus: Math.round(60 + reach * 260),
     patience: PATIENCE_SECONDS,
     promised: null,
@@ -114,6 +141,7 @@ export const makeWalkIn = (s: GameState): Candidate => {
     stats,
     tier: reach,
     faction,
+    origin: 'walkIn',
     // Already standing on your deck rather than weighing an offer from afar —
     // a walk-in has made most of the decision before you ever meet them.
     interest: Math.round(clamp(appeal(s) * 90 - reach * 15, 20, 85)),
@@ -156,6 +184,34 @@ export const claimHull = (s: GameState, ship: Visitor): void => {
     s.credits += paid
     log(s, `No berth for the ${hull.name}, so she went dockside. +${paid}c.`, 'info')
   }
+}
+
+/**
+ * A posted recruit reporting aboard. They are not being hired: the transfer
+ * went through before anybody put them on a courier, so nothing said in the
+ * conversation decides whether they stay. All that is left is a bunk and a
+ * name on the roster — and if the station has not got the bunk, they wait on
+ * the dock like anybody else.
+ */
+export const reportAboard = (s: GameState, talk: Talk, c: TalkCtx): void => {
+  const cand = c.candidate
+  if (!cand) return
+  const d = derive(s)
+  if (d.crewAlive.length >= d.crewCap) {
+    log(s, `${c.name} is aboard with nowhere to sleep, and waiting on the dock.`, 'warn')
+    return
+  }
+  s.candidates = s.candidates.filter((x) => x.id !== cand.id)
+  s.crew.push(
+    makeCrew(roller(s), {
+      name: c.name,
+      stats: cand.stats,
+      seed: cand.seed,
+      portrait: crewPortrait(cand),
+    }),
+  )
+  talk.flags.push('signed')
+  log(s, `${c.name} reported aboard.`, 'good')
 }
 
 /**

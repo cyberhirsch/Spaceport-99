@@ -6,7 +6,7 @@
  * simulation is split up. The split itself is layered, bottom to top:
  *
  *   core → staffing → rooms → state → hazards → station → standing
- *        → recruit → missions → traffic → tick → reducer
+ *        → recruit → boarding → missions → traffic → board → tick → reducer
  *
  * A module only ever imports from the layers below it.
  */
@@ -14,6 +14,7 @@
 // Importing the scripts is what registers them. Nothing else references these.
 import './talks/crew.ts'
 import './talks/hire.ts'
+import './talks/welcome.ts'
 import './talks/captain.ts'
 import './talks/prisoner.ts'
 import './talks/conquest.ts'
@@ -33,8 +34,10 @@ export * from './hazards.ts'
 export * from './station.ts'
 export * from './standing.ts'
 export * from './recruit.ts'
+export * from './boarding.ts'
 export * from './missions.ts'
 export * from './traffic.ts'
+export * from './board.ts'
 export * from './tick.ts'
 export * from './reducer.ts'
 

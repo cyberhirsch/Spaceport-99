@@ -1,4 +1,5 @@
 import { SAVE_VERSION, newGame, newSeed } from './engine.ts'
+import { allocatePortrait } from './staffing.ts'
 import { blankStanding } from './factions.ts'
 import { blankQuest } from './quest.ts'
 import type { GameState } from './types.ts'
@@ -50,6 +51,62 @@ const STEPS: { from: number; up: (raw: Record<string, unknown>) => void }[] = [
     up: (raw) => {
       raw.quest = blankQuest()
       raw.nextQuestIn = 0
+    },
+  },
+  // 12 → 13: crew started getting dealt portraits. An older station's crew all
+  // fall back to deriving from seed; give them distinct faces.
+  {
+    from: 12,
+    up: (raw) => {
+      const s = raw as unknown as GameState
+      for (const crew of s.crew) {
+        if (!crew.portrait) {
+          crew.portrait = allocatePortrait(s, s.crew.filter((c) => c.portrait).map((c) => c.portrait!))
+        }
+      }
+    },
+  },
+  // 13 → 14: applicants started arriving with a reason for being here. Anyone
+  // already on an older station's dock was posted — which is exactly what the
+  // one opening line they used to share said about them.
+  {
+    from: 13,
+    up: (raw) => {
+      const s = raw as unknown as GameState
+      for (const cand of s.candidates) {
+        if (!cand.origin) cand.origin = 'posted'
+      }
+    },
+  },
+  // 14 → 15: pirates stopped being weather. A boarding party that was burning
+  // like a fire on an older station has no hull to have come off, so it is
+  // simply gone when the station comes back up.
+  {
+    from: 14,
+    up: (raw) => {
+      const s = raw as unknown as GameState
+      const burning = raw.incidents as { kind: string }[]
+      raw.incidents = burning.filter((i) => i.kind !== 'pirates')
+      s.boarding = null
+    },
+  },
+  // 15 → 16: the Security Office, and a boarding that knows who has turned out to it.
+  {
+    from: 15,
+    up: (raw) => {
+      const s = raw as unknown as GameState
+      if (s.boarding && !s.boarding.responders) s.boarding.responders = []
+    },
+  },
+  // 16 → 17: a report that comes back is sealed until it is opened. Anything
+  // already on an older station's board has been on screen in full for as long
+  // as it has been there, so it counts as read: sealing it again would be
+  // offering somebody a surprise they have already had.
+  {
+    from: 16,
+    up: (raw) => {
+      const s = raw as unknown as GameState
+      for (const m of s.missions) if (m.read === undefined) m.read = true
     },
   },
 ]

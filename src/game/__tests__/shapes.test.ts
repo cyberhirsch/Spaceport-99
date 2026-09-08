@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   advance,
   availableCrew,
+  derive,
   inContact,
   missionCapacity,
   newGame,
@@ -11,6 +12,7 @@ import {
   WING,
 } from '../engine.ts'
 import { makeMission } from '../fleet.ts'
+import { alertsFor } from '../../components/alerts.ts'
 import { rollCall, unattended } from '../calls.ts'
 import type { GameState, Mission, MissionShape, ModuleKind } from '../types.ts'
 
@@ -219,4 +221,48 @@ test('the better the run, the more of the goodwill it earns', () => {
   const good = settle(12)
   const bad = settle(1)
   assert.ok(good > bad, `a good crew should out-earn a hopeless one: ${good} vs ${bad}`)
+})
+
+// ------------------------------------------------- what comes back --------
+
+test('a team that lands comes back sealed, and opening it is a separate act', () => {
+  const [board, m] = offer(ready(), { seconds: 4, danger: 0.1 })
+  let s = advance(fly(board, m), 8)
+  const home = s.missions.find((x) => x.id === m.id)!
+  assert.equal(home.status, 'report', 'they are back')
+  assert.ok(home.outcome, 'and it went however it went')
+  assert.equal(home.read, false, 'but nobody has read it')
+
+  s = reducer(s, { type: 'readReport', missionId: m.id })
+  assert.equal(s.missions.find((x) => x.id === m.id)?.read, true)
+  // Still on the board once read: filing it is what clears it.
+  assert.equal(s.missions.filter((x) => x.status === 'report').length, 1)
+  s = reducer(s, { type: 'fileReport', missionId: m.id })
+  assert.equal(s.missions.filter((x) => x.id === m.id).length, 0)
+})
+
+test('the bar counts dispatches nobody has opened, not reports lying about', () => {
+  const [board, m] = offer(ready(), { seconds: 4, danger: 0.1 })
+  const s = advance(fly(board, m), 8)
+  const said = (st: GameState) => alertsFor(st, derive(st))
+  assert.ok(
+    said(s).some((a) => /nobody has opened/.test(a)),
+    said(s).join(' | '),
+  )
+  const opened = reducer(s, { type: 'readReport', missionId: m.id })
+  assert.ok(!said(opened).some((a) => /nobody has opened/.test(a)), 'read, so it stops asking')
+})
+
+test('a rush that goes wrong says it was the rush', () => {
+  let s = ready()
+  const room = s.modules.find((m) => m.kind === 'hydroponics')!
+  s = reducer(s, { type: 'assign', crewId: availableCrew(s)[0].id, moduleId: room.id })
+  // A certainty rather than a coin toss, so the test is about the words.
+  const doomed: GameState = {
+    ...s,
+    modules: s.modules.map((m) => (m.id === room.id ? { ...m, rushRisk: 1 } : m)),
+  }
+  const after = reducer(doomed, { type: 'rush', moduleId: room.id })
+  assert.ok(after.log.some((l) => /pushed too hard/.test(l.text)), 'the cause is named')
+  assert.equal(after.incidents.length, 1, 'and it started something')
 })

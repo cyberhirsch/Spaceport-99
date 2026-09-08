@@ -71,12 +71,27 @@ test('the unlock curve runs from nothing to sixty', () => {
   const gates = BUILDABLE.map((d) => d.unlockAtCrew)
   assert.equal(Math.min(...gates), 0, 'the founding rooms need nobody')
   assert.equal(Math.max(...gates), 60, 'and the last one needs a full station')
-  assert.equal(BUILDABLE.length, 26)
+  assert.equal(BUILDABLE.length, 27)
 
   // Nothing is unreachable: a maxed run of quarters has to clear the top gate.
   const perSegment = def('quarters').crewCapacity ?? 0
   const maxRun = Math.round(perSegment * 3 * 3 * 1.3)
   assert.ok(BASE_CREW_CAP + maxRun * 2 >= 60, 'two maxed quarters runs hold the whole curve')
+})
+
+test('the only room that undoes damage is an early one', () => {
+  const fixers = BUILDABLE.filter((d) => d.repairs)
+  assert.equal(fixers.length, 1, 'exactly one room puts structural damage right')
+  const [shop] = fixers
+  // Upgrading a room resets its condition and a passing engineer occasionally
+  // fixes one, but neither is something to plan around. Incidents start
+  // chewing rooms up in the first hour, so the cure cannot sit behind a
+  // late-game roster: 24 is where this file draws the line on "not early".
+  assert.ok(
+    shop.unlockAtCrew < 24,
+    `${shop.name} unlocks at ${shop.unlockAtCrew}, long after rooms start taking damage`,
+  )
+  assert.ok(shop.cost >= 500, 'the price is what paces it, not the roster')
 })
 
 test('the five new rooms are on the curve and cost what they should', () => {

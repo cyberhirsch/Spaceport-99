@@ -35,6 +35,7 @@ interface Props {
   onPlace: (deck: number, col: number) => void
   onCancelPlacing: () => void
   onSelectModule: (id: string) => void
+  onRush: (id: string) => void
   onSelectCrew: (id: string) => void
   onSelectVisitor: (id: string) => void
   onSelectGuest: (id: string) => void
@@ -50,6 +51,9 @@ const Room = ({
   module,
   crewById,
   incident,
+  boarders,
+  responders,
+  onRush,
   drag,
   lifted,
   onOpen,
@@ -59,6 +63,12 @@ const Room = ({
   module: StationModule
   crewById: Map<string, Crew>
   incident: GameState['incidents'][number] | undefined
+  /** Finish this cycle now and take the chance it goes wrong. */
+  onRush: () => void
+  /** How many boarders are standing in this room, when there is a boarding on. */
+  boarders: number
+  /** And how many of the security watch have come to it. */
+  responders: number
   drag: DragState | null
   lifted: boolean
   onOpen: () => void
@@ -69,6 +79,17 @@ const Room = ({
   const slots = staffSlots(module)
   const running = workRate(module, crewById) > 0
   const showProgress = Boolean(d.cycleSeconds || d.trains)
+  // The gamble, on the room rather than three taps inside it. It appears once
+  // a cycle is properly under way — the offer is to skip the rest of this one
+  // — and it shows the odds, which climb every time they are taken.
+  const rushable =
+    Boolean(d.cycleSeconds) &&
+    module.staff.length > 0 &&
+    !module.standby &&
+    !incident &&
+    module.progress > 0.25
+  const risk = Math.round(module.rushRisk * 100)
+  const band = module.rushRisk < 0.25 ? 'low' : module.rushRisk < 0.5 ? 'mid' : 'high'
   const room = Boolean(drag?.crewId) && slots > 0
   const full = module.staff.length >= slots && !module.staff.includes(drag?.crewId ?? '')
 
@@ -76,7 +97,7 @@ const Room = ({
     <div
       className={[
         'room',
-        incident ? 'room--alarm' : '',
+        incident || boarders > 0 ? 'room--alarm' : '',
         running ? '' : 'room--idle',
         module.standby ? 'room--standby' : '',
         module.width > 1 ? 'room--merged' : '',
@@ -138,6 +159,20 @@ const Room = ({
         ))}
       </span>
 
+      {rushable && (
+        <button
+          className={`room__rush room__rush--${band}`}
+          title={`Finish this cycle now — ${risk}% chance it goes badly wrong`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            onRush()
+          }}
+        >
+          ⚡ {risk}%
+        </button>
+      )}
+
       {showProgress && (
         <span className="room__bar">
           <span className="room__bar-fill" style={{ width: `${module.progress * 100}%` }} />
@@ -150,6 +185,11 @@ const Room = ({
         </span>
       )}
 
+      {boarders > 0 && (
+        <span className="room__incident room__incident--boarders" title="Boarding party">
+          ☠ {boarders} aboard{responders > 0 && ` · ⛨ ${responders} responding`}
+        </span>
+      )}
       {incident && (
         <span className="room__incident" title={incidentDef(incident.kind).name}>
           {incidentDef(incident.kind).glyph}
@@ -173,6 +213,7 @@ export const StationView = ({
   onPlace,
   onCancelPlacing,
   onSelectModule,
+  onRush,
   onSelectCrew,
   onSelectVisitor,
   onSelectGuest,
@@ -189,6 +230,10 @@ export const StationView = ({
   const flightOf = (crewId: string) =>
     state.missions.find((m) => m.status === 'flying' && m.crewIds.includes(crewId))
   const nextDeck = deckCost(state.decks)
+  // Another deck is no use while the last one is still bare. The offer is for
+  // a station that has run out of room, not one that has not filled what it
+  // already paid to pressurise.
+  const bottomDeckUsed = state.modules.some((m) => m.deck === state.decks - 1)
   const aboard = guestsAboard(state)
   // A room is in hand either because it is being dragged or because its Move
   // button was tapped; both light up the same landing spots.
@@ -234,6 +279,9 @@ export const StationView = ({
             module={m}
             crewById={crewById}
             incident={state.incidents.find((i) => i.moduleId === m.id)}
+            onRush={() => onRush(m.id)}
+            boarders={state.boarding?.moduleId === m.id ? state.boarding.boarders.length : 0}
+            responders={state.boarding?.moduleId === m.id ? state.boarding.responders.length : 0}
             drag={drag}
             lifted={held?.id === m.id}
             onOpen={() => onSelectModule(m.id)}
@@ -326,11 +374,13 @@ export const StationView = ({
 
         </div>
 
-        <div className="deck--new">
-          <button className="deck__buy" onClick={onBuyDeck} disabled={state.credits < nextDeck}>
-            ＋ Pressurise deck {state.decks + 1} — {nextDeck}c
-          </button>
-        </div>
+        {bottomDeckUsed && (
+          <div className="deck--new">
+            <button className="deck__buy" onClick={onBuyDeck} disabled={state.credits < nextDeck}>
+              ＋ Pressurise deck {state.decks + 1} — {nextDeck}c
+            </button>
+          </div>
+        )}
       </section>
 
       <div className="dock-row">

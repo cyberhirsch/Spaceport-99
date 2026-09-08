@@ -3452,3 +3452,189 @@ input.rename:focus {
 .mission__duty--far {
   color: var(--violet);
 }
+
+/* ---------------------------------------------------------- the board -- */
+
+.quest-meters {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.quest-meter {
+  display: grid;
+  grid-template-columns: 5.5em 1fr 3em;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.quest-meter em {
+  font-style: normal;
+  color: var(--ink-dim, #8a97a8);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+}
+
+.quest-meter b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.quest-meter .spec__bar.is-hot i {
+  background: #ff5470;
+}
+
+.checklist--tight {
+  margin: 8px 0 2px;
+  font-size: 0.78rem;
+}
+
+.thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.thread {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #0a1119;
+  border-left: 3px solid #4a5a6e;
+}
+
+.thread--good { border-left-color: #38e8b0; }
+.thread--warn { border-left-color: #ffc45a; }
+.thread--bad { border-left-color: #ff5470; }
+
+.thread__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.thread__clock {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.74rem;
+  color: var(--ink-dim, #8a97a8);
+  white-space: nowrap;
+}
+
+.thread__detail {
+  font-size: 0.78rem;
+  color: var(--ink-dim, #8a97a8);
+}
+
+.room__incident--boarders {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #ff5470;
+}
+
+/* --------------------------------------------------- what came home --- */
+
+/*
+ * A dispatch nobody has opened. It says a hull is back and nothing else: the
+ * outcome is behind the button, because finding out is the reward and it
+ * cannot be had twice.
+ */
+.report--sealed {
+  border-color: var(--mint);
+  border-style: dashed;
+  background: #0c1a17;
+}
+
+.report--sealed strong {
+  color: var(--mint);
+}
+
+/*
+ * An exceptional run is not a good run and should not look like one: the card
+ * carries its own light rather than a differently coloured edge.
+ */
+.report--triumph {
+  border-color: var(--mint);
+  background: linear-gradient(160deg, #102a24, #101c29 60%);
+  box-shadow: 0 0 0 1px #38e8b033, 0 6px 20px -8px #38e8b055;
+}
+
+.report--triumph strong {
+  color: var(--mint);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+}
+
+/* Something brought home that is not money gets its own block, not a line. */
+.find {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #0a1119;
+  border-left: 3px solid var(--mint);
+  color: var(--ink-dim);
+}
+
+.find b {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mint);
+}
+
+/* A drawing is the one that changes what the station can build. */
+.find--spec {
+  border-left-color: var(--amber);
+  background: #17130a;
+}
+
+.find--spec b {
+  color: var(--amber);
+}
+
+/* ------------------------------------------------------- the gamble --- */
+
+/*
+ * Skip the rest of a cycle and take the chance. It lives on the room because
+ * a wager buried three taps inside a modal is not a wager, it is a setting.
+ * The number is the odds it goes wrong, and it climbs every time it is taken.
+ */
+.room__rush {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: #060c14cc;
+  font: inherit;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.room__rush:hover {
+  opacity: 1;
+}
+
+.room__rush--low {
+  color: var(--mint);
+}
+.room__rush--mid {
+  color: var(--amber);
+}
+.room__rush--high {
+  color: var(--red);
+  opacity: 1;
+}

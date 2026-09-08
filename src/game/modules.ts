@@ -247,7 +247,13 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     glyph: '⚙',
     hue: 45,
     cost: 640,
-    unlockAtCrew: 42,
+    // The only dependable way to undo structural damage — upgrading a room
+    // resets it, and a passing engineer occasionally fixes one, but neither is
+    // something to plan around. Incidents chew rooms up from the first hour,
+    // so gating the repair shop behind a late-game roster left small stations
+    // watching condition fall with nothing to do about it. The 640c is what
+    // paces it now.
+    unlockAtCrew: 18,
     slotsPerSegment: 2,
     stat: 'T',
     trains: 'T',
@@ -295,6 +301,20 @@ export const MODULE_DEFS: Record<ModuleKind, ModuleDef> = {
     stat: 'R',
     guns: 6,
     powerDraw: 3.5,
+  },
+  security: {
+    kind: 'security',
+    name: 'Security Office',
+    short: 'Security',
+    blurb:
+      'A standing watch. Whoever is posted here goes wherever the boarders are, fights alongside the room, and comes back when it is over.',
+    glyph: '⛨',
+    hue: 350,
+    cost: 480,
+    unlockAtCrew: 20,
+    slotsPerSegment: 2,
+    stat: 'R',
+    powerDraw: 2,
   },
   shield: {
     kind: 'shield',

@@ -44,6 +44,10 @@ export const wantOf = (p: Prospect & { seed: number; captain?: boolean }): Want 
   if (grip > 0 && grip < 0.35 && p.seed % 3 !== 0) return 'escape'
   if (p.captain) return 'belief'
   const roll = (p.seed >> 3) % 100
+  // Somebody who put in for the berth came for a reason and wants it
+  // confirmed. Nobody posted here reaches this script at all: they are crew
+  // before the conversation starts, and get welcomed rather than sold to.
+  if (p.origin === 'applied') return roll < 30 ? 'post' : 'belief'
   if (p.tier > 0.6) return roll < 55 ? 'belief' : 'post'
   if (roll < 38) return 'money'
   if (roll < 72) return 'post'
@@ -89,7 +93,9 @@ const spent = (c: TalkCtx, flag: string) => c.has(flag)
 const theyAre = (c: TalkCtx): string => {
   if (c.guest?.captain) return `master of the ${c.ship?.name ?? 'ship'}`
   if (c.guest) return `${c.guest.role} off the ${c.ship?.name ?? 'ship'}`
-  return 'sent over by HQ'
+  if (c.candidate?.origin === 'applied') return 'put in for this posting'
+  if (c.candidate?.origin === 'walkIn') return 'off a hull at the Trading Hub'
+  return 'posted here by HQ'
 }
 
 const script: TalkScript = {
@@ -99,8 +105,14 @@ const script: TalkScript = {
       if (c.guest?.captain) {
         return `"You wanted a word with me, not my crew. That is either flattering or a problem." They do not sit down.`
       }
+      if (c.candidate?.origin === 'applied') {
+        return `"${c.name}. I put in for this posting twice before anybody answered." They sit down without being asked. "So I would like to hear it is worth the wait."`
+      }
+      if (c.candidate?.origin === 'walkIn') {
+        return `"I came in on somebody else's hull this morning and I have not gone back aboard." They are looking past you at the rooms already.`
+      }
       if (c.candidate) {
-        return `"${c.name}. HQ put me on a courier eleven days ago and did not say much else about the posting." They wait.`
+        return `"${c.name}. HQ put me on a courier eleven days ago and did not say much else about the posting." They wait, and do not sit down.`
       }
       return `"I have got about ten minutes before they want me back at the ship."`
     },
@@ -140,6 +152,9 @@ const script: TalkScript = {
     text: (c) => {
       const p = c.prospect
       if (!p) return ''
+      if (p.origin === 'applied') {
+        return `"I read the filings on this place before I put in for it." They are watching you carefully. "Most stations out here are somebody's write-off. I did not think this one read like that."`
+      }
       switch (wantOf(p as Prospect & { seed: number })) {
         case 'money':
           return `"Same reason as everyone. The rates out here are better and there is nothing to spend it on, so it stacks up."`

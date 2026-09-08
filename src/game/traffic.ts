@@ -3,9 +3,10 @@ import { beginTalk, type SpeakerRef } from './talk.ts'
 import { PATRONS, factionDef } from './factions.ts'
 import { makeMission } from './fleet.ts'
 import { makeGuests, makeVisitor } from './visitors.ts'
+import { beginBoarding } from './boarding.ts'
 import type { CovertAsk, FactionId, Prisoner, GameState, Guest, Visitor } from './types.ts'
 import { clamp, log, namesInPlay, pickOne, roll, roller, spread } from './core.ts'
-import { allocatePortrait, isAway, unassign } from './staffing.ts'
+import { allocatePortrait } from './staffing.ts'
 import { defence, cellsAboard } from './rooms.ts'
 import { derive } from './state.ts'
 import { startIncident } from './hazards.ts'
@@ -119,8 +120,9 @@ export const admitVisitor = (s: GameState, v: Visitor): void => {
       break
     }
     case 'raider': {
-      if (dock) startIncident(s, 'pirates', dock)
       log(s, `${v.name} opened fire the moment the clamps had her.`, 'bad')
+      v.force = v.force ?? forceFor(s)
+      beginBoarding(s, v)
       break
     }
   }
@@ -542,64 +544,6 @@ export const raiseDemand = (s: GameState, v: Visitor): void => {
   v.timer = 150 + roll(s) * 120
   log(s, `${v.name} has opened a channel, and it is not a request for a berth.`, 'bad')
   s.talk = beginTalk('demand', { kind: 'visitor', id: v.id }, v.name)
-}
-
-/**
- * They come in.
- *
- * A raid costs rooms, cargo and blood, and it is survivable: crew are hurt
- * rather than killed unless the station had nothing to fight with and ignored
- * every step that led here. Nobody dies to a hull they were warned about twice
- * and could have paid, fought or reported.
- */
-export const resolveRaid = (s: GameState, v: Visitor): void => {
-  const d = defence(s)
-  const force = v.force ?? 12
-  const held = d.guns + d.shield * 0.7 + d.smallArms * 0.35
-  // How much of what they brought gets through.
-  const through = clamp(1 - held / (held + force), 0.12, 1)
-  const beaten = held > force * 1.35
-
-  for (const m of s.modules) {
-    if (m.kind === 'spine') continue
-    if (roll(s) >= through * 0.55) continue
-    m.condition = clamp(m.condition - spread(roller(s), 0.12, 0.34) * through, 0.15, 1)
-  }
-  const taken = Math.round(Math.min(s.credits, (140 + force * 26) * through))
-  s.credits -= taken
-
-  let hurt = 0
-  let killed = 0
-  const alive = s.crew.filter((c) => !c.dead && !isAway(s, c.id))
-  for (const c of alive) {
-    if (roll(s) >= through * 0.4) continue
-    const damage = Math.round(c.maxHp * spread(roller(s), 0.25, 0.6) * through)
-    // Defenceless and forewarned is the only way this kills anybody.
-    if (held < 1 && damage >= c.hp && alive.length > 1) {
-      c.dead = true
-      c.hp = 0
-      unassign(s, c.id)
-      killed += 1
-    } else {
-      c.hp = Math.max(1, c.hp - damage)
-      hurt += 1
-    }
-  }
-
-  shift(s, v.faction, -0.06)
-  v.intent = undefined
-  v.status = 'requesting'
-  v.timer = 0
-  log(
-    s,
-    beaten
-      ? `The ${v.name} came in and did not get far. −${taken}c, ${hurt} hurt.`
-      : `The ${v.name} came in. −${taken}c, ${hurt} hurt${killed ? `, ${killed} dead` : ''}.`,
-    killed ? 'bad' : 'warn',
-  )
-  if (killed === 0 && hurt === 0 && taken === 0) {
-    log(s, `They looked at what the station had and thought better of it.`, 'good')
-  }
 }
 
 /** They decide it is not worth it after all. */

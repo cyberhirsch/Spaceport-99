@@ -97,8 +97,11 @@ test('a raider is trouble the moment the clamps close', () => {
   const [ready, raider] = hailing(fresh(), { kind: 'raider', claim: 'patrol' })
   assert.equal(ready.incidents.length, 0)
   const s = reducer(ready, { type: 'acceptVisitor', visitorId: raider.id })
-  assert.equal(s.incidents.length, 1, 'they board')
-  assert.equal(s.incidents[0].kind, 'pirates')
+  assert.equal(s.incidents.length, 0, 'pirates are not weather')
+  assert.ok(s.boarding, 'they board')
+  assert.equal(s.visitors.find((v) => v.id === raider.id)?.intent, 'boarding')
+  const dock = s.modules.find((m) => m.kind === 'dock')!
+  assert.equal(s.boarding?.moduleId, dock.id, 'through the port they were let into')
 })
 
 test('auto-accept clears traffic without asking', () => {
@@ -306,8 +309,8 @@ test('the bay leaves a room that is currently on fire alone', () => {
 test('a raider sends nobody friendly onto the decks', () => {
   const [ready, raider] = hailing(fresh(), { kind: 'raider', claim: 'patrol' })
   const s = reducer(ready, { type: 'acceptVisitor', visitorId: raider.id })
-  assert.equal(guestsAboard(s).length, 0, 'what came off that hull is an emergency, not a guest')
-  assert.equal(s.incidents.length, 1)
+  assert.equal(guestsAboard(s).length, 0, 'what came off that hull is a boarding party, not a guest')
+  assert.ok(s.boarding, 'and it is standing in the port')
 })
 
 test('nothing comes alongside a docking port nobody is working', () => {

@@ -17,6 +17,24 @@ export const gearBonus = (c: Crew, stat: StatKey): number => {
 }
 
 /** What one crew member's kit is worth when the station has to defend itself. */
+/**
+ * The end of somebody. Their kit goes back in the hold for whoever is next,
+ * they come off whatever post they held, and the station notices. Everything
+ * that kills anyone goes through here, so nothing can half-kill them.
+ */
+export const killCrew = (s: GameState, c: Crew): void => {
+  c.hp = 0
+  c.dead = true
+  c.returnTo = null
+  for (const slot of SLOTS) {
+    const worn = c.gear?.[slot]
+    if (worn) s.stores[worn] = (s.stores[worn] ?? 0) + 1
+  }
+  c.gear = {}
+  unassign(s, c.id)
+  log(s, `${c.name} has died. The station observes a minute of silence.`, 'bad')
+}
+
 export const crewGuard = (c: Crew): number => {
   let n = 0
   for (const slot of SLOTS) {

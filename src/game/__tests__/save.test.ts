@@ -170,3 +170,69 @@ test('two rounds through save and load produce the same station', () => {
   const twice = loadGame()!
   assert.equal(shape(once), shape(twice))
 })
+
+test('a save without portraits gets all crew dealt distinct faces on load', () => {
+  const old = newGame('No Portraits', 707) as unknown as Record<string, unknown>
+  old.version = 12
+  // Strip portraits from crew so they fall back to seed derivation.
+  const crew = old.crew as unknown as Array<{ portrait?: number }>
+  for (const c of crew) delete c.portrait
+  storage.setItem('spaceport99.save', JSON.stringify(old))
+
+  const loaded = loadGame()
+  assert.ok(loaded, 'an old save without portraits loads')
+  const portraits = loaded.crew.map((c) => c.portrait).filter((p) => p !== undefined)
+  assert.equal(portraits.length, loaded.crew.length, 'all crew got a portrait')
+  const unique = new Set(portraits)
+  assert.equal(unique.size, portraits.length, 'all portraits are distinct where the pool allows')
+})
+
+test('a boarding party burning like a fire on an old save is simply gone', () => {
+  const old = newGame('Old Weather', 1001) as unknown as Record<string, unknown>
+  old.version = 14
+  const room = (old.modules as { id: string }[])[1]
+  old.incidents = [
+    { id: 'i1', kind: 'pirates', moduleId: room.id, hp: 40, maxHp: 66, spreadIn: 10, startedAt: 0 },
+    { id: 'i2', kind: 'fire', moduleId: room.id, hp: 20, maxHp: 42, spreadIn: 10, startedAt: 0 },
+  ]
+  delete old.boarding
+  storage.setItem('spaceport99.save', JSON.stringify(old))
+  const loaded = loadGame()!
+  assert.deepEqual(
+    loaded.incidents.map((i) => i.kind),
+    ['fire'],
+    'pirates are not an incident any more, and the fire is still a fire',
+  )
+  assert.equal(loaded.boarding, null)
+})
+
+test('a save from before recruits had a reason for being here reads them as posted', () => {
+  const old = newGame('No Reasons', 909) as unknown as Record<string, unknown>
+  old.version = 13
+  // A candidate as an older build wrote them: no story about how they got here.
+  old.candidates = [
+    {
+      id: 'a_old',
+      name: 'Wren Halloway',
+      seed: 12,
+      stats: { O: 4, R: 4, B: 4, I: 4, T: 4, A: 4, L: 4 },
+      tier: 0.4,
+      interest: 30,
+      askingBonus: 150,
+      patience: 240,
+      promised: null,
+      arrivesIn: 0,
+      faction: 'concern',
+    },
+  ]
+  storage.setItem('spaceport99.save', JSON.stringify(old))
+
+  const loaded = loadGame()
+  assert.ok(loaded, 'the old save loads')
+  assert.equal(loaded.candidates.length, 1, 'the applicant survived the migration')
+  assert.equal(
+    loaded.candidates[0].origin,
+    'posted',
+    'which is what the one line they used to share always said about them',
+  )
+})

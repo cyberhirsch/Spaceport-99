@@ -139,6 +139,7 @@ export const newGame = (name = 'Spaceport-99', seed = newSeed()): GameState => {
     ],
     crew: [],
     incidents: [],
+    boarding: null,
     log: [],
     decks: 1,
     lastTick: Date.now(),

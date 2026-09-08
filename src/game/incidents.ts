@@ -45,18 +45,6 @@ export const INCIDENT_DEFS: Record<IncidentKind, IncidentDef> = {
     onset: 'Decompression in',
     bounty: 30,
   },
-  pirates: {
-    kind: 'pirates',
-    name: 'Boarding Party',
-    glyph: '☠',
-    counter: 'R',
-    hp: 66,
-    crewDps: 1.5,
-    structureDps: 0.008,
-    spreadSeconds: 28,
-    onset: 'Boarders in',
-    bounty: 70,
-  },
   vermin: {
     kind: 'vermin',
     name: 'Void Mites',

@@ -417,3 +417,50 @@ test('a hull never arrives sharing a name with one in the fleet', () => {
   const all = [...s.ships.map((h) => h.name), ...s.visitors.map((v) => v.name)]
   assert.equal(new Set(all).size, all.length, `duplicate hull name: ${all.join(', ')}`)
 })
+
+// ------------------------------------------------- a conversation holds --
+
+/**
+ * A conversation with somebody aboard a hull that has seconds left on the
+ * clamps. Hands back the hull's id too: fresh traffic keeps arriving, so the
+ * question is always whether *this* hull is still there.
+ */
+const aboutToLeave = (): [GameState, string] => {
+  const [alongside, v] = berthed(fresh())
+  const leaving: GameState = { ...alongside, visitors: [{ ...v, timer: 5 }] }
+  return [open(leaving, 'hire', { kind: 'guest', id: v.aboard[0].id }), v.id]
+}
+
+const stillThere = (s: GameState, id: string): Visitor | undefined =>
+  s.visitors.find((v) => v.id === id)
+
+test('a hull does not undock in the middle of a conversation', () => {
+  const [talking, hull] = aboutToLeave()
+  assert.ok(talking.talk, 'the conversation opened')
+
+  const held = advance(talking, 60)
+  assert.ok(stillThere(held, hull), 'they were still being spoken to')
+  assert.equal(stillThere(held, hull)?.timer, 5, 'their clock did not move either')
+})
+
+test('a conversation holds the whole station, not just the clamps', () => {
+  const [talking] = aboutToLeave()
+  const held = advance(talking, 60)
+  assert.equal(held.elapsed, talking.elapsed, 'no time passed')
+  assert.deepEqual(held.resources, talking.resources, 'nothing was drawn down')
+})
+
+test('closing the conversation lets the clock run again', () => {
+  const [talking, hull] = aboutToLeave()
+  const closed = reducer(talking, { type: 'endTalk' })
+  assert.equal(closed.talk, null)
+  assert.equal(stillThere(advance(closed, 60), hull), undefined, 'now they go')
+})
+
+test('a conversation left open is not a pause button for time away', () => {
+  const [talking, hull] = aboutToLeave()
+  // Catching up on an absence is exempt: a conversation left open overnight
+  // would otherwise stop the game for as long as the player liked.
+  const away = reducer(talking, { type: 'catchUp', seconds: 600 })
+  assert.equal(stillThere(away, hull), undefined, 'the hull left while nobody was watching')
+})

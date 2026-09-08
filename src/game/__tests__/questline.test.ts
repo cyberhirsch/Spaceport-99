@@ -11,7 +11,8 @@ import {
   seeded,
 } from '../engine.ts'
 import { makeCrew } from '../crew.ts'
-import { LOST, ENOUGH_TO_KNOW, SIEGE_AT, WATCHED_AT, knowsEnough, openBearings } from '../quest.ts'
+import { LOST, ENOUGH_TO_KNOW, SIEGE_AT, WATCHED_AT, blankQuest, knowsEnough, openBearings } from '../quest.ts'
+import { bearingPrerequisites } from '../missions.ts'
 import { makeMission, makeShip } from '../fleet.ts'
 import { makeVisitor } from '../visitors.ts'
 import { labels, line, say } from './talkHelp.ts'
@@ -102,21 +103,64 @@ test('what happened to the last commander is only askable once you have been the
   assert.match(line(answer), /requisition is still open/)
 })
 
-test('a bearing is an ordinary far contract with a hull name on it', () => {
-  // No reach, no bearings: you cannot check what you cannot get to.
-  const near: GameState = { ...big(), quest: { ...big().quest, stage: 'letter' as const } }
-  assert.equal(questBearing(near), undefined)
+/** A station that can put a mission on the board and fly it: command staffed, hangar with its shuttle. */
+const flyable = (over: Partial<GameState> = {}): GameState => {
+  let s = place(place(big(over), 'command'), 'hangar')
+  const command = s.modules.find((m) => m.kind === 'command')!
+  s = reducer(s, { type: 'assign', crewId: s.crew[0].id, moduleId: command.id })
+  return s
+}
 
-  // With Deep Space Ops running, the first unchecked name comes up.
-  let far = place(big({ specs: { astro: 1 } }), 'dso')
+/** Everything `questBearing` might say across forty draws. */
+const offeredBy = (s: GameState): Set<string | undefined> => {
+  const seen = new Set<string | undefined>()
+  for (let i = 0; i < 40; i += 1) seen.add(questBearing({ ...s, rng: s.rng + i }))
+  return seen
+}
+
+test('the first two names are missions any hull can fly, with no Deep Space Ops', () => {
+  const near = flyable({ quest: { ...blankQuest(), stage: 'letter' as const } })
+  assert.ok(!near.modules.some((m) => m.kind === 'dso'), 'nothing reaches past the envelope')
+  assert.ok(offeredBy(near).has(LOST[0].name), 'the first name comes up regardless')
+  assert.equal(LOST[0].far, false)
+  assert.equal(LOST[1].far, false, 'and so does the one that finds the shuttle')
+
+  // Once the first is checked, the second follows on the same station.
+  const second = { ...near, quest: { ...near.quest, stage: 'checking' as const, checked: [LOST[0].name] } }
+  assert.ok(offeredBy(second).has(LOST[1].name))
+})
+
+test('the third name and beyond are past the envelope and wait for Deep Space Ops', () => {
+  const two = [LOST[0].name, LOST[1].name]
+  const stuck = flyable({ quest: { ...blankQuest(), stage: 'checking' as const, checked: two } })
+  assert.ok(LOST[2].far)
+  assert.equal(offeredBy(stuck).size, 1, 'nothing at all comes up')
+  assert.ok(offeredBy(stuck).has(undefined))
+
+  // With Deep Space Ops running, the next name comes up.
+  let far = place(flyable({ specs: { astro: 1 }, quest: stuck.quest }), 'dso')
   const dso = far.modules.find((m) => m.kind === 'dso')!
-  for (const c of far.crew.slice(0, 2)) {
+  for (const c of far.crew.slice(1, 3)) {
     far = reducer(far, { type: 'assign', crewId: c.id, moduleId: dso.id })
   }
-  far = { ...far, quest: { ...far.quest, stage: 'letter' as const } }
-  const offered = new Set<string | undefined>()
-  for (let i = 0; i < 40; i += 1) offered.add(questBearing({ ...far, rng: far.rng + i }))
-  assert.ok(offered.has(LOST[0].name), 'the first unchecked name gets offered')
+  assert.ok(offeredBy(far).has(LOST[2].name), 'the third name is on offer once you can reach it')
+})
+
+test('the file says what stands between you and the next name', () => {
+  const bare = { ...big(), quest: { ...blankQuest(), stage: 'letter' as const } }
+  const before = bearingPrerequisites(bare)
+  assert.ok(before.length >= 4 && before.every((p) => !p.done), 'nothing is in place yet')
+  assert.ok(!before.some((p) => /Deep Space/.test(p.text)), 'and a near name does not ask for reach')
+
+  const ready = flyable({ quest: bare.quest })
+  assert.ok(bearingPrerequisites(ready).every((p) => p.done), 'a flyable station has cleared them all')
+
+  const third = { ...ready, quest: { ...ready.quest, checked: [LOST[0].name, LOST[1].name] } }
+  const far = bearingPrerequisites(third)
+  assert.ok(far.some((p) => /Deep Space/.test(p.text) && !p.done), 'a far name asks for it')
+
+  const done = { ...ready, quest: { ...ready.quest, checked: LOST.map((h) => h.name) } }
+  assert.deepEqual(bearingPrerequisites(done), [], 'nothing left to check, nothing to ask for')
 })
 
 test('never two bearings on the board at once', () => {

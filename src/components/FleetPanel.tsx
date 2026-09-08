@@ -20,13 +20,29 @@ import {
   tradeInValue,
 } from '../game/fleet.ts'
 import { factionDef } from '../game/factions.ts'
-import { STAT_INFO, type GameState, type Ship, type ShipClass } from '../game/types.ts'
+import {
+  STAT_INFO,
+  type GameState,
+  type Mission,
+  type MissionFind,
+  type Ship,
+  type ShipClass,
+} from '../game/types.ts'
 import { EditableName } from './EditableName.tsx'
 import { hpStyle } from './meters.ts'
+
+/** What a team can bring home that is not money, and how much it is worth saying. */
+const FIND_INFO: Record<MissionFind['kind'], { glyph: string; label: string }> = {
+  spec: { glyph: '❑', label: 'A drawing nobody else has' },
+  ship: { glyph: '⬢', label: 'A hull' },
+  cache: { glyph: '◈', label: 'A cache' },
+  survivor: { glyph: '☺', label: 'Somebody alive' },
+}
 
 interface Props {
   state: GameState
   onOpenMission: (id: string) => void
+  onReadReport: (id: string) => void
   onDecline: (id: string) => void
   onRecall: (id: string) => void
   onAnswer: (id: string, choice: number) => void
@@ -140,9 +156,74 @@ const Guard = ({ state }: { state: GameState }) => {
   )
 }
 
+/**
+ * What has come home and not been read, and what has been read and not filed.
+ *
+ * Its own component because it renders above the launch prerequisites as well
+ * as below them: a station that scrapped its Command Module while a team was
+ * out still has a dispatch to open, and the bar is asking about it.
+ */
+const Dispatches = ({
+  state,
+  reports,
+  onReadReport,
+  onFileReport,
+}: {
+  state: GameState
+  reports: Mission[]
+  onReadReport: (id: string) => void
+  onFileReport: (id: string) => void
+}) => (
+  <>
+    {reports.map((m) => {
+      // Sealed. The outcome is not on screen until somebody opens it, which
+      // is the whole point: finding out is the reward, and it cannot be had
+      // twice.
+      if (!m.read) {
+        const ship = state.ships.find((x) => x.id === m.shipId)
+        return (
+          <div key={m.id} className="report report--sealed">
+            <strong>Home</strong>
+            <span>{m.name}</span>
+            <span className="report__body">
+              {ship ? `The ${ship.name} is back on the clamps.` : 'The team is back.'} Nobody has
+              opened the dispatch.
+            </span>
+            <button className="btn btn--primary" onClick={() => onReadReport(m.id)}>
+              Open it
+            </button>
+          </div>
+        )
+      }
+      const info = OUTCOME_INFO[m.outcome!]
+      // An exceptional run is not a good run. It should not look like one.
+      const tone = m.outcome === 'triumph' ? 'triumph' : info.tone
+      return (
+        <div key={m.id} className={`report report--${tone}`}>
+          <strong>{info.label}</strong>
+          <span>{m.name}</span>
+          <span className="report__body">{m.report}</span>
+          {m.find && (
+            <span className={`find find--${m.find.kind}`}>
+              <b>
+                {FIND_INFO[m.find.kind].glyph} {FIND_INFO[m.find.kind].label}
+              </b>
+              {m.find.detail}
+            </span>
+          )}
+          <button className="btn btn--tiny" onClick={() => onFileReport(m.id)}>
+            File it
+          </button>
+        </div>
+      )
+    })}
+  </>
+)
+
 export const FleetPanel = ({
   state,
   onOpenMission,
+  onReadReport,
   onDecline,
   onRecall,
   onAnswer,
@@ -179,6 +260,12 @@ export const FleetPanel = ({
     return (
       <div className="panel-body">
         <Guard state={state} />
+        <Dispatches
+          state={state}
+          reports={reports}
+          onReadReport={onReadReport}
+          onFileReport={onFileReport}
+        />
         <p className="panel-note">Before anything can launch:</p>
         <ul className="checklist">
           {steps.map((step) => (
@@ -218,21 +305,12 @@ export const FleetPanel = ({
     <div className="panel-body">
       <Guard state={state} />
 
-      {reports.map((m) => (
-        <div key={m.id} className={`report report--${OUTCOME_INFO[m.outcome!].tone}`}>
-          <strong>{OUTCOME_INFO[m.outcome!].label}</strong>
-          <span>{m.name}</span>
-          <span className="report__body">{m.report}</span>
-          {m.find && (
-            <span className={`report__find${m.find.kind === 'spec' ? ' report__find--spec' : ''}`}>
-              {m.find.kind === 'spec' ? '❑' : '◈'} {m.find.detail}
-            </span>
-          )}
-          <button className="btn btn--tiny" onClick={() => onFileReport(m.id)}>
-            File it
-          </button>
-        </div>
-      ))}
+      <Dispatches
+        state={state}
+        reports={reports}
+        onReadReport={onReadReport}
+        onFileReport={onFileReport}
+      />
 
       {flying.length > 0 && (
         <>

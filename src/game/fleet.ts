@@ -248,6 +248,7 @@ export const makeMission = (rng: Rng, standing: number, opts: MissionOpts = {}):
     bearing: opts.bearing,
     outcome: null,
     report: null,
+    read: false,
     find: null,
   }
 }

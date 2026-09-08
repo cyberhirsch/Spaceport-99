@@ -226,6 +226,8 @@ export const resolveMission = (s: GameState, m: Mission): void => {
   if (lostShip) bits.push('The ship did not come back.')
   if (lostCrew > 0) bits.push(`${lostCrew} did not come home.`)
   m.report = bits.join(' ')
+  // Sealed. Somebody has to open it.
+  m.read = false
   for (const c of team) awardXpTo(s, c.id, outcome === 'disaster' ? 10 : 25 + m.danger * 30)
   log(s, `${m.name}: ${OUTCOME_INFO[outcome].label.toLowerCase()}.`, OUTCOME_INFO[outcome].tone)
 }

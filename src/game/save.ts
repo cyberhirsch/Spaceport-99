@@ -98,6 +98,17 @@ const STEPS: { from: number; up: (raw: Record<string, unknown>) => void }[] = [
       if (s.boarding && !s.boarding.responders) s.boarding.responders = []
     },
   },
+  // 16 → 17: a report that comes back is sealed until it is opened. Anything
+  // already on an older station's board has been on screen in full for as long
+  // as it has been there, so it counts as read: sealing it again would be
+  // offering somebody a surprise they have already had.
+  {
+    from: 16,
+    up: (raw) => {
+      const s = raw as unknown as GameState
+      for (const m of s.missions) if (m.read === undefined) m.read = true
+    },
+  },
 ]
 
 export const migrate = (raw: GameState): GameState | null => {

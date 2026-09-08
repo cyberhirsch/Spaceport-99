@@ -92,8 +92,8 @@ export const alertsFor = (state: GameState, derived: Derived): string[] => {
         : `${waiting.length} visitors aboard want a word`
     })(),
     (() => {
-      const filed = state.missions.filter((m) => m.status === 'report').length
-      return filed > 0 && `${filed} mission report${filed === 1 ? '' : 's'} to read`
+      const sealed = state.missions.filter((m) => m.status === 'report' && !m.read).length
+      return sealed > 0 && `${sealed} dispatch${sealed === 1 ? '' : 'es'} nobody has opened`
     })(),
     state.modules.some((m) => m.kind === 'command') &&
       !state.modules.some((m) => m.kind === 'command' && m.staff.length > 0) &&

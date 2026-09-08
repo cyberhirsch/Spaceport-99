@@ -221,6 +221,7 @@ export default function App() {
             setMoving(null)
           }}
           onSelectModule={openModule}
+          onRush={(id) => act({ type: 'rush', moduleId: id })}
           onSelectCrew={(id) => setCrewId(id)}
           onSelectVisitor={(id) => setVisitorId(id)}
           onSelectGuest={(id) => setGuestId(id)}
@@ -278,6 +279,7 @@ export default function App() {
             <FleetPanel
               state={state}
               onOpenMission={(id) => setMissionId(id)}
+              onReadReport={(id) => act({ type: 'readReport', missionId: id })}
               onDecline={(id) => act({ type: 'declineMission', missionId: id })}
               onRecall={(id) => act({ type: 'recall', missionId: id })}
               onAnswer={(id, choice) => act({ type: 'answerCall', missionId: id, choice })}

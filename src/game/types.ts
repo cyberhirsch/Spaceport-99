@@ -626,6 +626,12 @@ export interface Mission {
   /** Written when the mission resolves, read in the after-action report. */
   report: string | null
   find: MissionFind | null
+  /**
+   * Whether anybody has actually read what came back. A team lands and the
+   * report stays sealed until the commander opens it — the moment of finding
+   * out is worth having, and it is lost if the answer is already on screen.
+   */
+  read: boolean
 }
 
 export interface Resources {

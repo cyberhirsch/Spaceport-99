@@ -87,6 +87,7 @@ export type Action =
   | { type: 'turnAway'; candidateId: string }
   | { type: 'launch'; missionId: string; shipId: string; crewIds: string[] }
   | { type: 'declineMission'; missionId: string }
+  | { type: 'readReport'; missionId: string }
   | { type: 'fileReport'; missionId: string }
   | { type: 'buyShip'; cls: ShipClass }
   | { type: 'refitShip'; shipId: string }
@@ -245,6 +246,9 @@ export const reducer = (state: GameState, action: Action): GameState => {
         m.rushRisk = 0.15
         m.progress = 0
         const r = roll(s)
+        // The sting has to read as the gamble's, or it looks like bad luck
+        // that happened to arrive at the same moment.
+        log(s, `${md.name} was pushed too hard.`, 'bad')
         startIncident(s, r < 0.55 ? 'fire' : r < 0.85 ? 'breach' : 'vermin', m)
       } else {
         m.rushRisk = Math.min(0.75, m.rushRisk + 0.13)
@@ -348,6 +352,12 @@ export const reducer = (state: GameState, action: Action): GameState => {
         shift(s, m.standing[0], -Math.abs(m.standing[1]))
         log(s, `${m.name} declined. ${factionDef(m.standing[0]).name} was told.`, 'warn')
       }
+      break
+    }
+    case 'readReport': {
+      const m = s.missions.find((x) => x.id === action.missionId)
+      if (!m || m.status !== 'report') return state
+      m.read = true
       break
     }
     case 'fileReport': {
